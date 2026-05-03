@@ -211,6 +211,9 @@ String _scopeSubtitle(Set<String> scopes) {
   if (scopes.contains('email')) {
     permissions.add('邮箱');
   }
+  if (scopes.contains('accountRule')) {
+    permissions.add('账户角色');
+  }
   if (permissions.isEmpty) {
     return '该应用将使用 ROSM 验证您的登录状态。';
   }

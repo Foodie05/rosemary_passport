@@ -59,7 +59,7 @@ class OidcService {
       'token_endpoint_auth_methods_supported': ['client_secret_post', 'none'],
       'code_challenge_methods_supported': ['S256'],
       'grant_types_supported': ['authorization_code', 'refresh_token'],
-      'scopes_supported': ['openid', 'profile', 'email'],
+      'scopes_supported': ['openid', 'profile', 'email', 'accountRule'],
       'revocation_endpoint': '${_config.serverBaseUrl}/oidc/revoke',
       'introspection_endpoint': '${_config.serverBaseUrl}/oidc/introspect',
     };
@@ -239,6 +239,7 @@ class OidcService {
       if (scopes.contains('email')) 'email_verified': user.isEmailVerified,
       if (scopes.contains('profile')) 'name': user.nickname,
       if (scopes.contains('profile')) 'nickname': user.nickname,
+      if (scopes.contains('accountRule')) 'roles': user.roles,
     };
   }
 

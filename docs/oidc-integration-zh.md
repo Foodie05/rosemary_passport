@@ -60,6 +60,7 @@
 - 校验 `redirect_uri`
 - 校验客户端允许的 `scope`
 - 校验客户端允许的 `grant_type`
+- 当 `scope` 包含 `openid` 时，要求请求携带非空 `nonce`
 - 默认支持 `authorization_code`
 - 支持 PKCE `S256`
 - 授权码一次性消费
@@ -97,12 +98,12 @@
 
 - `Authorization: Bearer <access_token>`
 
-当前返回字段：
+当前返回字段（按 scope 决定）：
 
 - `sub`
-- `email`
-- `nickname`
-- `roles`
+- `email`（需要 `email` scope）
+- `nickname`（需要 `profile` scope）
+- `roles`（需要 `accountRule` scope）
 
 对应实现：
 
@@ -314,6 +315,7 @@ JWT 中 `iss` 来自：
   - `openid`
   - `profile`
   - `email`
+  - `accountRule`（如需让应用识别账号角色：admin/user）
 - `grant_types`
   - `authorization_code`
   - `refresh_token`
@@ -341,6 +343,7 @@ curl https://your-passport.example.com/.well-known/openid-configuration
 - `jwks_uri`
 - `revocation_endpoint`
 - `introspection_endpoint`
+- `scopes_supported`（当前为 `openid`、`profile`、`email`、`accountRule`）
 
 ### 5.3 发起授权请求
 
@@ -440,6 +443,10 @@ curl https://your-passport.example.com/oidc/userinfo \
 }
 ```
 
+说明：
+
+- `roles` 仅在申请了 `accountRule` scope 时返回。
+
 ### 5.6 刷新令牌
 
 请求示例：
@@ -477,7 +484,7 @@ curl -X POST https://your-passport.example.com/oidc/introspect \
 {
   "active": true,
   "sub": "user-id",
-  "scope": "openid profile email",
+  "scope": "openid profile email accountRule",
   "token_type": "access_token"
 }
 ```

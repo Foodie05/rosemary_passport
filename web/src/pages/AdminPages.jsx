@@ -64,6 +64,20 @@ const SECURITY_GROUPS = [
 ];
 
 const SECURITY_FIELD_MAP = Object.fromEntries(SECURITY_FIELDS);
+const OIDC_SCOPE_OPTIONS = [
+  { value: 'openid', label: 'openid', description: '启用 OIDC 身份识别基础能力（含 nonce 要求）。' },
+  { value: 'profile', label: 'profile', description: '允许应用读取昵称等基础资料。' },
+  { value: 'email', label: 'email', description: '允许应用读取邮箱与邮箱验证状态。' },
+  { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
+];
+
+function parseUniqueLines(value) {
+  return `${value || ''}`
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
+}
 
 function SectionHeader({ title, description, actions }) {
   return (
@@ -761,6 +775,16 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
     setEditorOpen(true);
   }
 
+  const selectedScopes = parseUniqueLines(oidcForm.scopes);
+  const scopeSet = new Set(selectedScopes);
+
+  function toggleScope(scope, checked) {
+    const nextScopes = checked
+      ? (scopeSet.has(scope) ? selectedScopes : [...selectedScopes, scope])
+      : selectedScopes.filter((item) => item !== scope);
+    setOidcForm((current) => ({ ...current, scopes: nextScopes.join('\n') }));
+  }
+
   return (
     <SettingsShell
       icon={Key}
@@ -892,7 +916,22 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               <textarea rows="5" className="input-field" value={oidcForm.redirect_uris} onChange={(event) => setOidcForm((current) => ({ ...current, redirect_uris: event.target.value }))} />
             </ConfigField>
             <ConfigField label="Scopes">
-              <textarea rows="5" className="input-field" value={oidcForm.scopes} onChange={(event) => setOidcForm((current) => ({ ...current, scopes: event.target.value }))} />
+              <div className="space-y-3 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+                {OIDC_SCOPE_OPTIONS.map((scope) => (
+                  <label key={scope.value} className="flex items-start gap-3 rounded-xl bg-white px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
+                      checked={scopeSet.has(scope.value)}
+                      onChange={(event) => toggleScope(scope.value, event.target.checked)}
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-sage-800">{scope.label}</span>
+                      <span className="block text-xs leading-5 text-sage-500">{scope.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </ConfigField>
             <ConfigField label="Grant Types">
               <textarea rows="4" className="input-field md:col-span-2" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
@@ -970,6 +1009,7 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     '- `Client ID`：应用唯一标识，例如 `my-web-app`',
     '- `Redirect URI`：必须精确登记回调地址，不能只配域名',
     '- `Scopes`：建议至少包含 `openid`，如需邮箱和昵称则补 `email`、`profile`',
+    '- 可用 Scopes：`openid`、`profile`、`email`、`accountRule`',
     '- `Nonce`：当 `scope` 包含 `openid` 时必须传 `nonce`，否则授权请求会被拒绝（400）',
     '- `Grant Types`：常规 Web 应用建议开启授权码与刷新令牌',
     '- `Confidential`：服务端应用建议开启；纯前端公共客户端才考虑关闭',
@@ -1011,6 +1051,7 @@ Authorization: Bearer ACCESS_TOKEN`,
     '',
     '- 始终启用 PKCE，且使用 `S256`。',
     '- 当 `scope` 包含 `openid` 时务必携带 `nonce`，避免授权端点直接拒绝请求。',
+    '- 若申请 `accountRule`，应用可从 UserInfo 读取账户角色（如 admin/user）。',
     '- 机密客户端只把 `client_secret` 放在服务端，前端不要持有。',
     '- 回调地址要精确登记到完整路径，避免使用宽泛匹配。',
     '- 把 `state` 当成必填项，防止回调串改。',
@@ -1103,6 +1144,7 @@ Authorization: Bearer ACCESS_TOKEN`,
             <p><InlineCode>Client ID</InlineCode>：应用唯一标识，例如 <InlineCode>my-web-app</InlineCode></p>
             <p><InlineCode>Redirect URI</InlineCode>：必须精确登记回调地址，不能只配域名</p>
             <p><InlineCode>Scopes</InlineCode>：建议至少包含 <InlineCode>openid</InlineCode>，如需邮箱和昵称则补 <InlineCode>email</InlineCode>、<InlineCode>profile</InlineCode></p>
+            <p><InlineCode>可用 Scopes</InlineCode>：<InlineCode>openid</InlineCode>、<InlineCode>profile</InlineCode>、<InlineCode>email</InlineCode>、<InlineCode>accountRule</InlineCode></p>
             <p><InlineCode>Nonce</InlineCode>：当 scope 包含 <InlineCode>openid</InlineCode> 时必须传，否则授权端点会拒绝请求（400）</p>
             <p><InlineCode>Grant Types</InlineCode>：常规 Web 应用建议开启授权码与刷新令牌</p>
             <p><InlineCode>Confidential</InlineCode>：服务端应用建议开启；纯前端公共客户端才考虑关闭</p>
@@ -1147,6 +1189,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
           <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
             <p>始终启用 PKCE，且使用 <InlineCode>S256</InlineCode>。</p>
             <p>当 <InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时务必携带 <InlineCode>nonce</InlineCode>，否则授权端点会拒绝请求。</p>
+            <p>如果应用需要识别账号角色（例如 <InlineCode>admin</InlineCode>/<InlineCode>user</InlineCode>），请申请 <InlineCode>accountRule</InlineCode> scope。</p>
             <p>机密客户端只把 <InlineCode>client_secret</InlineCode> 放在服务端，前端不要持有。</p>
             <p>回调地址要精确登记到完整路径，避免使用宽泛匹配。</p>
             <p>把 <InlineCode>state</InlineCode> 当成必填项，防止回调串改。</p>
