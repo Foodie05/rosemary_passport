@@ -158,29 +158,27 @@
 - [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/security/token_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/security/token_service.dart)
 - [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart)
 
-### 3.2 `/oidc/authorize` 没有显式校验 `response_type=code`
+### 3.2 `/oidc/authorize` 已显式校验 `response_type=code`
 
 Discovery 声明：
 
 - `response_types_supported = ["code"]`
 
-但授权端点当前没有显式要求请求里必须传：
+授权端点当前会显式校验请求里必须满足：
 
 - `response_type=code`
 
-这会导致：
+若不满足会直接返回 `400 access_denied`，避免错误客户端“误通过”。
 
-- 协议约束不够严
-- 某些客户端配置错误时，服务端不会按标准方式明确拒绝
-
-### 3.3 没有 `nonce` 处理
+### 3.3 `nonce` 行为（当前实现）
 
 标准 OIDC 中，尤其在需要 `id_token` 的流程里，`nonce` 很关键。当前实现：
 
-- 没有接收和存储 `nonce`
-- 也没有在任何令牌中回传 `nonce`
+- 已接收 `nonce`，并在授权码记录中存储 `nonce`
+- 当请求 `scope` 包含 `openid` 时，必须携带非空 `nonce`，否则 `/oidc/authorize` 会直接 `400 access_denied`
+- 但当前 `token` 响应仍不返回 `id_token`，因此还没有 `id_token` 中的 `nonce` 回传链路
 
-在没有 `id_token` 的前提下，这一点目前不是唯一阻塞，但如果以后要补标准 OIDC，这一块必须一起补。
+所以接入方现在必须遵守：`scope` 含 `openid` 必传 `nonce`；同时如果未来补齐标准 OIDC，仍需配合 `id_token` 完整验证流程。
 
 ### 3.4 `token / introspect / revoke` 只接受 JSON，不接受标准表单编码
 
@@ -349,17 +347,19 @@ curl https://your-passport.example.com/.well-known/openid-configuration
 当前服务使用：
 
 - 已登录用户态访问 `GET /oidc/authorize`
-- 未登录会返回 `401`
+- 未登录会 `302` 跳转到登录页（`/login?next=...`）
 - 不会自动拉起单独的 Hosted Login UI
 
 示例：
 
 ```text
 GET /oidc/authorize
+  ?response_type=code
   ?client_id=my-client
   &redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback
   &scope=openid%20profile%20email
   &state=abc123
+  &nonce=nonce-abc123
   &code_challenge=BASE64URL_SHA256
   &code_challenge_method=S256
 ```
@@ -372,8 +372,8 @@ https://app.example.com/callback?code=xxx&state=abc123
 
 说明：
 
-- 当前实现没有显式校验 `response_type=code`
-- 但接入方仍应始终传 `response_type=code`
+- 当前实现会显式校验 `response_type=code`
+- 当 `scope` 包含 `openid` 时，`nonce` 为必填
 
 建议完整请求参数：
 
@@ -382,6 +382,7 @@ https://app.example.com/callback?code=xxx&state=abc123
 - `redirect_uri`
 - `scope`
 - `state`
+- `nonce`（当 `scope` 包含 `openid` 时必填）
 - `code_challenge`
 - `code_challenge_method=S256`
 
@@ -553,7 +554,7 @@ curl -X POST https://your-passport.example.com/oidc/revoke \
 按优先级从高到低：
 
 1. 补 `id_token`，并在 `authorization_code` 流程中返回
-2. 增加 `nonce` 支持
+2. 在补齐 `id_token` 后，完善 `nonce` 的标准回传与校验链路
 3. 将 `token / introspect / revoke` 改为兼容 `application/x-www-form-urlencoded`
 4. 支持 `client_secret_basic`
 5. 统一 `issuer` 与 JWT `iss`

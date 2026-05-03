@@ -928,10 +928,137 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
   const revocationEndpoint = oidcSettings?.revocation_endpoint || discovery?.revocation_endpoint || '';
   const accessTokenTtl = oidcSettings?.access_token_ttl_seconds || '';
   const refreshTokenTtl = oidcSettings?.refresh_token_ttl_seconds || '';
+  const [copying, setCopying] = useState(false);
+
+  const docsMarkdown = [
+    '# OIDC 接入文档',
+    '',
+    '面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。',
+    '',
+    '## 当前生效参数',
+    '',
+    '以下内容来自当前后台已鉴权读取到的运行配置，可直接提供给接入方使用。',
+    '',
+    `- Issuer：${issuer}`,
+    `- 授权端点：${authorizationEndpoint}`,
+    `- Token 端点：${tokenEndpoint}`,
+    `- UserInfo 端点：${userinfoEndpoint}`,
+    `- JWKS：${jwksUri}`,
+    `- Introspect：${introspectionEndpoint}`,
+    `- Revoke：${revocationEndpoint}`,
+    `- PKCE 要求：${oidcSettings?.pkce_required ? '必须使用 S256' : '当前未强制'}`,
+    `- Access Token TTL：${accessTokenTtl ? `${accessTokenTtl} 秒` : ''}`,
+    `- Refresh Token TTL：${refreshTokenTtl ? `${refreshTokenTtl} 秒` : ''}`,
+    `- JWT Issuer：${oidcSettings?.jwt_issuer || ''}`,
+    `- JWT Audience：${oidcSettings?.jwt_audience || ''}`,
+    '',
+    '## 1. 什么是 OIDC',
+    '',
+    'OIDC 是建立在 OAuth 2.0 之上的身份层协议。OAuth 2.0 解决“授权访问资源”，OIDC 进一步解决“确认用户是谁”。典型流程是应用把用户带到身份提供方登录，身份提供方确认身份后返回授权码，应用再用授权码换取令牌并读取用户资料。',
+    '',
+    '在接入实践里，最常见的是授权码模式配合 PKCE。这样前端负责引导用户跳转和回调，后端负责用授权码换令牌、验证令牌并建立本地会话。',
+    '',
+    '## 2. 当前服务支持范围',
+    '',
+    '- 已支持：Discovery、authorization_code、refresh_token、userinfo、jwks、introspect、revoke、PKCE S256、RS256',
+    '- 当前差异：token 端点返回 access_token / refresh_token，但当前不返回标准 id_token；token/introspect/revoke 目前使用 JSON body。',
+    '',
+    '## 3. 典型客户端配置',
+    '',
+    '推荐优先使用机密客户端，后端持有 `client_secret`，前端不要直接暴露。默认 scope 建议使用 `openid profile email`，grant type 建议启用 `authorization_code` 和 `refresh_token`。',
+    '',
+    '- `Client ID`：应用唯一标识，例如 `my-web-app`',
+    '- `Redirect URI`：必须精确登记回调地址，不能只配域名',
+    '- `Scopes`：建议至少包含 `openid`，如需邮箱和昵称则补 `email`、`profile`',
+    '- `Nonce`：当 `scope` 包含 `openid` 时必须传 `nonce`，否则授权请求会被拒绝（400）',
+    '- `Grant Types`：常规 Web 应用建议开启授权码与刷新令牌',
+    '- `Confidential`：服务端应用建议开启；纯前端公共客户端才考虑关闭',
+    '',
+    '## 4. 接入步骤',
+    '',
+    '步骤一：读取 Discovery',
+    '```',
+    `GET ${issuer}/.well-known/openid-configuration`,
+    '```',
+    '',
+    '步骤二：浏览器跳转到授权端点',
+    '```',
+    `${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`,
+    '```',
+    '',
+    '步骤三：后端交换令牌',
+    '```',
+    `POST ${tokenEndpoint}
+Content-Type: application/json
+
+{
+  "grant_type": "authorization_code",
+  "code": "AUTH_CODE",
+  "client_id": "my-web-app",
+  "client_secret": "YOUR_CLIENT_SECRET",
+  "redirect_uri": "https://app.example.com/callback",
+  "code_verifier": "ORIGINAL_CODE_VERIFIER"
+}`,
+    '```',
+    '',
+    '步骤四：读取用户信息',
+    '```',
+    `GET ${userinfoEndpoint}
+Authorization: Bearer ACCESS_TOKEN`,
+    '```',
+    '',
+    '## 5. 最佳实践',
+    '',
+    '- 始终启用 PKCE，且使用 `S256`。',
+    '- 当 `scope` 包含 `openid` 时务必携带 `nonce`，避免授权端点直接拒绝请求。',
+    '- 机密客户端只把 `client_secret` 放在服务端，前端不要持有。',
+    '- 回调地址要精确登记到完整路径，避免使用宽泛匹配。',
+    '- 把 `state` 当成必填项，防止回调串改。',
+    '- 生产环境固定使用 HTTPS，并确认 `issuer`、JWKS 与回调域名都对外可访问。',
+    '- 应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。',
+    '- 如果要对接严格标准 OIDC SDK，请留意本实现当前还未返回 `id_token`。',
+    '',
+    '## 6. 管理员检查清单',
+    '',
+    '- 确认上方展示的 `Issuer` 与实际公网域名一致。',
+    '- 确认 `JWT Issuer` 与 `Issuer` 保持一致，避免第三方校验失败。',
+    '- 确认客户端登记的 `Redirect URI` 没有拼写错误。',
+    '- 确认接入方知道当前 `token` 端点使用 JSON body。',
+    '- 确认接入方已按当前 TTL 设计自己的会话续期逻辑。',
+    '',
+  ].join('\n');
+
+  async function copyDocsAsMarkdown() {
+    if (copying) return;
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(docsMarkdown);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = docsMarkdown;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } finally {
+      setCopying(false);
+    }
+  }
 
   return (
     <div className="max-w-5xl space-y-8">
-      <SectionHeader title="OIDC 接入文档" description="面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。" />
+      <SectionHeader
+        title="OIDC 接入文档"
+        description="面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。"
+        actions={(
+          <button type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
+            {copying ? '复制中...' : '复制为 MD'}
+          </button>
+        )}
+      />
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
@@ -976,6 +1103,7 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
             <p><InlineCode>Client ID</InlineCode>：应用唯一标识，例如 <InlineCode>my-web-app</InlineCode></p>
             <p><InlineCode>Redirect URI</InlineCode>：必须精确登记回调地址，不能只配域名</p>
             <p><InlineCode>Scopes</InlineCode>：建议至少包含 <InlineCode>openid</InlineCode>，如需邮箱和昵称则补 <InlineCode>email</InlineCode>、<InlineCode>profile</InlineCode></p>
+            <p><InlineCode>Nonce</InlineCode>：当 scope 包含 <InlineCode>openid</InlineCode> 时必须传，否则授权端点会拒绝请求（400）</p>
             <p><InlineCode>Grant Types</InlineCode>：常规 Web 应用建议开启授权码与刷新令牌</p>
             <p><InlineCode>Confidential</InlineCode>：服务端应用建议开启；纯前端公共客户端才考虑关闭</p>
           </div>
@@ -990,7 +1118,7 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
             </div>
             <div>
               <p className="font-bold text-sage-800">步骤二：浏览器跳转到授权端点</p>
-              <CodeBlock>{`${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email&state=random_state&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`}</CodeBlock>
+              <CodeBlock>{`${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`}</CodeBlock>
             </div>
             <div>
               <p className="font-bold text-sage-800">步骤三：后端交换令牌</p>
@@ -1018,6 +1146,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
           <h3 className="text-lg font-bold text-sage-900">5. 最佳实践</h3>
           <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
             <p>始终启用 PKCE，且使用 <InlineCode>S256</InlineCode>。</p>
+            <p>当 <InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时务必携带 <InlineCode>nonce</InlineCode>，否则授权端点会拒绝请求。</p>
             <p>机密客户端只把 <InlineCode>client_secret</InlineCode> 放在服务端，前端不要持有。</p>
             <p>回调地址要精确登记到完整路径，避免使用宽泛匹配。</p>
             <p>把 <InlineCode>state</InlineCode> 当成必填项，防止回调串改。</p>
