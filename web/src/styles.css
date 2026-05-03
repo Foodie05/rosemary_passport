@@ -1,0 +1,249 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sage-50: #f4f7f4;
+  --color-sage-100: #e2e9e2;
+  --color-sage-200: #c5d3c5;
+  --color-sage-300: #a8bda8;
+  --color-sage-400: #8ba88b;
+  --color-sage-500: #6e926e;
+  --color-sage-600: #577557;
+  --color-sage-700: #415841;
+  --color-sage-800: #2b3b2b;
+  --color-sage-900: #161d16;
+
+  --color-rosemary-50: #f0f4ff;
+  --color-rosemary-100: #e1e9ff;
+  --color-rosemary-500: #7c9aff;
+
+  --font-sans: "Inter", "Avenir Next", "PingFang SC", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --app-bg: #f4f7f4;
+  --app-text: #161d16;
+  --app-text-muted: #6e926e;
+  --app-surface: rgba(255, 255, 255, 0.72);
+  --app-surface-solid: #ffffff;
+  --app-surface-soft: rgba(255, 255, 255, 0.6);
+  --app-border: rgba(255, 255, 255, 0.4);
+  --app-border-strong: #c5d3c5;
+  --app-input-bg: rgba(255, 255, 255, 0.6);
+  --app-input-border: #c5d3c5;
+  --app-shadow: rgba(22, 29, 22, 0.08);
+}
+
+html[data-theme='dark'] {
+  --app-bg: #09100c;
+  --app-text: #edf4ee;
+  --app-text-muted: #9bb09f;
+  --app-surface: rgba(17, 24, 20, 0.82);
+  --app-surface-solid: #111814;
+  --app-surface-soft: rgba(17, 24, 20, 0.72);
+  --app-border: rgba(132, 151, 136, 0.16);
+  --app-border-strong: rgba(132, 151, 136, 0.26);
+  --app-input-bg: rgba(17, 24, 20, 0.92);
+  --app-input-border: rgba(132, 151, 136, 0.22);
+  --app-shadow: rgba(0, 0, 0, 0.34);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply antialiased;
+    background: var(--app-bg);
+    color: var(--app-text);
+    transition: background-color 220ms ease, color 220ms ease;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-md shadow-sm;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    box-shadow: 0 10px 30px -18px var(--app-shadow);
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-400/20 focus:border-sage-400 transition-all duration-300;
+    background: var(--app-input-bg);
+    border: 1px solid var(--app-input-border);
+    color: var(--app-text);
+  }
+
+  .btn-primary {
+    @apply px-6 py-2.5 bg-sage-600 text-white rounded-xl hover:bg-sage-700 active:scale-[0.98] transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-2.5 rounded-xl active:scale-[0.98] transition-all duration-300 shadow-sm disabled:opacity-50 disabled:pointer-events-none;
+    background: var(--app-surface-solid);
+    color: var(--app-text);
+    border: 1px solid var(--app-input-border);
+  }
+
+  .policy-tooltip {
+    @apply pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-64 -translate-x-1/2 rounded-2xl px-3 py-2 text-xs leading-5 font-medium opacity-0 shadow-lg transition-all duration-150;
+    border: 1px solid var(--app-input-border);
+    background: var(--app-surface-solid);
+    color: var(--app-text);
+  }
+
+  .loading-spinner {
+    @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent align-[-0.125em];
+  }
+
+  .group:hover > .policy-tooltip,
+  .group:focus-within > .policy-tooltip {
+    @apply translate-y-1 opacity-100;
+  }
+}
+
+@layer utilities {
+  html[data-theme='dark'] .bg-white {
+    background-color: var(--app-surface-solid) !important;
+  }
+
+  html[data-theme='dark'] .bg-white\/30 {
+    background-color: rgba(17, 24, 20, 0.3) !important;
+  }
+
+  html[data-theme='dark'] .bg-white\/40 {
+    background-color: rgba(17, 24, 20, 0.4) !important;
+  }
+
+  html[data-theme='dark'] .bg-white\/50 {
+    background-color: rgba(17, 24, 20, 0.5) !important;
+  }
+
+  html[data-theme='dark'] .bg-white\/60 {
+    background-color: rgba(17, 24, 20, 0.6) !important;
+  }
+
+  html[data-theme='dark'] .bg-white\/70 {
+    background-color: rgba(17, 24, 20, 0.72) !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-50 {
+    background-color: #0e1511 !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-50\/50 {
+    background-color: rgba(14, 21, 17, 0.5) !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-50\/60 {
+    background-color: rgba(14, 21, 17, 0.6) !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-50\/70 {
+    background-color: rgba(14, 21, 17, 0.72) !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-100 {
+    background-color: #15201a !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-100\/50 {
+    background-color: rgba(21, 32, 26, 0.5) !important;
+  }
+
+  html[data-theme='dark'] .bg-sage-200 {
+    background-color: #203028 !important;
+  }
+
+  html[data-theme='dark'] .border-white,
+  html[data-theme='dark'] .border-white\/40 {
+    border-color: var(--app-border) !important;
+  }
+
+  html[data-theme='dark'] .border-sage-100 {
+    border-color: rgba(132, 151, 136, 0.12) !important;
+  }
+
+  html[data-theme='dark'] .border-sage-200 {
+    border-color: rgba(132, 151, 136, 0.18) !important;
+  }
+
+  html[data-theme='dark'] .border-sage-300 {
+    border-color: rgba(132, 151, 136, 0.24) !important;
+  }
+
+  html[data-theme='dark'] .text-sage-900 {
+    color: #eff5f0 !important;
+  }
+
+  html[data-theme='dark'] .text-sage-800 {
+    color: #dde8de !important;
+  }
+
+  html[data-theme='dark'] .text-sage-700 {
+    color: #c8d8cb !important;
+  }
+
+  html[data-theme='dark'] .text-sage-600 {
+    color: #b3c6b7 !important;
+  }
+
+  html[data-theme='dark'] .text-sage-500 {
+    color: #9bb09f !important;
+  }
+
+  html[data-theme='dark'] .text-sage-400 {
+    color: #7f9784 !important;
+  }
+
+  html[data-theme='dark'] .placeholder\:text-sage-300::placeholder,
+  html[data-theme='dark'] .placeholder\:text-sage-400::placeholder {
+    color: #6f8573 !important;
+  }
+
+  html[data-theme='dark'] .hover\:bg-sage-50:hover {
+    background-color: rgba(21, 32, 26, 0.85) !important;
+  }
+
+  html[data-theme='dark'] .hover\:bg-sage-100:hover {
+    background-color: rgba(32, 48, 40, 0.92) !important;
+  }
+
+  html[data-theme='dark'] .hover\:bg-sage-200:hover {
+    background-color: rgba(45, 65, 53, 0.96) !important;
+  }
+
+  html[data-theme='dark'] .hover\:bg-red-50:hover {
+    background-color: rgba(127, 29, 29, 0.18) !important;
+  }
+
+  html[data-theme='dark'] .hover\:text-sage-900:hover {
+    color: #f4faf5 !important;
+  }
+
+  html[data-theme='dark'] .shadow-sage-900\/8 {
+    --tw-shadow-color: rgba(0, 0, 0, 0.34) !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-sage-200 rounded-full hover:bg-sage-300 transition-colors;
+}

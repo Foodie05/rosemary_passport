@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  passport_server:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8091
+      SERVER_BASE_URL: ${SERVER_BASE_URL}
+      WEB_BASE_URL: ${WEB_BASE_URL}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      DB_SSL_MODE: disable
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_PRIVATE_KEY_PEM_B64: ${JWT_PRIVATE_KEY_PEM_B64}
+      JWT_PUBLIC_KEY_PEM_B64: ${JWT_PUBLIC_KEY_PEM_B64}
+      JWT_BINDING_KEY: ${JWT_BINDING_KEY}
+      EMAIL_CODE_HMAC_KEY: ${EMAIL_CODE_HMAC_KEY}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
+      ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS}
+      REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS}
+      ARGON2_MEMORY_KB: ${ARGON2_MEMORY_KB}
+      ARGON2_ITERATIONS: ${ARGON2_ITERATIONS}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM}
+      HCAPTCHA_SECRET: ${HCAPTCHA_SECRET}
+      HCAPTCHA_SITEKEY: ${HCAPTCHA_SITEKEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_SECURE: ${SMTP_SECURE}
+      EMAIL_CODE_TTL_SECONDS: ${EMAIL_CODE_TTL_SECONDS}
+      OIDC_REQUIRE_PKCE: ${OIDC_REQUIRE_PKCE}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL}
+      LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD}
+      LOCAL_ADMIN_NICKNAME: ${LOCAL_ADMIN_NICKNAME}
+    ports:
+      - "127.0.0.1:8091:8091"

@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Let existing files and directories pass through directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Route all SPA paths back to the entry document.
+RewriteRule ^ index.html [L]

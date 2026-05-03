@@ -1,0 +1,46 @@
+# macOS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# Logs
+*.log
+logs/
+
+# Node
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dart / Flutter / build outputs
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+**/build/
+dist/
+**/dist/
+
+# Local runtime/artifacts
+.local/
+tmp/
+*.tmp
+coverage/
+
+# OS/cache
+*.swp
+*.swo
