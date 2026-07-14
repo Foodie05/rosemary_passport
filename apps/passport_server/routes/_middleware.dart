@@ -11,6 +11,7 @@ import '../lib/src/services/admin_settings_service.dart';
 import '../lib/src/services/auth_service.dart';
 import '../lib/src/services/oidc_admin_service.dart';
 import '../lib/src/services/oidc_service.dart';
+import '../lib/src/services/phone_verification_service.dart';
 import '../lib/src/services/security_service.dart';
 import '../lib/src/services/token_validation_service.dart';
 import '../lib/src/utils/http.dart';
@@ -35,6 +36,11 @@ Handler middleware(Handler handler) {
       .use(provider<AuditService>((_) => services.auditService))
       .use(provider<AdminSettingsService>((_) => services.adminSettingsService))
       .use(provider<SecurityService>((_) => services.securityService))
+      .use(
+        provider<PhoneVerificationService>(
+          (_) => services.phoneVerificationService,
+        ),
+      )
       .use(_securityHeaders());
 }
 
@@ -97,7 +103,8 @@ Map<String, String> _corsHeaders(Request request, AppConfig config) {
   final origin = request.headers['origin']?.trim() ?? '';
   if (origin.isEmpty || !config.corsAllowedOrigins.contains(origin)) {
     return {
-      'vary': 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+      'vary':
+          'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
     };
   }
   final requestedHeaders =
@@ -111,6 +118,7 @@ Map<String, String> _corsHeaders(Request request, AppConfig config) {
     'access-control-allow-headers': allowHeaders,
     'access-control-allow-credentials': 'true',
     'access-control-max-age': '3600',
-    'vary': 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+    'vary':
+        'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
   };
 }

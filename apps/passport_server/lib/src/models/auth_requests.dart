@@ -28,6 +28,7 @@ class PasswordLoginRequest {
     this.captchaToken,
     this.factorType,
     this.emailCode,
+    this.phoneCode,
     this.authenticatorCode,
   });
 
@@ -39,6 +40,7 @@ class PasswordLoginRequest {
   final String? captchaToken;
   final String? factorType;
   final String? emailCode;
+  final String? phoneCode;
   final String? authenticatorCode;
 
   Map<String, dynamic> toJson() => _$PasswordLoginRequestToJson(this);

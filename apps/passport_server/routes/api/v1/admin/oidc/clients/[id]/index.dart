@@ -32,7 +32,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
   final redirectUris = _readStringList(body['redirect_uris']);
   final scopes = _readStringList(
     body['scopes'],
-    fallback: const ['openid', 'profile', 'email'],
+    fallback: const ['openid', 'profile', 'email', 'phone'],
   );
   final grantTypes = _readStringList(
     body['grant_types'],

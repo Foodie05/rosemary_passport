@@ -59,7 +59,13 @@ class OidcService {
       'token_endpoint_auth_methods_supported': ['client_secret_post', 'none'],
       'code_challenge_methods_supported': ['S256'],
       'grant_types_supported': ['authorization_code', 'refresh_token'],
-      'scopes_supported': ['openid', 'profile', 'email', 'accountRule'],
+      'scopes_supported': [
+        'openid',
+        'profile',
+        'email',
+        'phone',
+        'accountRule',
+      ],
       'revocation_endpoint': '${_config.serverBaseUrl}/oidc/revoke',
       'introspection_endpoint': '${_config.serverBaseUrl}/oidc/introspect',
     };
@@ -237,6 +243,12 @@ class OidcService {
       'sub': user.id,
       if (scopes.contains('email')) 'email': user.email,
       if (scopes.contains('email')) 'email_verified': user.isEmailVerified,
+      if (scopes.contains('phone') &&
+          (user.phoneNumber ?? '').trim().isNotEmpty)
+        'phone_number': user.phoneNumber,
+      if (scopes.contains('phone') &&
+          (user.phoneNumber ?? '').trim().isNotEmpty)
+        'phone_number_verified': user.isPhoneVerified,
       if (scopes.contains('profile')) 'name': user.nickname,
       if (scopes.contains('profile')) 'nickname': user.nickname,
       if (scopes.contains('accountRule')) 'roles': user.roles,
@@ -316,7 +328,7 @@ class OidcService {
     required String clientId,
     required String? clientSecret,
   }) async {
-    final client = await _authenticateConfidentialClient(
+    final client = await _authenticateClient(
       clientId: clientId,
       clientSecret: clientSecret,
     );
@@ -411,6 +423,17 @@ class OidcService {
     required String? clientSecret,
   }) async {
     final client = await _authenticateConfidentialClient(
+      clientId: clientId,
+      clientSecret: clientSecret,
+    );
+    return client != null;
+  }
+
+  Future<bool> authenticateRevocationClient({
+    required String clientId,
+    required String? clientSecret,
+  }) async {
+    final client = await _authenticateClient(
       clientId: clientId,
       clientSecret: clientSecret,
     );

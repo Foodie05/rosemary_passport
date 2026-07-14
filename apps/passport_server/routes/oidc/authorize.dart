@@ -140,7 +140,7 @@ Future<Response> onRequest(RequestContext context) async {
           ? clientId
           : displayName,
       isOfficial: client['is_official'] == true,
-      subtitle: _scopeSubtitle(requestedScopes),
+      scopeLines: _scopeLines(requestedScopes),
       consentToken: consentToken,
       headers: {
         'set-cookie': buildOidcConsentCookie(
@@ -203,31 +203,28 @@ Future<Response> onRequest(RequestContext context) async {
   );
 }
 
-String _scopeSubtitle(Set<String> scopes) {
+List<String> _scopeLines(Set<String> scopes) {
   final permissions = <String>[];
   if (scopes.contains('profile')) {
-    permissions.add('昵称');
+    permissions.add('基础资料（昵称）');
   }
   if (scopes.contains('email')) {
-    permissions.add('邮箱');
+    permissions.add('电子邮箱');
+  }
+  if (scopes.contains('phone')) {
+    permissions.add('电话号码');
   }
   if (scopes.contains('accountRule')) {
     permissions.add('账户角色');
   }
-  if (permissions.isEmpty) {
-    return '该应用将使用 ROSM 验证您的登录状态。';
-  }
-  if (permissions.length == 1) {
-    return '该应用将获得你的${permissions.first}。';
-  }
-  return '该应用将获得你的${permissions.join('和')}。';
+  return permissions;
 }
 
 Response _authorizationConsentPage(
   RequestContext context, {
   required String clientDisplayName,
   required bool isOfficial,
-  required String subtitle,
+  required List<String> scopeLines,
   required String consentToken,
   Map<String, String> headers = const {},
 }) {
@@ -251,9 +248,11 @@ Response _authorizationConsentPage(
       )
       .toString();
   final escapedTitle = _escapeHtml('是否授权登录 $clientDisplayName?');
-  final escapedSubtitle = _escapeHtml(subtitle);
   final badgeLabel = isOfficial ? '官方应用' : '第三方应用';
   final escapedBadgeLabel = _escapeHtml(badgeLabel);
+  final scopeListHtml = scopeLines
+      .map((line) => '<li>${_escapeHtml(line)}</li>')
+      .join();
   return Response(
     statusCode: 200,
     headers: {
@@ -460,6 +459,19 @@ Response _authorizationConsentPage(
         font-size: 1.02rem;
         line-height: 1.8;
       }
+      .permission-head {
+        margin: 1rem 0 0.3rem;
+        color: var(--text-subtle);
+        font-size: 1.02rem;
+        line-height: 1.8;
+      }
+      .permission-list {
+        margin: 0;
+        padding-left: 1.2rem;
+        color: var(--text-main);
+        font-size: 1rem;
+        line-height: 1.85;
+      }
       .actions {
         display: flex;
         gap: 0.9rem;
@@ -540,7 +552,9 @@ Response _authorizationConsentPage(
             $escapedBadgeLabel
           </div>
           <h1>$escapedTitle</h1>
-          <p class="subtitle">$escapedSubtitle</p>
+          ${scopeLines.isEmpty
+            ? '<p class="subtitle">该应用将使用 ROSM 验证你的登录状态。</p>'
+            : '<p class="permission-head">您将授权此应用获取你的：</p><ul class="permission-list">$scopeListHtml</ul>'}
           <div class="actions">
             <a class="button secondary" href="$cancelUrl">取消</a>
             <a class="button primary" href="$approveUrl">确认</a>

@@ -61,7 +61,7 @@ class TokenService {
 
   TokenPair issueTokenPair(
     AuthenticatedUser user, {
-    List<String> scopes = const ['openid', 'profile', 'email'],
+    List<String> scopes = const ['openid', 'profile', 'email', 'phone'],
     String clientId = 'first_party_web',
     String? nonce,
     Map<String, dynamic> additionalAccessClaims = const {},
@@ -122,6 +122,12 @@ class TokenService {
               if (scopes.contains('profile')) 'name': user.nickname,
               if (scopes.contains('profile')) 'nickname': user.nickname,
               if (scopes.contains('email')) 'email_verified': true,
+              if (scopes.contains('phone') &&
+                  (user.phoneNumber ?? '').trim().isNotEmpty)
+                'phone_number': user.phoneNumber,
+              if (scopes.contains('phone') &&
+                  (user.phoneNumber ?? '').trim().isNotEmpty)
+                'phone_number_verified': user.isPhoneVerified,
               if (nonce != null && nonce.trim().isNotEmpty)
                 'nonce': nonce.trim(),
             },

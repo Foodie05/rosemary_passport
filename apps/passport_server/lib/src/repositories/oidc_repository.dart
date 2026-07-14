@@ -19,7 +19,7 @@ class OidcRepository {
         is_official boolean not null default false,
         client_secret_hash text,
         redirect_uris text[] not null,
-        scopes text[] not null default array['openid', 'profile', 'email']::text[],
+        scopes text[] not null default array['openid', 'profile', 'email', 'phone']::text[],
         grant_types text[] not null default array['authorization_code', 'refresh_token']::text[],
         is_confidential boolean not null default true,
         is_active boolean not null default true,
@@ -92,7 +92,7 @@ class OidcRepository {
         true,
         null,
         array['http://localhost:5173/callback']::text[],
-        array['openid', 'profile', 'email']::text[],
+        array['openid', 'profile', 'email', 'phone']::text[],
         array['authorization_code', 'refresh_token']::text[],
         false,
         true
