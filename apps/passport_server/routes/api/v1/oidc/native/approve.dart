@@ -3,7 +3,7 @@ import 'package:dart_frog/dart_frog.dart';
 import '../../../../../lib/src/middleware/guards.dart';
 import '../../../../../lib/src/services/oidc_service.dart';
 import '../../../../../lib/src/utils/http.dart';
-import '_native_oidc.dart';
+import '../../../../../lib/src/utils/native_oidc.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {

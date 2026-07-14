@@ -1,8 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 
-import '../../../../../lib/src/config/app_config.dart';
-import '../../../../../lib/src/services/oidc_service.dart';
-import '../../../../../lib/src/utils/http.dart';
+import '../config/app_config.dart';
+import '../services/oidc_service.dart';
+import 'http.dart';
 
 class NativeAuthorizationRequest {
   const NativeAuthorizationRequest({
