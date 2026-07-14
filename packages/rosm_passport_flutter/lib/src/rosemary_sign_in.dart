@@ -77,9 +77,14 @@ class RosmPassportSignInPage extends StatefulWidget {
 }
 
 class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
+  static final _logoUri = Uri.parse(
+    'https://tianyue.s3.bitiful.net/logo/rosemary_pure.png',
+  );
+
   late final RosmAuthorizationRequest _request;
   RosmAuthorizationStart? _start;
-  var _mode = _SignInMode.email;
+  RosmAuthResult? _pendingAuth;
+  var _mode = _SignInMode.phone;
   var _loading = true;
   var _busy = false;
   var _sent = false;
@@ -165,7 +170,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               phoneNumber: _phone.text.trim(),
               verifyCode: _code.text.trim(),
             );
-      await _finish(auth);
+      _showConsent(auth);
     });
   }
 
@@ -176,7 +181,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         password: _password.text,
         captchaToken: await widget.config.requestCaptchaToken?.call(),
       );
-      await _finish(auth);
+      _showConsent(auth);
     });
   }
 
@@ -194,7 +199,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         email: email,
         credential: credential,
       );
-      await _finish(auth);
+      _showConsent(auth);
     });
   }
 
@@ -233,6 +238,34 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         _sent = false;
         _error = '密码已重置，请使用新密码登录。';
       });
+    });
+  }
+
+  void _showConsent(RosmAuthResult auth) {
+    if (!mounted) return;
+    setState(() {
+      _pendingAuth = auth;
+      _error = null;
+      _sent = false;
+      _recoveryMode = false;
+    });
+  }
+
+  Future<void> _approveAndFinish() async {
+    final auth = _pendingAuth;
+    if (auth == null) {
+      return;
+    }
+    await _run(() async {
+      await _finish(auth);
+    });
+  }
+
+  Future<void> _denyAuthorization() async {
+    await _run(() async {
+      await widget.client.cancelNativeAuthorization(_request);
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
     });
   }
 
@@ -292,52 +325,123 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final mode = _activeMode;
     return Theme(
       data: theme.copyWith(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF5F7F63),
-          primary: const Color(0xFF2C6F8F),
-          surface: const Color(0xFFF5F8F3),
+          primary: _RosmColors.sage600,
+          surface: _RosmColors.surface,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          fillColor: _RosmColors.surface,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 18,
+          ),
+          labelStyle: const TextStyle(
+            color: _RosmColors.sage700,
+            fontWeight: FontWeight.w700,
+          ),
+          prefixIconColor: _RosmColors.sage500,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: _RosmColors.sage200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(
+              color: _RosmColors.sage500,
+              width: 1.4,
+            ),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: _RosmColors.sage600,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(58),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+            elevation: 3,
+            shadowColor: const Color(0x33577557),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _RosmColors.sage700,
+            side: const BorderSide(color: _RosmColors.sage300),
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F8F3),
-        appBar: AppBar(
-          title: Text(_start?.client.displayName ?? 'ROSM 通行证'),
-          backgroundColor: const Color(0xFFF5F8F3),
-          foregroundColor: const Color(0xFF1F2A2D),
-          elevation: 0,
-        ),
+        backgroundColor: _RosmColors.surface,
         body: SafeArea(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    _Header(start: _start),
-                    const SizedBox(height: 18),
-                    if (_error != null) _Message(text: _error!),
-                    const SizedBox(height: 12),
-                    _Card(
-                      child: _recoveryMode
-                          ? _buildRecovery()
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildModeTabs(),
-                                const SizedBox(height: 18),
-                                _buildModeBody(),
-                              ],
-                            ),
+              ? const Center(
+                  child: CircularProgressIndicator(color: _RosmColors.sage600),
+                )
+              : Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(28, 28, 28, 32),
+                      children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: IconButton(
+                            tooltip: '关闭',
+                            onPressed: _busy
+                                ? null
+                                : () => Navigator.of(context).maybePop(),
+                            icon: const Icon(Icons.close_rounded),
+                            color: _RosmColors.sage500,
+                          ),
+                        ),
+                        _Header(
+                          start: _start,
+                          mode: mode,
+                          confirmingConsent: _pendingAuth != null,
+                        ),
+                        const SizedBox(height: 26),
+                        if (_error != null) ...[
+                          _Message(text: _error!),
+                          const SizedBox(height: 18),
+                        ],
+                        if (_pendingAuth != null)
+                          _ConsentPage(
+                            appName: _start?.client.displayName,
+                            scopes: _start?.scopes ?? const [],
+                            busy: _busy,
+                            onApprove: _approveAndFinish,
+                            onDeny: _denyAuthorization,
+                          )
+                        else if (_recoveryMode)
+                          _Card(child: _buildRecovery())
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildModeTabs(),
+                              const SizedBox(height: 36),
+                              _buildModeBody(),
+                            ],
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    _ScopeList(scopes: _start?.scopes ?? const []),
-                  ],
+                  ),
                 ),
         ),
       ),
@@ -345,15 +449,38 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   }
 
   Widget _buildModeTabs() {
-    final modes = <_SignInMode>[
-      if (widget.config.enableEmailCode) _SignInMode.email,
-      if (widget.config.enablePhoneCode) _SignInMode.phone,
-      if (widget.config.enablePassword) _SignInMode.password,
-    ];
+    final modes = _availableModes;
+    if (modes.isEmpty) {
+      return const SizedBox.shrink();
+    }
     if (!modes.contains(_mode) && modes.isNotEmpty) {
       _mode = modes.first;
     }
     return SegmentedButton<_SignInMode>(
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? Colors.white
+              : _RosmColors.surface;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected)
+              ? _RosmColors.ink
+              : _RosmColors.sage500;
+        }),
+        side: const WidgetStatePropertyAll(
+          BorderSide(color: _RosmColors.sage200, width: 1.2),
+        ),
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+        ),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
       segments: modes
           .map(
             (mode) => ButtonSegment<_SignInMode>(
@@ -375,6 +502,24 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     );
   }
 
+  List<_SignInMode> get _availableModes {
+    return [
+      if (widget.config.enablePhoneCode) _SignInMode.phone,
+      if (widget.config.enableEmailCode) _SignInMode.email,
+      if (widget.config.enablePasskey) _SignInMode.passkey,
+      if (widget.config.enablePassword) _SignInMode.password,
+    ];
+  }
+
+  _SignInMode get _activeMode {
+    final modes = _availableModes;
+    if (modes.isEmpty || modes.contains(_mode)) {
+      return _mode;
+    }
+    _mode = modes.first;
+    return _mode;
+  }
+
   Widget _buildModeBody() {
     if (_mode == _SignInMode.password) {
       return Column(
@@ -383,24 +528,51 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           TextField(
             controller: _passwordEmail,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: '邮箱'),
+            decoration: const InputDecoration(
+              labelText: '邮箱',
+              prefixIcon: Icon(Icons.mail_outline_rounded),
+            ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _password,
             obscureText: true,
-            decoration: const InputDecoration(labelText: '密码'),
+            decoration: const InputDecoration(
+              labelText: '密码',
+              prefixIcon: Icon(Icons.lock_outline_rounded),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           FilledButton(
             onPressed: _busy ? null : _loginWithPassword,
-            child: Text(_busy ? '处理中...' : '登录并授权'),
+            child: Text(_busy ? '处理中...' : '登录并授权  →'),
           ),
           TextButton(
             onPressed: _busy
                 ? null
                 : () => setState(() => _recoveryMode = true),
             child: const Text('忘记密码'),
+          ),
+        ],
+      );
+    }
+
+    if (_mode == _SignInMode.passkey) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: '邮箱（可选）',
+              prefixIcon: Icon(Icons.mail_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _busy ? null : _loginWithPasskey,
+            child: Text(_busy ? '处理中...' : '使用通行密钥登录  →'),
           ),
         ],
       );
@@ -415,37 +587,51 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           keyboardType: isEmail
               ? TextInputType.emailAddress
               : TextInputType.phone,
-          decoration: InputDecoration(labelText: isEmail ? '邮箱' : '手机号'),
+          decoration: InputDecoration(
+            labelText: isEmail ? '邮箱' : '手机号',
+            prefixIcon: Icon(
+              isEmail ? Icons.mail_outline_rounded : Icons.phone_iphone_rounded,
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _code,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '验证码'),
+        if (_sent) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _code,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '验证码',
+                    prefixIcon: Icon(Icons.pin_outlined),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton(
-              onPressed: _busy ? null : _sendCode,
-              child: Text(_sent ? '重发' : '发送'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-          onPressed: _busy ? null : _loginWithCode,
-          child: Text(_busy ? '处理中...' : '登录并授权'),
-        ),
-        if (widget.config.enablePasskey) ...[
-          const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: _busy ? null : _loginWithPasskey,
-            child: const Text('使用通行密钥'),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 96,
+                child: OutlinedButton(
+                  onPressed: _busy ? null : _sendCode,
+                  child: const Text('重发'),
+                ),
+              ),
+            ],
           ),
         ],
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: _busy ? null : (_sent ? _loginWithCode : _sendCode),
+          child: Text(
+            _busy
+                ? '处理中...'
+                : _sent
+                ? '登录并授权  →'
+                : isEmail
+                ? '发送邮箱验证码  →'
+                : '发送登录验证码  →',
+          ),
+        ),
       ],
     );
   }
@@ -502,42 +688,166 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.start});
+  const _Header({
+    required this.start,
+    required this.mode,
+    required this.confirmingConsent,
+  });
 
   final RosmAuthorizationStart? start;
+  final _SignInMode mode;
+  final bool confirmingConsent;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: const BoxDecoration(
-            color: Color(0xFFD4E8F7),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.verified_user,
-            color: Color(0xFF0F5474),
-            size: 38,
+        const Text(
+          'ROSM 通行证',
+          style: TextStyle(
+            color: _RosmColors.sage600,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image.network(
+            _RosmPassportSignInPageState._logoUri.toString(),
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: _RosmColors.sage100,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                Icons.verified_user_rounded,
+                color: _RosmColors.sage600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
         Text(
-          start == null ? 'ROSM 通行证' : '${start!.client.displayName} 通行证',
-          textAlign: TextAlign.center,
+          confirmingConsent ? '确认授权' : '欢迎回来',
           style: const TextStyle(
-            color: Color(0xFF172027),
-            fontSize: 28,
+            color: _RosmColors.ink,
+            fontSize: 34,
             fontWeight: FontWeight.w900,
+            height: 1.08,
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          '登录后可同步账号状态并使用已授权服务',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFF536067), fontSize: 15),
+        Text(
+          confirmingConsent
+              ? _consentIntroFor(start?.client.displayName)
+              : _introFor(mode, start?.client.displayName),
+          style: const TextStyle(
+            color: _RosmColors.sage500,
+            fontSize: 16,
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConsentPage extends StatelessWidget {
+  const _ConsentPage({
+    required this.scopes,
+    required this.busy,
+    required this.onApprove,
+    required this.onDeny,
+    this.appName,
+  });
+
+  final List<RosmScopeInfo> scopes;
+  final String? appName;
+  final bool busy;
+  final VoidCallback onApprove;
+  final VoidCallback onDeny;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedName = appName?.trim();
+    final title = normalizedName == null || normalizedName.isEmpty
+        ? '确认授权'
+        : '授权给 $normalizedName';
+    final meanings = _scopeMeanings(scopes);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: _RosmColors.ink,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '继续后，该应用将获得以下授权能力。',
+                style: TextStyle(
+                  color: _RosmColors.sage500,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              for (final meaning in meanings)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: _RosmColors.sage600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          meaning,
+                          style: const TextStyle(
+                            color: _RosmColors.ink,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: busy ? null : onApprove,
+          child: Text(busy ? '处理中...' : '确认授权并继续  →'),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton(
+          onPressed: busy ? null : onDeny,
+          child: const Text('取消'),
         ),
       ],
     );
@@ -554,13 +864,13 @@ class _Card extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xDBFFFFFF),
-        border: Border.all(color: const Color(0xFFC8D8C7)),
-        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _RosmColors.sage100),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A5F7F63),
-            blurRadius: 24,
-            offset: Offset(0, 12),
+            color: Color(0x0F161D16),
+            blurRadius: 22,
+            offset: Offset(0, 10),
           ),
         ],
       ),
@@ -588,58 +898,35 @@ class _Message extends StatelessWidget {
   }
 }
 
-class _ScopeList extends StatelessWidget {
-  const _ScopeList({required this.scopes});
-
-  final List<RosmScopeInfo> scopes;
-
-  @override
-  Widget build(BuildContext context) {
-    if (scopes.isEmpty) return const SizedBox.shrink();
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '授权范围',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-          ),
-          const SizedBox(height: 10),
-          for (final scope in scopes)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    size: 18,
-                    color: Color(0xFF2C6F8F),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${scope.name}: ${scope.description}',
-                      style: const TextStyle(color: Color(0xFF536067)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-enum _SignInMode { email, phone, password }
+enum _SignInMode { phone, email, passkey, password }
 
 String _labelFor(_SignInMode mode) {
   return switch (mode) {
-    _SignInMode.email => '邮箱',
     _SignInMode.phone => '手机',
+    _SignInMode.email => '验证码',
+    _SignInMode.passkey => '通行密钥',
     _SignInMode.password => '密码',
   };
+}
+
+String _introFor(_SignInMode mode, String? appName) {
+  final suffix = appName == null || appName.trim().isEmpty
+      ? '完成登录。'
+      : '完成登录并授权 ${appName.trim()}。';
+  return switch (mode) {
+    _SignInMode.phone => '请输入手机号并使用短信验证码$suffix',
+    _SignInMode.email => '请输入邮箱并使用验证码$suffix',
+    _SignInMode.passkey => '使用系统通行密钥安全$suffix',
+    _SignInMode.password => '请输入邮箱和密码$suffix',
+  };
+}
+
+String _consentIntroFor(String? appName) {
+  final normalizedName = appName?.trim();
+  if (normalizedName == null || normalizedName.isEmpty) {
+    return '请确认是否允许该应用使用你的 ROSM 账号登录。';
+  }
+  return '请确认是否允许 $normalizedName 使用你的 ROSM 账号登录。';
 }
 
 String _messageFor(Object error) {
@@ -647,4 +934,36 @@ String _messageFor(Object error) {
     return error.message;
   }
   return error.toString();
+}
+
+List<String> _scopeMeanings(List<RosmScopeInfo> scopes) {
+  final meanings = <String>[];
+  for (final scope in scopes) {
+    final meaning = switch (scope.name) {
+      'openid' => '确认你的 ROSM 登录身份',
+      'profile' => '读取你的基础资料，例如昵称',
+      'email' => '读取你的邮箱地址和验证状态',
+      'phone' => '读取你的手机号和验证状态',
+      'accountRule' => '读取你的账号角色，用于判断权限',
+      'offline_access' => '在你离开应用后保持登录状态',
+      _ => scope.description.trim().isEmpty ? '使用已授权服务' : scope.description,
+    };
+    if (!meanings.contains(meaning)) {
+      meanings.add(meaning);
+    }
+  }
+  return meanings.isEmpty ? const ['确认你的 ROSM 登录身份'] : meanings;
+}
+
+class _RosmColors {
+  const _RosmColors._();
+
+  static const surface = Color(0xFFFAFCFA);
+  static const ink = Color(0xFF161D16);
+  static const sage100 = Color(0xFFE2E9E2);
+  static const sage200 = Color(0xFFC5D3C5);
+  static const sage300 = Color(0xFFA8BDA8);
+  static const sage500 = Color(0xFF6E926E);
+  static const sage600 = Color(0xFF577557);
+  static const sage700 = Color(0xFF415841);
 }
