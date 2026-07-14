@@ -37,6 +37,21 @@ class AdminSettingsService {
         ...security,
         'hcaptcha_secret': '',
         'hcaptcha_secret_configured': captchaSecret.trim().isNotEmpty,
+        'phone_verification_enabled':
+            (security['phone_verification_enabled'] ?? true) == true,
+        'phone_sms_access_key_id':
+            (security['phone_sms_access_key_id'] ?? '').toString(),
+        'phone_sms_access_key_secret': '',
+        'phone_sms_access_key_secret_configured':
+            (security['phone_sms_access_key_secret'] ?? '')
+                .toString()
+                .trim()
+                .isNotEmpty,
+        'phone_sms_sign_name': (security['phone_sms_sign_name'] ?? '').toString(),
+        'phone_sms_template_code':
+            (security['phone_sms_template_code'] ?? '').toString(),
+        'phone_sms_scheme_name':
+            (security['phone_sms_scheme_name'] ?? '').toString(),
       },
       'registration': registration,
       'oidc': {
@@ -54,7 +69,7 @@ class AdminSettingsService {
         'pkce_required': _config.oidcRequirePkce,
         'response_types_supported': ['code'],
         'grant_types_supported': ['authorization_code', 'refresh_token'],
-        'scopes_supported': ['openid', 'profile', 'email'],
+        'scopes_supported': ['openid', 'profile', 'email', 'phone', 'accountRule'],
         'token_endpoint_auth_methods_supported': ['client_secret_post', 'none'],
         'id_token_signing_alg_values_supported': ['RS256'],
       },
@@ -81,6 +96,14 @@ class AdminSettingsService {
       if ((nextSecurity['hcaptcha_secret'] ?? '').toString().isEmpty &&
           (current['hcaptcha_secret'] ?? '').toString().isNotEmpty) {
         nextSecurity.remove('hcaptcha_secret');
+      }
+      if ((nextSecurity['phone_sms_access_key_secret'] ?? '')
+              .toString()
+              .isEmpty &&
+          (current['phone_sms_access_key_secret'] ?? '')
+              .toString()
+              .isNotEmpty) {
+        nextSecurity.remove('phone_sms_access_key_secret');
       }
       final next = _policyService.sanitizeSecuritySettings({
         ...current,
@@ -150,5 +173,27 @@ class AdminSettingsService {
       return {'ok': false, 'message': 'hCaptcha Site Key 未配置。'};
     }
     return _captchaService.verifyCaptchaConfiguration();
+  }
+
+  Future<Map<String, dynamic>> testPhoneSmsConfig() async {
+    final security = await _settingsRepository.getJson('security');
+    final enabled = (security['phone_verification_enabled'] ?? true) == true;
+    if (!enabled) {
+      return {'ok': false, 'message': '手机号验证码功能已关闭。'};
+    }
+    final accessKeyId =
+        (security['phone_sms_access_key_id'] ?? '').toString().trim();
+    final accessKeySecret =
+        (security['phone_sms_access_key_secret'] ?? '').toString().trim();
+    final signName = (security['phone_sms_sign_name'] ?? '').toString().trim();
+    final templateCode =
+        (security['phone_sms_template_code'] ?? '').toString().trim();
+    if (accessKeyId.isEmpty ||
+        accessKeySecret.isEmpty ||
+        signName.isEmpty ||
+        templateCode.isEmpty) {
+      return {'ok': false, 'message': '请先完整配置短信 AccessKey、签名和模板。'};
+    }
+    return {'ok': true, 'message': '短信配置字段完整，可用于手机号验证。'};
   }
 }

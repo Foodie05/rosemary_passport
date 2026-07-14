@@ -8,6 +8,7 @@ import {
   Info,
   Lock,
   Mail,
+  Smartphone,
   ShieldCheck,
   User,
 } from 'lucide-react';
@@ -197,11 +198,16 @@ export function LoginPage({
   completeLogin,
   prepareEmailCodeLogin,
   completeEmailCodeLogin,
+  preparePhoneCodeLogin,
+  completePhoneCodeLogin,
   resendPasswordLoginCode,
+  resendPasswordPhoneCode,
   resendEmailCodeLogin,
+  resendPhoneCodeLogin,
   loadLoginCodeCooldown,
   beginWebAuthnLogin,
   completeWebAuthnLogin,
+  authNext = '',
 }) {
   const [webauthnLoading, setWebauthnLoading] = useState(false);
   const [webauthnError, setWebauthnError] = useState('');
@@ -232,6 +238,43 @@ export function LoginPage({
   }
 
   function renderPanel(view) {
+    if (view.method === 'phone_code') {
+      if (view.step === 'credentials') {
+        return (
+          <form className="space-y-6" onSubmit={preparePhoneCodeLogin}>
+            <AuthInput
+              icon={Smartphone}
+              label="手机号"
+              placeholder="13800138000"
+              value={loginForm.phone_number}
+              onChange={(event) => setLoginForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
+            />
+            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+              <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
+            </button>
+          </form>
+        );
+      }
+
+      return (
+        <form className="space-y-6" onSubmit={completePhoneCodeLogin}>
+          <CodeInputWithAction
+            icon={ShieldCheck}
+            label="手机验证码"
+            placeholder="6位验证码"
+            value={loginForm.phone_code}
+            onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value.replace(/\D/g, '') }))}
+            actionLabel={loginCodeSending ? '发送中...' : loginCodeCooldownRemaining > 0 ? `${loginCodeCooldownRemaining} 秒后重发` : '发送验证码'}
+            onAction={() => void resendPhoneCodeLogin()}
+            actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
+          />
+          <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
+          </button>
+        </form>
+      );
+    }
+
     if (view.method === 'email_code') {
       if (view.step === 'credentials') {
         return (
@@ -347,7 +390,7 @@ export function LoginPage({
                 保持登录状态
               </label>
             </div>
-            <Link to="/forgot-password" className="text-xs font-bold text-sage-600 transition-colors hover:text-sage-900">
+            <Link to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'} className="text-xs font-bold text-sage-600 transition-colors hover:text-sage-900">
               忘记密码？
             </Link>
           </div>
@@ -368,6 +411,13 @@ export function LoginPage({
                 title="邮箱验证码"
                 subtitle="发送一次登录验证码到当前账户邮箱"
                 onClick={() => void selectPasswordFactor('email_code')}
+              />
+            ) : null}
+            {passwordLoginFactors.includes('phone_code') ? (
+              <FactorListItem
+                title="手机验证码"
+                subtitle="发送一次登录验证码到当前账户手机号"
+                onClick={() => void selectPasswordFactor('phone_code')}
               />
             ) : null}
             {passwordLoginFactors.includes('authenticator') ? (
@@ -412,6 +462,24 @@ export function LoginPage({
               placeholder="6位动态验证码"
               value={loginForm.authenticator_code}
               onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value.replace(/\D/g, '') }))}
+            />
+            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+              <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
+            </button>
+          </>
+        ) : null}
+
+        {view.selectedPasswordFactor === 'phone_code' ? (
+          <>
+            <CodeInputWithAction
+              icon={ShieldCheck}
+              label="手机验证码"
+              placeholder="6位验证码"
+              value={loginForm.phone_code}
+              onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value.replace(/\D/g, '') }))}
+              actionLabel={loginCodeSending ? '发送中...' : loginCodeCooldownRemaining > 0 ? `${loginCodeCooldownRemaining} 秒后重发` : '发送验证码'}
+              onAction={() => void resendPasswordPhoneCode()}
+              actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
             />
             <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
@@ -478,14 +546,28 @@ export function LoginPage({
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold text-sage-900">欢迎回来</h1>
                 <p className="text-sage-500">
-                  {loginMethod === 'email_code'
-                    ? '请输入邮箱并使用邮箱验证码完成登录。'
+                  {loginMethod === 'phone_code'
+                    ? '请输入手机号并使用短信验证码完成登录。'
                     : loginStep === 'credentials'
                       ? '请输入您的凭据以访问账户。'
                       : '请输入二因素验证信息以完成本次登录。'}
                 </p>
               </div>
-              <div className="relative grid grid-cols-3 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
+              <div className="relative grid grid-cols-4 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
+                <button
+                  type="button"
+                  onClick={() => switchTab('phone_code')}
+                  className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${loginMethod === 'phone_code' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+                >
+                  {loginMethod === 'phone_code' ? (
+                    <motion.span
+                      layoutId="login-method-pill"
+                      className="absolute inset-0 -z-10 rounded-xl bg-white shadow-sm"
+                      transition={{ type: 'spring', stiffness: 360, damping: 32, mass: 0.9 }}
+                    />
+                  ) : null}
+                  手机
+                </button>
                 <button
                   type="button"
                   onClick={() => switchTab('email_code')}
@@ -558,7 +640,7 @@ export function LoginPage({
             <p className="text-center text-sm text-sage-500">
               还没有账户？
               {' '}
-              <Link to="/register" className="font-bold text-sage-900 underline-offset-4 hover:underline">
+              <Link to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="font-bold text-sage-900 underline-offset-4 hover:underline">
                 立即注册
               </Link>
             </p>
@@ -572,6 +654,8 @@ export function LoginPage({
 export function RegisterPage({
   registerForm,
   setRegisterForm,
+  registerMethod,
+  setRegisterMethod,
   loading,
   registerCodeSending,
   registerCodeCooldownRemaining,
@@ -580,6 +664,7 @@ export function RegisterPage({
   hcaptchaRef,
   publicConfig,
   mountCaptcha,
+  authNext = '',
 }) {
   useEffect(() => {
     mountCaptcha?.();
@@ -588,7 +673,7 @@ export function RegisterPage({
   const registerCodeDisabled =
     registerCodeSending ||
     registerCodeCooldownRemaining > 0 ||
-    !registerForm.email.trim() ||
+    !(registerMethod === 'phone' ? registerForm.phone_number.trim() : registerForm.email.trim()) ||
     !publicConfig?.captcha?.site_key;
 
   return (
@@ -600,7 +685,24 @@ export function RegisterPage({
         <div className="mx-auto w-full max-w-md space-y-8">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-sage-900">创建新账户</h1>
-            <p className="text-sage-500">加入 ROSM 通行证，完成邮箱验证后即可开始使用。</p>
+            <p className="text-sage-500">支持邮箱或手机号注册，完成验证码验证后即可开始使用。</p>
+          </div>
+
+          <div className="relative grid grid-cols-2 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
+            <button
+              type="button"
+              onClick={() => setRegisterMethod('email')}
+              className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${registerMethod === 'email' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+            >
+              邮箱注册
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegisterMethod('phone')}
+              className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${registerMethod === 'phone' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+            >
+              手机注册
+            </button>
           </div>
 
           <form className="space-y-5" onSubmit={submitRegister}>
@@ -611,20 +713,30 @@ export function RegisterPage({
               value={registerForm.nickname}
               onChange={(event) => setRegisterForm((current) => ({ ...current, nickname: event.target.value }))}
             />
-            <AuthInput
-              icon={Mail}
-              label="邮箱地址"
-              placeholder="name@example.com"
-              value={registerForm.email}
-              onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
-            />
+            {registerMethod === 'email' ? (
+              <AuthInput
+                icon={Mail}
+                label="邮箱地址"
+                placeholder="name@example.com"
+                value={registerForm.email}
+                onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
+              />
+            ) : (
+              <AuthInput
+                icon={Smartphone}
+                label="手机号码"
+                placeholder="13800138000"
+                value={registerForm.phone_number}
+                onChange={(event) => setRegisterForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
+              />
+            )}
             <div className="grid grid-cols-[1fr_auto] gap-3">
               <AuthInput
                 icon={ShieldCheck}
-                label="邮箱验证码"
+                label={registerMethod === 'email' ? '邮箱验证码' : '短信验证码'}
                 placeholder="输入验证码"
-                value={registerForm.email_code}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, email_code: event.target.value }))}
+                value={registerMethod === 'email' ? registerForm.email_code : registerForm.phone_code}
+                onChange={(event) => setRegisterForm((current) => ({ ...current, [registerMethod === 'email' ? 'email_code' : 'phone_code']: event.target.value }))}
               />
               <button type="button" onClick={() => void submitRegisterCode()} className="btn-secondary mt-[30px] whitespace-nowrap px-4" disabled={registerCodeDisabled}>
                 <LoadingButtonText
@@ -660,7 +772,7 @@ export function RegisterPage({
                 {publicConfig?.captcha?.site_key ? (
                   <div className="space-y-3">
                     <div ref={hcaptchaRef} />
-                    <p className="text-xs text-sage-500">发送邮箱验证码前需要先完成一次人机验证。</p>
+                    <p className="text-xs text-sage-500">发送验证码前需要先完成一次人机验证。</p>
                   </div>
                 ) : (
                   <p className="text-sm text-sage-500">当前不可用</p>
@@ -676,7 +788,7 @@ export function RegisterPage({
           <p className="text-center text-sm text-sage-500">
             已经有账户了？
             {' '}
-            <Link to="/login" className="font-bold text-sage-900 underline-offset-4 hover:underline">
+            <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="font-bold text-sage-900 underline-offset-4 hover:underline">
               返回登录
             </Link>
           </p>
@@ -687,30 +799,51 @@ export function RegisterPage({
   );
 }
 
-export function ForgotPasswordPage() {
-  const [isSent, setIsSent] = useState(false);
+export function ForgotPasswordPage({
+  loading,
+  sendRecoveryCode,
+  resetPasswordByCode,
+  authNext = '',
+}) {
+  const [method, setMethod] = useState('email');
+  const [step, setStep] = useState('request');
+  const [form, setForm] = useState({ account: '', code: '', new_password: '' });
+  const [error, setError] = useState('');
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-sage-50 p-6">
       <div className="w-full max-w-md">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card rounded-[2.5rem] p-10 shadow-2xl shadow-sage-900/5">
           <AnimatePresence mode="wait">
-            {!isSent ? (
+            {step === 'request' ? (
               <motion.div key="request" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
                 <div className="space-y-4 text-center">
                   <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-sage-100 text-sage-600">
                     <Lock size={32} />
                   </div>
                   <h1 className="text-2xl font-bold text-sage-900">忘记密码了？</h1>
-                  <p className="leading-relaxed text-sage-500">当前版本尚未开放自助重置接口，你可以先验证界面流程，后续接入邮件找回能力。</p>
+                  <p className="leading-relaxed text-sage-500">通过邮箱或手机号验证码重置密码。</p>
                 </div>
 
                 <div className="space-y-6">
-                  <AuthInput icon={Mail} label="邮箱地址" placeholder="name@example.com" value="" onChange={() => {}} />
-                  <button onClick={() => setIsSent(true)} className="btn-primary w-full py-4 font-bold" type="button">
-                    模拟发送重置链接
+                  <div className="relative grid grid-cols-2 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
+                    <button type="button" onClick={() => setMethod('email')} className={`rounded-xl px-4 py-2 text-sm font-bold ${method === 'email' ? 'bg-white text-sage-900' : 'text-sage-500'}`}>邮箱</button>
+                    <button type="button" onClick={() => setMethod('phone')} className={`rounded-xl px-4 py-2 text-sm font-bold ${method === 'phone' ? 'bg-white text-sage-900' : 'text-sage-500'}`}>手机</button>
+                  </div>
+                  <AuthInput icon={method === 'email' ? Mail : Smartphone} label={method === 'email' ? '邮箱地址' : '手机号码'} placeholder={method === 'email' ? 'name@example.com' : '13800138000'} value={form.account} onChange={(event) => setForm((current) => ({ ...current, account: event.target.value }))} />
+                  {error ? <p className="text-sm text-red-600">{error}</p> : null}
+                  <button onClick={async () => {
+                    setError('');
+                    try {
+                      await sendRecoveryCode({ method, account: form.account });
+                      setStep('verify');
+                    } catch (e) {
+                      setError(e.message || '发送失败');
+                    }
+                  }} className="btn-primary w-full py-4 font-bold" type="button" disabled={loading}>
+                    发送验证码
                   </button>
-                  <Link to="/login" className="flex items-center justify-center gap-2 text-sm font-bold text-sage-400 transition-colors hover:text-sage-600">
+                  <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="flex items-center justify-center gap-2 text-sm font-bold text-sage-400 transition-colors hover:text-sage-600">
                     <ChevronLeft size={18} />
                     返回登录
                   </Link>
@@ -722,14 +855,35 @@ export function ForgotPasswordPage() {
                   <CheckCircle2 size={48} />
                 </div>
                 <div className="space-y-3">
-                  <h1 className="text-2xl font-bold text-sage-900">流程已触发</h1>
-                  <p className="leading-relaxed text-sage-500">这是前端占位流程。真正的密码找回接口接入后，这里会改为邮件投递结果。</p>
+                  <h1 className="text-2xl font-bold text-sage-900">输入验证码并设置新密码</h1>
+                  <p className="leading-relaxed text-sage-500">若账号存在，你将收到验证码。</p>
                 </div>
                 <div className="pt-4">
-                  <button onClick={() => setIsSent(false)} className="btn-secondary mb-4 w-full py-4 font-bold" type="button">
+                  <div className="space-y-4 text-left">
+                    <AuthInput icon={ShieldCheck} label="验证码" placeholder="6位验证码" value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} />
+                    <AuthInput icon={Lock} label="新密码" type="password" placeholder="••••••••" value={form.new_password} onChange={(event) => setForm((current) => ({ ...current, new_password: event.target.value }))} />
+                    {error ? <p className="text-sm text-red-600">{error}</p> : null}
+                  </div>
+                  <button onClick={async () => {
+                    setError('');
+                    try {
+                      await resetPasswordByCode({
+                        method,
+                        account: form.account,
+                        code: form.code,
+                        new_password: form.new_password,
+                      });
+                      setStep('done');
+                    } catch (e) {
+                      setError(e.message || '重置失败');
+                    }
+                  }} className="btn-primary mb-3 mt-4 w-full py-4 font-bold" type="button" disabled={loading}>
+                    重置密码
+                  </button>
+                  <button onClick={() => setStep('request')} className="btn-secondary mb-4 w-full py-4 font-bold" type="button">
                     重新填写
                   </button>
-                  <Link to="/login" className="text-sm font-bold text-sage-600 underline-offset-4 hover:underline">
+                  <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="text-sm font-bold text-sage-600 underline-offset-4 hover:underline">
                     返回登录页面
                   </Link>
                 </div>
@@ -744,6 +898,7 @@ export function ForgotPasswordPage() {
 
 export function PostRegisterPasskeyPrompt({
   open,
+  registrationMethod = 'email',
   saving,
   error,
   onConfirm,
@@ -781,6 +936,12 @@ export function PostRegisterPasskeyPrompt({
             <div className="space-y-2 text-sm leading-7 text-sage-600">
               <p>登录时通常只需指纹、面容或设备解锁，无需反复输入密码。</p>
               <p>通行密钥基于当前设备安全能力，抗钓鱼能力通常比传统密码更强。</p>
+              <p>
+                建议在完成注册后，再补充一种不同于当前注册方式的二因素：
+                {registrationMethod === 'phone'
+                  ? '可添加邮箱验证码、Authenticator 或通行密钥。'
+                  : '可添加手机验证码、Authenticator 或通行密钥。'}
+              </p>
               <p>现在也可以跳过，之后仍可在账户安全页面手动添加。</p>
             </div>
           </div>

@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists users (
   id uuid primary key,
   email text not null unique,
+  phone_number text unique,
   nickname text not null,
   password_hash text not null,
   passkey_hash text,
@@ -10,9 +11,13 @@ create table if not exists users (
   authenticator_secret text,
   authenticator_verified_at timestamptz,
   is_email_verified boolean not null default false,
+  is_phone_verified boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table users add column if not exists phone_number text;
+alter table users add column if not exists is_phone_verified boolean not null default false;
+create unique index if not exists idx_users_phone_number_unique on users(phone_number) where phone_number is not null;
 alter table users add column if not exists passkey_hash text;
 alter table users add column if not exists security_code_hash text;
 alter table users add column if not exists authenticator_secret text;
@@ -67,7 +72,7 @@ create table if not exists oidc_clients (
   client_id text primary key,
   client_secret_hash text,
   redirect_uris text[] not null,
-  scopes text[] not null default array['openid', 'profile', 'email']::text[],
+  scopes text[] not null default array['openid', 'profile', 'email', 'phone']::text[],
   grant_types text[] not null default array['authorization_code', 'refresh_token']::text[],
   is_confidential boolean not null default true,
   is_active boolean not null default true,
@@ -218,7 +223,7 @@ values (
   'first_party_web',
   null,
   array['http://localhost:5173/callback']::text[],
-  array['openid', 'profile', 'email']::text[],
+  array['openid', 'profile', 'email', 'phone']::text[],
   array['authorization_code', 'refresh_token']::text[],
   false,
   true

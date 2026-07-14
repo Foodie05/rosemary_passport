@@ -7,6 +7,7 @@ class UserRecord {
   const UserRecord({
     required this.id,
     required this.email,
+    required this.phoneNumber,
     required this.nickname,
     required this.passwordHash,
     required this.passkeyHash,
@@ -15,10 +16,12 @@ class UserRecord {
     required this.hasAuthenticator,
     required this.roles,
     required this.isEmailVerified,
+    required this.isPhoneVerified,
   });
 
   final String id;
   final String email;
+  final String? phoneNumber;
   final String nickname;
   final String passwordHash;
   final String? passkeyHash;
@@ -27,6 +30,7 @@ class UserRecord {
   final bool hasAuthenticator;
   final List<String> roles;
   final bool isEmailVerified;
+  final bool isPhoneVerified;
 
   bool get hasPasskey => passkeyHash != null && passkeyHash!.trim().isNotEmpty;
   bool get hasSecurityCode =>
@@ -38,6 +42,8 @@ class UserRecord {
   }) => AuthenticatedUser(
     id: id,
     email: email,
+    phoneNumber: phoneNumber,
+    isPhoneVerified: isPhoneVerified,
     nickname: nickname,
     roles: roles,
     accessTokenId: accessTokenId,
@@ -60,6 +66,8 @@ class UserRepository {
              (u.authenticator_secret is not null and length(trim(u.authenticator_secret)) > 0)
                as has_authenticator,
              u.is_email_verified,
+             u.phone_number,
+             u.is_phone_verified,
              coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
       from users u
       left join user_roles ur on ur.user_id = u.id
@@ -77,6 +85,7 @@ class UserRepository {
     return UserRecord(
       id: row[0] as String,
       email: row[1] as String,
+      phoneNumber: row[8] as String?,
       nickname: row[2] as String,
       passwordHash: row[3] as String,
       passkeyHash: row[4] as String?,
@@ -84,7 +93,8 @@ class UserRepository {
       authenticatorSecret: null,
       hasAuthenticator: row[6] as bool,
       isEmailVerified: row[7] as bool,
-      roles: (row[8] as List).map((e) => e.toString()).toList(),
+      isPhoneVerified: row[9] as bool,
+      roles: (row[10] as List).map((e) => e.toString()).toList(),
     );
   }
 
@@ -96,6 +106,8 @@ class UserRepository {
              (u.authenticator_secret is not null and length(trim(u.authenticator_secret)) > 0)
                as has_authenticator,
              u.is_email_verified,
+             u.phone_number,
+             u.is_phone_verified,
              coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
       from users u
       left join user_roles ur on ur.user_id = u.id
@@ -113,6 +125,7 @@ class UserRepository {
     return UserRecord(
       id: row[0] as String,
       email: row[1] as String,
+      phoneNumber: row[8] as String?,
       nickname: row[2] as String,
       passwordHash: row[3] as String,
       passkeyHash: row[4] as String?,
@@ -120,7 +133,46 @@ class UserRepository {
       authenticatorSecret: null,
       hasAuthenticator: row[6] as bool,
       isEmailVerified: row[7] as bool,
-      roles: (row[8] as List).map((e) => e.toString()).toList(),
+      isPhoneVerified: row[9] as bool,
+      roles: (row[10] as List).map((e) => e.toString()).toList(),
+    );
+  }
+
+  Future<UserRecord?> findByPhoneNumber(String phoneNumber) async {
+    final result = await _db.execute(
+      '''
+      select u.id, u.email, u.nickname, u.password_hash, u.passkey_hash,
+             u.security_code_hash,
+             (u.authenticator_secret is not null and length(trim(u.authenticator_secret)) > 0)
+               as has_authenticator,
+             u.is_email_verified,
+             u.phone_number,
+             u.is_phone_verified,
+             coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
+      from users u
+      left join user_roles ur on ur.user_id = u.id
+      where u.phone_number = @phone_number
+      group by u.id
+      ''',
+      params: {'phone_number': phoneNumber},
+    );
+    if (result.isEmpty) {
+      return null;
+    }
+    final row = result.first;
+    return UserRecord(
+      id: row[0] as String,
+      email: row[1] as String,
+      phoneNumber: row[8] as String?,
+      nickname: row[2] as String,
+      passwordHash: row[3] as String,
+      passkeyHash: row[4] as String?,
+      securityCodeHash: row[5] as String?,
+      authenticatorSecret: null,
+      hasAuthenticator: row[6] as bool,
+      isEmailVerified: row[7] as bool,
+      isPhoneVerified: row[9] as bool,
+      roles: (row[10] as List).map((e) => e.toString()).toList(),
     );
   }
 
@@ -232,6 +284,16 @@ class UserRepository {
     );
   }
 
+  Future<void> updatePhoneNumber({
+    required String userId,
+    required String phoneNumber,
+  }) async {
+    await _db.execute(
+      'update users set phone_number = @phone_number, is_phone_verified = true, updated_at = now() where id = @user_id',
+      params: {'phone_number': phoneNumber, 'user_id': userId},
+    );
+  }
+
   Future<void> updatePasswordHash({
     required String userId,
     required String passwordHash,
@@ -317,6 +379,7 @@ class UserRepository {
     final result = await _db.execute(
       '''
       select u.id, u.email, u.nickname, u.is_email_verified, u.created_at,
+             u.phone_number, u.is_phone_verified,
              exists(
                select 1
                from user_webauthn_credentials uwc
@@ -351,9 +414,11 @@ class UserRepository {
             'nickname': row[2],
             'is_email_verified': row[3],
             'created_at': row[4].toString(),
-            'has_passkey': row[5],
-            'has_authenticator': row[6],
-            'roles': (row[7] as List).map((e) => e.toString()).toList(),
+            'phone_number': row[5],
+            'is_phone_verified': row[6],
+            'has_passkey': row[7],
+            'has_authenticator': row[8],
+            'roles': (row[9] as List).map((e) => e.toString()).toList(),
           },
         )
         .toList();

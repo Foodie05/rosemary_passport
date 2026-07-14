@@ -77,6 +77,8 @@ export function UserAccountPage({
   updateNicknameSilently,
   sendBindEmailCode,
   bindEmail,
+  sendBindPhoneCode,
+  bindPhone,
   sendPasswordResetCode,
   resetPasswordWithCode,
   beginAuthenticatorSetup,
@@ -90,22 +92,28 @@ export function UserAccountPage({
   const [nickname, setNickname] = useState(displayName);
   const [editingNickname, setEditingNickname] = useState(false);
   const [bindModalOpen, setBindModalOpen] = useState(false);
+  const [bindPhoneModalOpen, setBindPhoneModalOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [authenticatorModalOpen, setAuthenticatorModalOpen] = useState(false);
   const [passkeyModalOpen, setPasskeyModalOpen] = useState(false);
   const [bindForm, setBindForm] = useState({ email: '', current_password: '', email_code: '' });
+  const [bindPhoneForm, setBindPhoneForm] = useState({ phone_number: '', current_password: '', verify_code: '' });
   const [resetForm, setResetForm] = useState({ new_password: '', email_code: '' });
   const [authenticatorForm, setAuthenticatorForm] = useState({ current_password: '', code: '' });
   const [passkeyForm, setPasskeyForm] = useState({ current_password: '' });
   const [bindError, setBindError] = useState('');
+  const [bindPhoneError, setBindPhoneError] = useState('');
   const [resetError, setResetError] = useState('');
   const [authenticatorError, setAuthenticatorError] = useState('');
   const [passkeyError, setPasskeyError] = useState('');
   const [bindCodeSent, setBindCodeSent] = useState(false);
+  const [bindPhoneCodeSent, setBindPhoneCodeSent] = useState(false);
   const [resetCodeSent, setResetCodeSent] = useState(false);
   const [bindSending, setBindSending] = useState(false);
+  const [bindPhoneSending, setBindPhoneSending] = useState(false);
   const [resetSending, setResetSending] = useState(false);
   const [bindSaving, setBindSaving] = useState(false);
+  const [bindPhoneSaving, setBindPhoneSaving] = useState(false);
   const [resetSaving, setResetSaving] = useState(false);
   const [authenticatorSettingUp, setAuthenticatorSettingUp] = useState(false);
   const [authenticatorSaving, setAuthenticatorSaving] = useState(false);
@@ -113,6 +121,7 @@ export function UserAccountPage({
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeyRemovingId, setPasskeyRemovingId] = useState('');
   const [bindCooldownRemaining, setBindCooldownRemaining] = useState(0);
+  const [bindPhoneCooldownRemaining, setBindPhoneCooldownRemaining] = useState(0);
   const [resetCooldownRemaining, setResetCooldownRemaining] = useState(0);
   const [authenticatorSecret, setAuthenticatorSecret] = useState('');
   const [authenticatorOtpAuthUri, setAuthenticatorOtpAuthUri] = useState('');
@@ -130,6 +139,11 @@ export function UserAccountPage({
     bindCooldownRemaining > 0 ||
     !bindForm.email.trim() ||
     !bindForm.current_password;
+  const bindPhoneSendDisabled =
+    bindPhoneSending ||
+    bindPhoneCooldownRemaining > 0 ||
+    !bindPhoneForm.phone_number.trim() ||
+    !bindPhoneForm.current_password;
   const resetSendDisabled = resetSending || resetCooldownRemaining > 0;
 
   useEffect(() => {
@@ -141,6 +155,16 @@ export function UserAccountPage({
     }, 1000);
     return () => window.clearInterval(timer);
   }, [bindCooldownRemaining]);
+
+  useEffect(() => {
+    if (bindPhoneCooldownRemaining <= 0) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      setBindPhoneCooldownRemaining((current) => (current > 1 ? current - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [bindPhoneCooldownRemaining]);
 
   useEffect(() => {
     if (resetCooldownRemaining <= 0) {
@@ -226,6 +250,35 @@ export function UserAccountPage({
       setBindError(error.message || '绑定失败');
     } finally {
       setBindSaving(false);
+    }
+  }
+
+  async function handleSendBindPhoneCode() {
+    setBindPhoneError('');
+    setBindPhoneSending(true);
+    try {
+      await sendBindPhoneCode(bindPhoneForm);
+      setBindPhoneCodeSent(true);
+      setBindPhoneCooldownRemaining(60);
+    } catch (error) {
+      setBindPhoneError(error.message || '发送失败');
+    } finally {
+      setBindPhoneSending(false);
+    }
+  }
+
+  async function handleConfirmBindPhone() {
+    setBindPhoneError('');
+    setBindPhoneSaving(true);
+    try {
+      await bindPhone(bindPhoneForm);
+      setBindPhoneModalOpen(false);
+      setBindPhoneCodeSent(false);
+      setBindPhoneForm({ phone_number: '', current_password: '', verify_code: '' });
+    } catch (error) {
+      setBindPhoneError(error.message || '绑定失败');
+    } finally {
+      setBindPhoneSaving(false);
     }
   }
 
@@ -445,9 +498,14 @@ export function UserAccountPage({
                 : '如需更换绑定邮箱，可通过邮箱验证码完成验证与绑定。'}
             </p>
             <div className="mt-6 flex justify-end">
-              <button type="button" onClick={() => setBindModalOpen(true)} className="btn-primary px-4 py-2.5">
-                绑定邮箱
-              </button>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setBindModalOpen(true)} className="btn-primary px-4 py-2.5">
+                  绑定邮箱
+                </button>
+                <button type="button" onClick={() => setBindPhoneModalOpen(true)} className="btn-secondary px-4 py-2.5">
+                  绑定手机号
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -474,6 +532,10 @@ export function UserAccountPage({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-sage-600">当前邮箱</span>
                 <span className="max-w-[180px] truncate text-sm font-semibold text-sage-900">{session.user?.email || '-'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-sage-600">当前手机号</span>
+                <span className="max-w-[180px] truncate text-sm font-semibold text-sage-900">{session.user?.phone_number || '-'}</span>
               </div>
             </div>
           </div>
@@ -513,6 +575,41 @@ export function UserAccountPage({
           </div>
           <p className="text-xs text-sage-500">发送成功后，这个邮箱会进入共享发码冷却；在倒计时结束前不能再次发送。</p>
           {bindError ? <p className="text-sm text-red-600">{bindError}</p> : null}
+        </Modal>
+      )}
+
+      {bindPhoneModalOpen && (
+        <Modal
+          title="绑定手机号"
+          onClose={() => {
+            setBindPhoneModalOpen(false);
+            setBindPhoneError('');
+            setBindPhoneCodeSent(false);
+          }}
+          actions={
+            <>
+              <button type="button" onClick={handleSendBindPhoneCode} className="btn-secondary" disabled={bindPhoneSendDisabled}>
+                <LoadingButtonText loading={bindPhoneSending} loadingText="发送中..." idleText={bindPhoneCooldownRemaining > 0 ? `${bindPhoneCooldownRemaining} 秒后重发` : '发送验证码'} />
+              </button>
+              <button type="button" onClick={handleConfirmBindPhone} className="btn-primary" disabled={bindPhoneSaving || !bindPhoneCodeSent || !bindPhoneForm.verify_code}>
+                <LoadingButtonText loading={bindPhoneSaving} loadingText="绑定中..." idleText="完成绑定" />
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-sage-700">手机号</label>
+            <input className="input-field" value={bindPhoneForm.phone_number} onChange={(event) => setBindPhoneForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-sage-700">当前密码</label>
+            <input className="input-field" type="password" value={bindPhoneForm.current_password} onChange={(event) => setBindPhoneForm((current) => ({ ...current, current_password: event.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-sage-700">短信验证码</label>
+            <input className="input-field" value={bindPhoneForm.verify_code} onChange={(event) => setBindPhoneForm((current) => ({ ...current, verify_code: event.target.value.replace(/\D/g, '') }))} />
+          </div>
+          {bindPhoneError ? <p className="text-sm text-red-600">{bindPhoneError}</p> : null}
         </Modal>
       )}
 

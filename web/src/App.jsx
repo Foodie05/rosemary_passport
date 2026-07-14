@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AdminLayout, UserLayout } from './components/Layouts';
 import { HCAPTCHA_SITE_KEY, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
-import { AdminOIDCConfig, AdminOidcDocsPage, AdminSecurityPolicy, AdminServiceConfig, AdminUsers } from './pages/AdminPages';
+import { AdminFlutterSdkDocsPage, AdminOIDCConfig, AdminOidcDocsPage, AdminSecurityPolicy, AdminServiceConfig, AdminUsers } from './pages/AdminPages';
 import { ForgotPasswordPage, LoginPage, PostRegisterPasskeyPrompt, RegisterPage } from './pages/AuthPages';
 import { UserAccountPage } from './pages/UserPages';
 import { useTheme } from './theme';
@@ -30,13 +30,19 @@ function AppRoutes({
   completeLogin,
   prepareEmailCodeLogin,
   completeEmailCodeLogin,
+  preparePhoneCodeLogin,
+  completePhoneCodeLogin,
   requestPasswordLoginCode,
+  requestPasswordPhoneCode,
   requestEmailCodeLogin,
+  requestPhoneCodeLogin,
   loadLoginCodeCooldown,
   beginWebAuthnLogin,
   completeWebAuthnLogin,
   registerForm,
   setRegisterForm,
+  registerMethod,
+  setRegisterMethod,
   registerCodeSending,
   registerCodeCooldownRemaining,
   submitRegister,
@@ -44,12 +50,16 @@ function AppRoutes({
   publicHcaptchaRef,
   publicConfig,
   mountPublicCaptcha,
+  sendRecoveryCode,
+  resetPasswordByCode,
   session,
   logout,
   mustBindEmail,
   updateNicknameSilently,
   sendBindEmailCode,
   bindEmail,
+  sendBindPhoneCode,
+  bindPhone,
   sendPasswordResetCode,
   resetPasswordWithCode,
   beginAuthenticatorSetup,
@@ -63,6 +73,7 @@ function AppRoutes({
   saveServiceConfig,
   testSmtpConnection,
   testHcaptchaConnection,
+  testPhoneSmsConnection,
   users,
   usersPagination,
   loadUsers,
@@ -87,6 +98,12 @@ function AppRoutes({
 }) {
   const location = useLocation();
   const loginNext = location.pathname === '/login'
+    ? new URLSearchParams(location.search).get('next')?.trim() || ''
+    : '';
+  const registerNext = location.pathname === '/register'
+    ? new URLSearchParams(location.search).get('next')?.trim() || ''
+    : '';
+  const forgotNext = location.pathname === '/forgot-password'
     ? new URLSearchParams(location.search).get('next')?.trim() || ''
     : '';
 
@@ -116,11 +133,16 @@ function AppRoutes({
                 completeLogin={completeLogin}
                 prepareEmailCodeLogin={prepareEmailCodeLogin}
                 completeEmailCodeLogin={completeEmailCodeLogin}
+                preparePhoneCodeLogin={preparePhoneCodeLogin}
+                completePhoneCodeLogin={completePhoneCodeLogin}
                 resendPasswordLoginCode={requestPasswordLoginCode}
+                resendPasswordPhoneCode={requestPasswordPhoneCode}
                 resendEmailCodeLogin={requestEmailCodeLogin}
+                resendPhoneCodeLogin={requestPhoneCodeLogin}
                 loadLoginCodeCooldown={loadLoginCodeCooldown}
                 beginWebAuthnLogin={beginWebAuthnLogin}
                 completeWebAuthnLogin={completeWebAuthnLogin}
+                authNext={loginNext}
               />
             )
           }
@@ -134,6 +156,8 @@ function AppRoutes({
               <RegisterPage
                 registerForm={registerForm}
                 setRegisterForm={setRegisterForm}
+                registerMethod={registerMethod}
+                setRegisterMethod={setRegisterMethod}
                 loading={loading}
                 registerCodeSending={registerCodeSending}
                 registerCodeCooldownRemaining={registerCodeCooldownRemaining}
@@ -142,11 +166,12 @@ function AppRoutes({
                 hcaptchaRef={publicHcaptchaRef}
                 publicConfig={publicConfig}
                 mountCaptcha={mountPublicCaptcha}
+                authNext={registerNext}
               />
             )
           }
         />
-        <Route path="/forgot-password" element={isLoggedIn ? <Navigate to={defaultAuthedPath} replace /> : <ForgotPasswordPage />} />
+        <Route path="/forgot-password" element={isLoggedIn ? <Navigate to={defaultAuthedPath} replace /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} authNext={forgotNext} />} />
 
         <Route path="/admin" element={isLoggedIn ? <AdminLayout session={session} logout={logout} mustBindEmail={mustBindEmail} /> : <Navigate to="/login" replace />}>
           <Route index element={<Navigate to="/admin/account" replace />} />
@@ -159,6 +184,8 @@ function AppRoutes({
                 updateNicknameSilently={updateNicknameSilently}
                 sendBindEmailCode={sendBindEmailCode}
                 bindEmail={bindEmail}
+                sendBindPhoneCode={sendBindPhoneCode}
+                bindPhone={bindPhone}
                 sendPasswordResetCode={sendPasswordResetCode}
                 resetPasswordWithCode={resetPasswordWithCode}
                 beginAuthenticatorSetup={beginAuthenticatorSetup}
@@ -170,7 +197,7 @@ function AppRoutes({
               />
             }
           />
-          <Route path="service" element={<AdminServiceConfig systemForm={systemForm} setSystemForm={setSystemForm} saveServiceConfig={saveServiceConfig} testSmtpConnection={testSmtpConnection} testHcaptchaConnection={testHcaptchaConnection} />} />
+          <Route path="service" element={<AdminServiceConfig systemForm={systemForm} setSystemForm={setSystemForm} saveServiceConfig={saveServiceConfig} testSmtpConnection={testSmtpConnection} testHcaptchaConnection={testHcaptchaConnection} testPhoneSmsConnection={testPhoneSmsConnection} />} />
           <Route
             path="users"
             element={
@@ -187,6 +214,7 @@ function AppRoutes({
           />
           <Route path="oidc" element={<AdminOIDCConfig discovery={discovery} oidcSettings={systemSettings?.oidc} loadDiscovery={loadDiscovery} oidcClients={oidcClients} loadOidcClients={loadOidcClients} safely={safely} oidcForm={oidcForm} setOidcForm={setOidcForm} saveOidcClient={saveOidcClient} deleteOidcClient={deleteOidcClient} />} />
           <Route path="oidc/docs" element={<AdminOidcDocsPage discovery={discovery} oidcSettings={systemSettings?.oidc} />} />
+          <Route path="oidc/docs/flutter-sdk" element={<AdminFlutterSdkDocsPage discovery={discovery} oidcSettings={systemSettings?.oidc} />} />
           <Route
             path="security"
             element={
@@ -271,7 +299,7 @@ function App() {
   }, [normalizeProvider]);
 
   const [toast, setToast] = useState(null);
-  const [loginMethod, setLoginMethod] = useState('email_code');
+  const [loginMethod, setLoginMethod] = useState('phone_code');
   const [loginStep, setLoginStep] = useState('credentials');
   const [status, setStatus] = useState('');
   const [publicConfig, setPublicConfig] = useState(null);
@@ -294,30 +322,37 @@ function App() {
   const [loginCodeSending, setLoginCodeSending] = useState(false);
   const [loginCodeCooldownRemaining, setLoginCodeCooldownRemaining] = useState(0);
   const [passwordLoginFactors, setPasswordLoginFactors] = useState([]);
-  const [selectedPasswordFactor, setSelectedPasswordFactor] = useState('email_code');
+  const [selectedPasswordFactor, setSelectedPasswordFactor] = useState('phone_code');
   const [postRegisterPasskeyPromptOpen, setPostRegisterPasskeyPromptOpen] = useState(false);
   const [postRegisterPasskeySaving, setPostRegisterPasskeySaving] = useState(false);
   const [postRegisterPasskeyError, setPostRegisterPasskeyError] = useState('');
+  const [postRegisterMethod, setPostRegisterMethod] = useState('email');
+  const [pendingAuthRedirect, setPendingAuthRedirect] = useState('');
 
   const [loginForm, setLoginForm] = useState({
     email: '',
+    phone_number: '',
     password: '',
     email_code: '',
+    phone_code: '',
     authenticator_code: '',
   });
   const [registerForm, setRegisterForm] = useState({
     email: '',
     email_code: '',
+    phone_number: '',
+    phone_code: '',
     nickname: '',
     password: '',
   });
+  const [registerMethod, setRegisterMethod] = useState('email');
   const [systemForm, setSystemForm] = useState({});
   const [oidcForm, setOidcForm] = useState({
     client_id: '',
     display_name: '',
     is_official: false,
     redirect_uris: '',
-    scopes: 'openid\nprofile\nemail',
+    scopes: 'openid\nprofile\nemail\nphone',
     grant_types: 'authorization_code\nrefresh_token',
     client_secret: '',
     is_confidential: false,
@@ -367,6 +402,22 @@ function App() {
 
   useEffect(() => {
     void bootstrapSession();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const pathname = window.location.pathname;
+      if (pathname !== '/login' && pathname !== '/register') {
+        return;
+      }
+      const params = new URLSearchParams(window.location.search);
+      const next = (params.get('next') || '').trim();
+      if (next) {
+        setPendingAuthRedirect(next);
+      }
+    } catch (_) {
+      // ignore malformed URL parsing
+    }
   }, []);
 
   useEffect(() => {
@@ -588,6 +639,12 @@ function App() {
       smtp_password_confirm: smtp.password || '',
       smtp_secure: Boolean(smtp.secure),
       registration_email_verify: registration.require_email_verification !== false,
+      phone_verification_enabled: security.phone_verification_enabled !== false,
+      phone_sms_access_key_id: security.phone_sms_access_key_id || '',
+      phone_sms_access_key_secret: '',
+      phone_sms_sign_name: security.phone_sms_sign_name || '',
+      phone_sms_template_code: security.phone_sms_template_code || '',
+      phone_sms_scheme_name: security.phone_sms_scheme_name || '',
     });
   }, [normalizeProviderList, usersPagination.page_size]);
 
@@ -764,11 +821,16 @@ function App() {
     setRegisterCodeSending(true);
     try {
       const captchaToken = getPublicCaptchaToken();
-      const data = await api('/api/v1/auth/send-code', {
-        method: 'POST',
-        body: { email: registerForm.email.trim(), captcha_token: captchaToken },
-      });
-      showToast('验证码已发送，请检查邮箱。', 'success');
+      const data = registerMethod === 'phone'
+        ? await api('/api/v1/auth/send-phone-register-code', {
+            method: 'POST',
+            body: { phone_number: registerForm.phone_number.trim(), captcha_token: captchaToken },
+          })
+        : await api('/api/v1/auth/send-code', {
+            method: 'POST',
+            body: { email: registerForm.email.trim(), captcha_token: captchaToken },
+          });
+      showToast(registerMethod === 'phone' ? '验证码已发送，请检查短信。' : '验证码已发送，请检查邮箱。', 'success');
       setRegisterCodeCooldownRemaining(Number(data.retry_after || 0));
     } catch (error) {
       showToast(error.message || '验证码发送失败', 'error');
@@ -802,15 +864,41 @@ function App() {
     }
   }
 
+  async function requestPasswordPhoneCode() {
+    setLoginCodeSending(true);
+    try {
+      const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
+      await api('/api/v1/auth/send-phone-code', {
+        method: 'POST',
+        body: {
+          phone_number: loginForm.phone_number.trim(),
+          captcha_token: captchaToken,
+        },
+      });
+      showToast('手机验证码已发送，请完成验证。', 'success');
+      setLoginCodeCooldownRemaining(60);
+      return true;
+    } catch (error) {
+      showToast(error.message || '手机验证码发送失败，请稍后重试。', 'error');
+      return false;
+    } finally {
+      resetBackgroundCaptcha();
+      setLoginCodeSending(false);
+    }
+  }
+
   async function selectPasswordFactor(factor) {
     setSelectedPasswordFactor(factor);
     setLoginForm((current) => ({
       ...current,
       email_code: '',
+      phone_code: '',
       authenticator_code: '',
     }));
     if (factor === 'email_code') {
       await requestPasswordLoginCode();
+    } else if (factor === 'phone_code') {
+      await requestPasswordPhoneCode();
     }
   }
 
@@ -862,6 +950,7 @@ function App() {
           password: loginForm.password,
           factor_type: selectedPasswordFactor,
           email_code: loginForm.email_code.trim(),
+          phone_code: loginForm.phone_code.trim(),
           authenticator_code: loginForm.authenticator_code.trim(),
           ...(captchaToken ? { captcha_token: captchaToken } : {}),
         },
@@ -893,6 +982,57 @@ function App() {
     } finally {
       resetBackgroundCaptcha();
       setLoginCodeSending(false);
+    }
+  }
+
+  async function requestPhoneCodeLogin() {
+    setLoginCodeSending(true);
+    try {
+      const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
+      const data = await api('/api/v1/auth/send-phone-login-code', {
+        method: 'POST',
+        body: {
+          phone_number: loginForm.phone_number.trim(),
+          ...(captchaToken ? { captcha_token: captchaToken } : {}),
+        },
+      });
+      setLoginStep('code');
+      setLoginCodeCooldownRemaining(Math.max(60, Number(data.retry_after || 0)));
+      showToast('请求已受理。若该手机号已绑定账号，将收到短信验证码。', 'success');
+    } catch (error) {
+      showToast(error.message || '登录验证码发送失败，请稍后重试。', 'error');
+    } finally {
+      resetBackgroundCaptcha();
+      setLoginCodeSending(false);
+    }
+  }
+
+  async function preparePhoneCodeLogin(event) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      await requestPhoneCodeLogin();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completePhoneCodeLogin(event) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      const payload = await api('/api/v1/auth/phone-login', {
+        method: 'POST',
+        body: {
+          phone_number: loginForm.phone_number.trim(),
+          verify_code: loginForm.phone_code.trim(),
+        },
+      });
+      onLoginSuccess(payload);
+    } catch (error) {
+      showToast(error.message || '登录失败，请检查验证码后重试。', 'error');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -944,18 +1084,24 @@ function App() {
   function onLoginSuccess(payload) {
     setSession({ user: payload.user, security: payload.security || {} });
     setStatus(`已登录：${payload.user?.email || ''}`);
-    setLoginMethod('email_code');
+    setLoginMethod('phone_code');
     setLoginStep('credentials');
     setPasswordLoginFactors([]);
-    setSelectedPasswordFactor('email_code');
+    setSelectedPasswordFactor('phone_code');
     setLoginForm({
       email: payload.user?.email || '',
+      phone_number: payload.user?.phone_number || '',
       password: '',
       email_code: '',
+      phone_code: '',
       authenticator_code: '',
     });
     if (!(payload.security?.must_bind_email)) {
       void Promise.allSettled([loadSystemConfig(), loadOidcClients()]);
+    }
+    if (pendingAuthRedirect && payload.post_register_passkey_bootstrap !== true) {
+      window.location.replace(pendingAuthRedirect);
+      return;
     }
     showToast('登录成功', 'success');
   }
@@ -964,23 +1110,36 @@ function App() {
     event.preventDefault();
     setLoading(true);
     try {
-      const payload = await api('/api/v1/auth/register', {
-        method: 'POST',
-        body: {
-          email: registerForm.email.trim(),
-          email_code: registerForm.email_code.trim(),
-          nickname: registerForm.nickname.trim(),
-          password: registerForm.password,
-        },
-      });
+      const payload = registerMethod === 'phone'
+        ? await api('/api/v1/auth/register-phone', {
+            method: 'POST',
+            body: {
+              phone_number: registerForm.phone_number.trim(),
+              verify_code: registerForm.phone_code.trim(),
+              nickname: registerForm.nickname.trim(),
+              password: registerForm.password,
+            },
+          })
+        : await api('/api/v1/auth/register', {
+            method: 'POST',
+            body: {
+              email: registerForm.email.trim(),
+              email_code: registerForm.email_code.trim(),
+              nickname: registerForm.nickname.trim(),
+              password: registerForm.password,
+            },
+          });
       onLoginSuccess(payload);
       setRegisterForm({
         email: '',
         email_code: '',
+        phone_number: '',
+        phone_code: '',
         nickname: '',
         password: '',
       });
       setPostRegisterPasskeyError('');
+      setPostRegisterMethod(registerMethod);
       setPostRegisterPasskeyPromptOpen(
         payload.post_register_passkey_bootstrap === true,
       );
@@ -1008,6 +1167,10 @@ function App() {
         response: serializeRegistrationCredential(credential),
       });
       setPostRegisterPasskeyPromptOpen(false);
+      if (pendingAuthRedirect) {
+        window.location.replace(pendingAuthRedirect);
+        return;
+      }
       showToast('系统通行密钥已连接，后续可更快捷登录。', 'success');
     } catch (error) {
       setPostRegisterPasskeyError(getPasskeySetupErrorMessage(error));
@@ -1050,6 +1213,34 @@ function App() {
       body: payload,
     });
     redirectToLoginWithToast('邮箱绑定成功，请重新登录。');
+    return result;
+  }
+
+  async function sendBindPhoneCode(payload) {
+    try {
+      const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
+      const result = await api('/api/v1/me/send-bind-phone-code', {
+        method: 'POST',
+        auth: true,
+        body: {
+          ...payload,
+          ...(captchaToken ? { captcha_token: captchaToken } : {}),
+        },
+      });
+      showToast('验证码已发送，请注意查收短信。', 'success');
+      return result;
+    } finally {
+      resetBackgroundCaptcha();
+    }
+  }
+
+  async function bindPhone(payload) {
+    const result = await api('/api/v1/me/bind-phone', {
+      method: 'POST',
+      auth: true,
+      body: payload,
+    });
+    redirectToLoginWithToast('手机号绑定成功，请重新登录。');
     return result;
   }
 
@@ -1158,6 +1349,33 @@ function App() {
     return result;
   }
 
+  async function sendRecoveryCode(payload) {
+    try {
+      const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
+      const result = await api('/api/v1/auth/send-recovery-code', {
+        method: 'POST',
+        body: {
+          method: payload.method,
+          account: payload.account,
+          ...(captchaToken ? { captcha_token: captchaToken } : {}),
+        },
+      });
+      showToast('若账号存在，验证码已发送。', 'success');
+      return result;
+    } finally {
+      resetBackgroundCaptcha();
+    }
+  }
+
+  async function resetPasswordByCode(payload) {
+    const result = await api('/api/v1/auth/reset-password-by-code', {
+      method: 'POST',
+      body: payload,
+    });
+    redirectToLoginWithToast('密码已重置，请使用新密码登录。');
+    return result;
+  }
+
   async function beginWebAuthnLogin(email = '') {
     return api('/api/v1/auth/webauthn/options', {
       method: 'POST',
@@ -1188,6 +1406,12 @@ function App() {
           security: {
             hcaptcha_site_key: systemForm.hcaptcha_site_key || '',
             hcaptcha_secret: systemForm.hcaptcha_secret || '',
+            phone_verification_enabled: Boolean(systemForm.phone_verification_enabled ?? true),
+            phone_sms_access_key_id: systemForm.phone_sms_access_key_id || '',
+            phone_sms_access_key_secret: systemForm.phone_sms_access_key_secret || '',
+            phone_sms_sign_name: systemForm.phone_sms_sign_name || '',
+            phone_sms_template_code: systemForm.phone_sms_template_code || '',
+            phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
           },
           registration: {
             require_email_verification: Boolean(systemForm.registration_email_verify),
@@ -1219,6 +1443,12 @@ function App() {
           security: {
             hcaptcha_site_key: systemForm.hcaptcha_site_key || '',
             hcaptcha_secret: systemForm.hcaptcha_secret || '',
+            phone_verification_enabled: Boolean(systemForm.phone_verification_enabled ?? true),
+            phone_sms_access_key_id: systemForm.phone_sms_access_key_id || '',
+            phone_sms_access_key_secret: systemForm.phone_sms_access_key_secret || '',
+            phone_sms_sign_name: systemForm.phone_sms_sign_name || '',
+            phone_sms_template_code: systemForm.phone_sms_template_code || '',
+            phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
           },
           registration: {
             require_email_verification: Boolean(systemForm.registration_email_verify),
@@ -1269,6 +1499,33 @@ function App() {
       await loadPublicConfig();
     } catch (error) {
       showToast(error.message || 'hCaptcha 连接验证失败。', 'error');
+    }
+  }
+
+  async function testPhoneSmsConnection() {
+    try {
+      await api('/api/v1/admin/settings', {
+        method: 'PUT',
+        auth: true,
+        body: {
+          security: {
+            phone_verification_enabled: Boolean(systemForm.phone_verification_enabled ?? true),
+            phone_sms_access_key_id: systemForm.phone_sms_access_key_id || '',
+            phone_sms_access_key_secret: systemForm.phone_sms_access_key_secret || '',
+            phone_sms_sign_name: systemForm.phone_sms_sign_name || '',
+            phone_sms_template_code: systemForm.phone_sms_template_code || '',
+            phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
+          },
+        },
+      });
+      const result = await api('/api/v1/admin/settings/phone-sms-test', {
+        method: 'POST',
+        auth: true,
+      });
+      showToast(result.message || '短信配置验证成功。', 'success');
+      await loadSystemConfig();
+    } catch (error) {
+      showToast(error.message || '短信配置验证失败。', 'error');
     }
   }
 
@@ -1423,7 +1680,7 @@ function App() {
           display_name: oidcForm.display_name.trim(),
           is_official: Boolean(oidcForm.is_official),
           redirect_uris: parseLines(oidcForm.redirect_uris),
-          scopes: parseLines(oidcForm.scopes, ['openid', 'profile', 'email']),
+          scopes: parseLines(oidcForm.scopes, ['openid', 'profile', 'email', 'phone']),
           grant_types: parseLines(oidcForm.grant_types, ['authorization_code', 'refresh_token']),
           client_secret: oidcForm.client_secret,
           is_confidential: Boolean(oidcForm.is_confidential),
@@ -1459,10 +1716,10 @@ function App() {
     setDiscovery(null);
     setOidcClients([]);
     setSystemSettings(null);
-    setLoginMethod('email_code');
+    setLoginMethod('phone_code');
     setLoginStep('credentials');
     setPasswordLoginFactors([]);
-    setSelectedPasswordFactor('email_code');
+    setSelectedPasswordFactor('phone_code');
   }
 
   return (
@@ -1480,12 +1737,17 @@ function App() {
       )}
         <PostRegisterPasskeyPrompt
           open={postRegisterPasskeyPromptOpen}
+          registrationMethod={postRegisterMethod}
           saving={postRegisterPasskeySaving}
           error={postRegisterPasskeyError}
           onConfirm={() => void completePostRegisterPasskeySetup()}
           onSkip={() => {
             setPostRegisterPasskeyError('');
             setPostRegisterPasskeyPromptOpen(false);
+            if (pendingAuthRedirect) {
+              window.location.replace(pendingAuthRedirect);
+              return;
+            }
           }}
         />
         <AppRoutes
@@ -1508,13 +1770,19 @@ function App() {
         completeLogin={completeLogin}
         prepareEmailCodeLogin={prepareEmailCodeLogin}
         completeEmailCodeLogin={completeEmailCodeLogin}
+        preparePhoneCodeLogin={preparePhoneCodeLogin}
+        completePhoneCodeLogin={completePhoneCodeLogin}
         requestPasswordLoginCode={requestPasswordLoginCode}
+        requestPasswordPhoneCode={requestPasswordPhoneCode}
         requestEmailCodeLogin={requestEmailCodeLogin}
+        requestPhoneCodeLogin={requestPhoneCodeLogin}
         loadLoginCodeCooldown={loadLoginCodeCooldown}
         beginWebAuthnLogin={beginWebAuthnLogin}
         completeWebAuthnLogin={completeWebAuthnLogin}
         registerForm={registerForm}
         setRegisterForm={setRegisterForm}
+        registerMethod={registerMethod}
+        setRegisterMethod={setRegisterMethod}
         registerCodeSending={registerCodeSending}
         registerCodeCooldownRemaining={registerCodeCooldownRemaining}
         submitRegister={submitRegister}
@@ -1522,12 +1790,16 @@ function App() {
         publicHcaptchaRef={publicHcaptchaRef}
         publicConfig={publicConfig}
         mountPublicCaptcha={mountPublicCaptcha}
+        sendRecoveryCode={sendRecoveryCode}
+        resetPasswordByCode={resetPasswordByCode}
         session={session}
         logout={logout}
         mustBindEmail={mustBindEmail}
         updateNicknameSilently={updateNicknameSilently}
         sendBindEmailCode={sendBindEmailCode}
         bindEmail={bindEmail}
+        sendBindPhoneCode={sendBindPhoneCode}
+        bindPhone={bindPhone}
         sendPasswordResetCode={sendPasswordResetCode}
         resetPasswordWithCode={resetPasswordWithCode}
         beginAuthenticatorSetup={beginAuthenticatorSetup}
@@ -1541,6 +1813,7 @@ function App() {
         saveServiceConfig={saveServiceConfig}
         testSmtpConnection={testSmtpConnection}
         testHcaptchaConnection={testHcaptchaConnection}
+        testPhoneSmsConnection={testPhoneSmsConnection}
         users={users}
         usersPagination={usersPagination}
         loadUsers={loadUsers}

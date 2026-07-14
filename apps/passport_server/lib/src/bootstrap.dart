@@ -19,6 +19,7 @@ import 'services/email_code_service.dart';
 import 'services/email_service.dart';
 import 'services/oidc_admin_service.dart';
 import 'services/oidc_service.dart';
+import 'services/phone_verification_service.dart';
 import 'services/security_policy_service.dart';
 import 'services/security_service.dart';
 import 'services/token_validation_service.dart';
@@ -56,6 +57,12 @@ class AppServices {
       config: config,
       repository: webAuthnRepository,
     );
+    phoneVerificationService = PhoneVerificationService(
+      config: config,
+      settingsRepository: settingsRepository,
+      securityService: securityService,
+      securityPolicyService: securityPolicyService,
+    );
     adminSettingsService = AdminSettingsService(
       settingsRepository,
       config,
@@ -77,6 +84,7 @@ class AppServices {
       securityPolicyService: securityPolicyService,
       authenticatorService: authenticatorService,
       webAuthnService: webAuthnService,
+      phoneVerificationService: phoneVerificationService,
     );
     oidcService = OidcService(
       config: config,
@@ -118,4 +126,5 @@ class AppServices {
   late final OidcService oidcService;
   late final AdminSettingsService adminSettingsService;
   late final WebAuthnService webAuthnService;
+  late final PhoneVerificationService phoneVerificationService;
 }

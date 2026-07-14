@@ -30,6 +30,7 @@ PasswordLoginRequest _$PasswordLoginRequestFromJson(
   captchaToken: json['captcha_token'] as String?,
   factorType: json['factor_type'] as String?,
   emailCode: json['email_code'] as String?,
+  phoneCode: json['phone_code'] as String?,
   authenticatorCode: json['authenticator_code'] as String?,
 );
 
@@ -41,6 +42,7 @@ Map<String, dynamic> _$PasswordLoginRequestToJson(
   'captcha_token': ?instance.captchaToken,
   'factor_type': ?instance.factorType,
   'email_code': ?instance.emailCode,
+  'phone_code': ?instance.phoneCode,
   'authenticator_code': ?instance.authenticatorCode,
 };
 

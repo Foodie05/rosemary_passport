@@ -68,8 +68,10 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'openid', label: 'openid', description: '启用 OIDC 身份识别基础能力（含 nonce 要求）。' },
   { value: 'profile', label: 'profile', description: '允许应用读取昵称等基础资料。' },
   { value: 'email', label: 'email', description: '允许应用读取邮箱与邮箱验证状态。' },
+  { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/master/packages/rosm_passport_flutter';
 
 function parseUniqueLines(value) {
   return `${value || ''}`
@@ -288,6 +290,7 @@ export function AdminServiceConfig({
   saveServiceConfig,
   testSmtpConnection,
   testHcaptchaConnection,
+  testPhoneSmsConnection,
 }) {
   return (
     <SettingsShell
@@ -299,6 +302,7 @@ export function AdminServiceConfig({
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" type="button" onClick={testSmtpConnection}>验证 SMTP 连接</button>
           <button className="btn-secondary" type="button" onClick={testHcaptchaConnection}>验证 hCaptcha 连接</button>
+          <button className="btn-secondary" type="button" onClick={testPhoneSmsConnection}>验证短信配置</button>
           <button className="btn-primary" type="submit">保存服务配置</button>
         </div>
       )}
@@ -352,6 +356,36 @@ export function AdminServiceConfig({
             <label className="flex items-center gap-3 text-sm text-sage-600">
               <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(systemForm.registration_email_verify)} onChange={(event) => setSystemForm((current) => ({ ...current, registration_email_verify: event.target.checked }))} />
               注册必须验证邮箱
+            </label>
+          </div>
+        </div>
+
+        <div className="border-t border-sage-100 pt-8">
+          <div className="space-y-5">
+            <div>
+              <h3 className="text-lg font-bold text-sage-900">手机号验证（阿里云）</h3>
+              <p className="mt-1 text-sm text-sage-500">将验证码发送与校验所需参数集中管理，供手机号登录、MFA 与手机号绑定使用。</p>
+            </div>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <ConfigField label="AccessKey ID">
+                <input className="input-field" value={systemForm.phone_sms_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_id: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="AccessKey Secret">
+                <input type="password" className="input-field" value={systemForm.phone_sms_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_secret: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="短信签名 SignName">
+                <input className="input-field" value={systemForm.phone_sms_sign_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_sign_name: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="短信模板 TemplateCode">
+                <input className="input-field" value={systemForm.phone_sms_template_code || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_template_code: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="方案名 SchemeName（可选）">
+                <input className="input-field" value={systemForm.phone_sms_scheme_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_scheme_name: event.target.value }))} />
+              </ConfigField>
+            </div>
+            <label className="flex items-center gap-3 text-sm text-sage-600">
+              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(systemForm.phone_verification_enabled ?? true)} onChange={(event) => setSystemForm((current) => ({ ...current, phone_verification_enabled: event.target.checked }))} />
+              启用手机号验证码能力（登录 / MFA / 绑定）
             </label>
           </div>
         </div>
@@ -749,7 +783,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
       display_name: '',
       is_official: false,
       redirect_uris: '',
-      scopes: 'openid\nprofile\nemail',
+      scopes: 'openid\nprofile\nemail\nphone',
       grant_types: 'authorization_code\nrefresh_token',
       client_secret: '',
       is_confidential: false,
@@ -916,7 +950,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               <textarea rows="5" className="input-field" value={oidcForm.redirect_uris} onChange={(event) => setOidcForm((current) => ({ ...current, redirect_uris: event.target.value }))} />
             </ConfigField>
             <ConfigField label="Scopes">
-              <div className="space-y-3 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+              <div className="max-h-56 space-y-3 overflow-y-auto rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
                 {OIDC_SCOPE_OPTIONS.map((scope) => (
                   <label key={scope.value} className="flex items-start gap-3 rounded-xl bg-white px-3 py-2">
                     <input
@@ -1000,21 +1034,75 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     '## 2. 当前服务支持范围',
     '',
     '- 已支持：Discovery、authorization_code、refresh_token、userinfo、jwks、introspect、revoke、PKCE S256、RS256',
-    '- 当前差异：token 端点返回 access_token / refresh_token，但当前不返回标准 id_token；token/introspect/revoke 目前使用 JSON body。',
+    '- 已支持 id_token：当 scope 包含 openid 时，token 端点会返回 id_token。',
+    '- 当前差异：token/introspect/revoke 目前使用 JSON body。',
     '',
     '## 3. 典型客户端配置',
     '',
-    '推荐优先使用机密客户端，后端持有 `client_secret`，前端不要直接暴露。默认 scope 建议使用 `openid profile email`，grant type 建议启用 `authorization_code` 和 `refresh_token`。',
+    '推荐优先使用机密客户端，后端持有 `client_secret`，前端不要直接暴露。默认 scope 建议使用 `openid profile email phone`，grant type 建议启用 `authorization_code` 和 `refresh_token`。',
     '',
     '- `Client ID`：应用唯一标识，例如 `my-web-app`',
     '- `Redirect URI`：必须精确登记回调地址，不能只配域名',
-    '- `Scopes`：建议至少包含 `openid`，如需邮箱和昵称则补 `email`、`profile`',
-    '- 可用 Scopes：`openid`、`profile`、`email`、`accountRule`',
+    '- `Scopes`：建议至少包含 `openid`，如需邮箱、手机号和昵称则补 `email`、`phone`、`profile`',
+    '- 可用 Scopes：`openid`、`profile`、`email`、`phone`、`accountRule`',
     '- `Nonce`：当 `scope` 包含 `openid` 时必须传 `nonce`，否则授权请求会被拒绝（400）',
     '- `Grant Types`：常规 Web 应用建议开启授权码与刷新令牌',
     '- `Confidential`：服务端应用建议开启；纯前端公共客户端才考虑关闭',
     '',
-    '## 4. 接入步骤',
+    '## 4. Flutter SDK 原生接入',
+    '',
+    `SDK 地址：${FLUTTER_SDK_GITHUB_URL}`,
+    '',
+    '移动端 Flutter 应用建议使用 ROSM Passport Flutter SDK，以原生页面完成登录、授权确认、token 交换、刷新和登出，不需要跳转到 Web 登录页。',
+    '',
+    '管理端配置建议：',
+    '',
+    '- `Client ID`：例如 `my-flutter-app`',
+    '- `Display Name`：填写展示给用户看的应用名',
+    '- `Redirect URI`：使用应用自定义 scheme，例如 `com.example.app:/oidc/callback`',
+    '- `Scopes`：至少包含 `openid profile`，按需增加 `email`、`phone`、`accountRule`',
+    '- `Grant Types`：启用 `authorization_code` 和 `refresh_token`',
+    '- `Confidential`：关闭。移动端是 public client，不能内置 `client_secret`',
+    '- `Active`：开启',
+    '',
+    'Flutter 侧依赖：',
+    '',
+    '```yaml',
+    'dependencies:',
+    '  rosm_passport_flutter:',
+    `    git: ${FLUTTER_SDK_GITHUB_URL}`,
+    '```',
+    '',
+    'Flutter 侧示例：',
+    '',
+    '```dart',
+    `final passport = RosmPassportClient(
+  issuer: Uri.parse('${issuer || 'https://auth.example.com'}'),
+  clientId: 'my-flutter-app',
+  redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+  scopes: const {'openid', 'profile', 'email', 'phone'},
+);
+
+final request = passport.createAuthorizationRequest();
+final start = await passport.startNativeAuthorization(request);
+
+await passport.sendEmailLoginCode(email: 'user@example.com');
+final session = await passport.loginWithEmailCode(
+  email: 'user@example.com',
+  emailCode: '123456',
+);
+
+final approval = await passport.approveNativeAuthorization(request);
+final tokens = await passport.exchangeCode(
+  request: request,
+  approval: approval,
+);
+final userInfo = await passport.userInfo();`,
+    '```',
+    '',
+    'SDK 对应用侧暴露 Dart 类型和方法，例如 `RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 请求和响应只在 SDK 内部处理。',
+    '',
+    '## 5. Web / 服务端接入步骤',
     '',
     '步骤一：读取 Discovery',
     '```',
@@ -1023,7 +1111,7 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     '',
     '步骤二：浏览器跳转到授权端点',
     '```',
-    `${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`,
+    `${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email%20phone&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`,
     '```',
     '',
     '步骤三：后端交换令牌',
@@ -1047,7 +1135,7 @@ Content-Type: application/json
 Authorization: Bearer ACCESS_TOKEN`,
     '```',
     '',
-    '## 5. 最佳实践',
+    '## 6. 最佳实践',
     '',
     '- 始终启用 PKCE，且使用 `S256`。',
     '- 当 `scope` 包含 `openid` 时务必携带 `nonce`，避免授权端点直接拒绝请求。',
@@ -1057,9 +1145,9 @@ Authorization: Bearer ACCESS_TOKEN`,
     '- 把 `state` 当成必填项，防止回调串改。',
     '- 生产环境固定使用 HTTPS，并确认 `issuer`、JWKS 与回调域名都对外可访问。',
     '- 应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。',
-    '- 如果要对接严格标准 OIDC SDK，请留意本实现当前还未返回 `id_token`。',
+    '- 如果使用 Flutter SDK，请将客户端配置为 Public，并确保 redirect URI 与应用侧自定义 scheme 完全一致。',
     '',
-    '## 6. 管理员检查清单',
+    '## 7. 管理员检查清单',
     '',
     '- 确认上方展示的 `Issuer` 与实际公网域名一致。',
     '- 确认 `JWT Issuer` 与 `Issuer` 保持一致，避免第三方校验失败。',
@@ -1095,9 +1183,14 @@ Authorization: Bearer ACCESS_TOKEN`,
         title="OIDC 接入文档"
         description="面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。"
         actions={(
-          <button type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
-            {copying ? '复制中...' : '复制为 MD'}
-          </button>
+          <>
+            <button type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
+              {copying ? '复制中...' : '复制为 MD'}
+            </button>
+            <Link to="/admin/oidc/docs/flutter-sdk" className="btn-primary">
+              Flutter SDK 接入
+            </Link>
+          </>
         )}
       />
 
@@ -1133,18 +1226,19 @@ Authorization: Bearer ACCESS_TOKEN`,
           <h3 className="text-lg font-bold text-sage-900">2. 当前服务支持范围</h3>
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <InfoRow label="已支持" value="Discovery、authorization_code、refresh_token、userinfo、jwks、introspect、revoke、PKCE S256、RS256" />
-            <InfoRow label="当前差异" value="token 端点返回 access_token / refresh_token，但当前不返回标准 id_token；token/introspect/revoke 目前使用 JSON body。" />
+            <InfoRow label="id_token" value="当 scope 包含 openid 时，token 端点会返回 id_token。" />
+            <InfoRow label="当前差异" value="token/introspect/revoke 目前使用 JSON body。" />
           </div>
         </div>
 
         <div>
           <h3 className="text-lg font-bold text-sage-900">3. 典型客户端配置</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">推荐优先使用机密客户端，后端持有 <InlineCode>client_secret</InlineCode>，前端不要直接暴露。默认 scope 建议使用 <InlineCode>openid profile email</InlineCode>，grant type 建议启用 <InlineCode>authorization_code</InlineCode> 和 <InlineCode>refresh_token</InlineCode>。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">推荐优先使用机密客户端，后端持有 <InlineCode>client_secret</InlineCode>，前端不要直接暴露。默认 scope 建议使用 <InlineCode>openid profile email phone</InlineCode>，grant type 建议启用 <InlineCode>authorization_code</InlineCode> 和 <InlineCode>refresh_token</InlineCode>。</p>
           <div className="mt-3 space-y-3 text-sm leading-7 text-sage-600">
             <p><InlineCode>Client ID</InlineCode>：应用唯一标识，例如 <InlineCode>my-web-app</InlineCode></p>
             <p><InlineCode>Redirect URI</InlineCode>：必须精确登记回调地址，不能只配域名</p>
-            <p><InlineCode>Scopes</InlineCode>：建议至少包含 <InlineCode>openid</InlineCode>，如需邮箱和昵称则补 <InlineCode>email</InlineCode>、<InlineCode>profile</InlineCode></p>
-            <p><InlineCode>可用 Scopes</InlineCode>：<InlineCode>openid</InlineCode>、<InlineCode>profile</InlineCode>、<InlineCode>email</InlineCode>、<InlineCode>accountRule</InlineCode></p>
+            <p><InlineCode>Scopes</InlineCode>：建议至少包含 <InlineCode>openid</InlineCode>，如需邮箱、手机号和昵称则补 <InlineCode>email</InlineCode>、<InlineCode>phone</InlineCode>、<InlineCode>profile</InlineCode></p>
+            <p><InlineCode>可用 Scopes</InlineCode>：<InlineCode>openid</InlineCode>、<InlineCode>profile</InlineCode>、<InlineCode>email</InlineCode>、<InlineCode>phone</InlineCode>、<InlineCode>accountRule</InlineCode></p>
             <p><InlineCode>Nonce</InlineCode>：当 scope 包含 <InlineCode>openid</InlineCode> 时必须传，否则授权端点会拒绝请求（400）</p>
             <p><InlineCode>Grant Types</InlineCode>：常规 Web 应用建议开启授权码与刷新令牌</p>
             <p><InlineCode>Confidential</InlineCode>：服务端应用建议开启；纯前端公共客户端才考虑关闭</p>
@@ -1152,7 +1246,20 @@ Authorization: Bearer ACCESS_TOKEN`,
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">4. 接入步骤</h3>
+          <h3 className="text-lg font-bold text-sage-900">4. Flutter SDK 原生接入</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">Flutter 应用建议使用 ROSM Passport Flutter SDK，以原生页面完成登录、授权确认、token 交换、刷新和登出，不需要跳转到 Web 登录页。</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a className="btn-secondary" href={FLUTTER_SDK_GITHUB_URL} target="_blank" rel="noreferrer">
+              查看 SDK
+            </a>
+            <Link to="/admin/oidc/docs/flutter-sdk" className="btn-primary">
+              打开 Flutter SDK 接入页面
+            </Link>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">5. Web / 服务端接入步骤</h3>
           <div className="mt-3 space-y-5 text-sm leading-7 text-sage-600">
             <div>
               <p className="font-bold text-sage-800">步骤一：读取 Discovery</p>
@@ -1160,7 +1267,7 @@ Authorization: Bearer ACCESS_TOKEN`,
             </div>
             <div>
               <p className="font-bold text-sage-800">步骤二：浏览器跳转到授权端点</p>
-              <CodeBlock>{`${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`}</CodeBlock>
+              <CodeBlock>{`${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email%20phone&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`}</CodeBlock>
             </div>
             <div>
               <p className="font-bold text-sage-800">步骤三：后端交换令牌</p>
@@ -1185,7 +1292,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">5. 最佳实践</h3>
+          <h3 className="text-lg font-bold text-sage-900">6. 最佳实践</h3>
           <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
             <p>始终启用 PKCE，且使用 <InlineCode>S256</InlineCode>。</p>
             <p>当 <InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时务必携带 <InlineCode>nonce</InlineCode>，否则授权端点会拒绝请求。</p>
@@ -1195,12 +1302,12 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
             <p>把 <InlineCode>state</InlineCode> 当成必填项，防止回调串改。</p>
             <p>生产环境固定使用 HTTPS，并确认 <InlineCode>issuer</InlineCode>、JWKS 与回调域名都对外可访问。</p>
             <p>应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。</p>
-            <p>如果要对接严格标准 OIDC SDK，请留意本实现当前还未返回 <InlineCode>id_token</InlineCode>。</p>
+            <p>如果使用 Flutter SDK，请将客户端配置为 Public，并确保 redirect URI 与应用侧自定义 scheme 完全一致。</p>
           </div>
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">6. 管理员检查清单</h3>
+          <h3 className="text-lg font-bold text-sage-900">7. 管理员检查清单</h3>
           <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
             <p>确认上方展示的 <InlineCode>Issuer</InlineCode> 与实际公网域名一致。</p>
             <p>确认 <InlineCode>JWT Issuer</InlineCode> 与 <InlineCode>Issuer</InlineCode> 保持一致，避免第三方校验失败。</p>
@@ -1208,6 +1315,136 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
             <p>确认接入方知道当前 <InlineCode>token</InlineCode> 端点使用 JSON body。</p>
             <p>确认接入方已按当前 TTL 设计自己的会话续期逻辑。</p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
+  const issuer = oidcSettings?.issuer || discovery?.issuer || 'https://auth.example.com';
+  const tokenEndpoint = oidcSettings?.token_endpoint || discovery?.token_endpoint || `${issuer}/oidc/token`;
+  const userinfoEndpoint = oidcSettings?.userinfo_endpoint || discovery?.userinfo_endpoint || `${issuer}/oidc/userinfo`;
+  const revocationEndpoint = oidcSettings?.revocation_endpoint || discovery?.revocation_endpoint || `${issuer}/oidc/revoke`;
+  const nativeStartEndpoint = `${issuer}/api/v1/oidc/native/start`;
+  const nativeApproveEndpoint = `${issuer}/api/v1/oidc/native/approve`;
+
+  return (
+    <div className="max-w-5xl space-y-8">
+      <SectionHeader
+        title="Flutter SDK 接入"
+        description="面向移动端应用的原生接入说明。应用侧使用 Dart 类和 SDK 方法完成登录授权，JSON 请求由 SDK 内部处理。"
+        actions={(
+          <>
+            <Link to="/admin/oidc/docs" className="btn-secondary">
+              返回 OIDC 文档
+            </Link>
+            <a className="btn-primary" href={FLUTTER_SDK_GITHUB_URL} target="_blank" rel="noreferrer">
+              GitHub SDK
+            </a>
+          </>
+        )}
+      />
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">1. 在管理端创建移动端客户端</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">移动端应用属于 Public Client。不要给 Flutter 包内置 <InlineCode>client_secret</InlineCode>，所有授权请求都使用 Authorization Code + PKCE S256。</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoRow label="Client ID" value="my-flutter-app" />
+          <InfoRow label="Display Name" value="展示给用户看的应用名" />
+          <InfoRow label="Redirect URI" value="com.example.app:/oidc/callback" />
+          <InfoRow label="Scopes" value="openid profile email phone" />
+          <InfoRow label="Grant Types" value="authorization_code, refresh_token" />
+          <InfoRow label="Confidential" value="关闭，移动端必须作为 Public Client" />
+        </div>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">2. 添加 SDK 依赖</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 放在当前 GitHub 仓库中，应用可以直接通过 git 依赖接入。</p>
+        </div>
+        <CodeBlock>{`dependencies:
+  rosm_passport_flutter:
+    git:
+      url: https://github.com/Foodie05/rosemary_passport.git
+      path: packages/rosm_passport_flutter`}</CodeBlock>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">3. 初始化客户端</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">应用侧只使用 Dart 类，不需要自己拼接 JSON 请求。SDK 会生成 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>code_verifier</InlineCode> 和 <InlineCode>code_challenge</InlineCode>。</p>
+        </div>
+        <CodeBlock>{`final passport = RosmPassportClient(
+  issuer: Uri.parse('${issuer}'),
+  clientId: 'my-flutter-app',
+  redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+  scopes: const {'openid', 'profile', 'email', 'phone'},
+);
+
+final request = passport.createAuthorizationRequest();
+final start = await passport.startNativeAuthorization(request);
+
+// start.client.displayName 和 start.scopes 可用于渲染原生授权确认页。
+print(start.client.displayName);`}</CodeBlock>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">4. 完成登录与授权</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 提供邮箱验证码、手机号验证码、密码登录和 Passkey/WebAuthn 方法。应用可以使用自己的 UI 收集验证码或展示授权确认。</p>
+        </div>
+        <CodeBlock>{`await passport.sendEmailLoginCode(email: 'user@example.com');
+
+final session = await passport.loginWithEmailCode(
+  email: 'user@example.com',
+  emailCode: '123456',
+);
+
+final approval = await passport.approveNativeAuthorization(request);
+final tokens = await passport.exchangeCode(
+  request: request,
+  approval: approval,
+);
+
+final userInfo = await passport.userInfo();`}</CodeBlock>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoRow label="登录结果类型" value="RosmAuthResult，包含 RosmUser 与 RosmSecurityState" />
+          <InfoRow label="Token 类型" value="RosmTokenSet，包含 access_token / refresh_token / id_token" />
+          <InfoRow label="UserInfo 类型" value="RosmUserInfo，按 scope 返回邮箱、手机号、昵称和角色" />
+          <InfoRow label="本地存储" value="默认使用 flutter_secure_storage，可替换 RosmTokenStore" />
+        </div>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">5. 刷新、登出与端点</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内部会调用 ROSM 的 OIDC token、userinfo、revoke 与 native bridge 端点，应用侧只需要调用方法。</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoRow label="Native Start" value={nativeStartEndpoint} />
+          <InfoRow label="Native Approve" value={nativeApproveEndpoint} />
+          <InfoRow label="Token" value={tokenEndpoint} />
+          <InfoRow label="UserInfo" value={userinfoEndpoint} />
+          <InfoRow label="Revoke" value={revocationEndpoint} />
+          <InfoRow label="SDK" value={FLUTTER_SDK_GITHUB_URL} />
+        </div>
+        <CodeBlock>{`final refreshed = await passport.refresh();
+final userInfo = await passport.userInfo();
+await passport.signOut();`}</CodeBlock>
+      </div>
+
+      <div className="glass-card space-y-4 rounded-3xl p-8">
+        <h3 className="text-lg font-bold text-sage-900">6. 检查清单</h3>
+        <div className="space-y-2 text-sm leading-7 text-sage-600">
+          <p>客户端必须关闭 <InlineCode>Confidential</InlineCode>，移动端不保存 <InlineCode>client_secret</InlineCode>。</p>
+          <p><InlineCode>Redirect URI</InlineCode> 必须和 Flutter 初始化的自定义 scheme 完全一致。</p>
+          <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
+          <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
+          <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>
         </div>
       </div>
     </div>

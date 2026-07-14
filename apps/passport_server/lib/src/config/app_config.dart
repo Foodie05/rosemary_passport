@@ -92,6 +92,30 @@ class AppConfig {
   int get emailCodeTtlSeconds =>
       int.parse(_env['EMAIL_CODE_TTL_SECONDS'] ?? '300');
 
+  String get aliyunAccessKeyId => (_env['ALIYUN_ACCESS_KEY_ID'] ?? '').trim();
+  String get aliyunAccessKeySecret =>
+      (_env['ALIYUN_ACCESS_KEY_SECRET'] ?? '').trim();
+  String get aliyunSmsSignName => (_env['ALIYUN_SMS_SIGN_NAME'] ?? '').trim();
+  String get aliyunSmsTemplateCode =>
+      (_env['ALIYUN_SMS_TEMPLATE_CODE'] ?? '').trim();
+  String get aliyunSmsSchemeName =>
+      (_env['ALIYUN_SMS_SCHEME_NAME'] ?? '').trim();
+  String get aliyunSmsCountryCode =>
+      (_env['ALIYUN_SMS_COUNTRY_CODE'] ?? '86').trim();
+  int get aliyunSmsCodeLength =>
+      int.parse(_env['ALIYUN_SMS_CODE_LENGTH'] ?? '6');
+  int get aliyunSmsCodeValidTimeSeconds =>
+      int.parse(_env['ALIYUN_SMS_VALID_TIME_SECONDS'] ?? '300');
+  int get aliyunSmsSendIntervalSeconds =>
+      int.parse(_env['ALIYUN_SMS_SEND_INTERVAL_SECONDS'] ?? '60');
+  int get aliyunSmsDuplicatePolicy =>
+      int.parse(_env['ALIYUN_SMS_DUPLICATE_POLICY'] ?? '1');
+  bool get phoneVerificationEnabled =>
+      aliyunAccessKeyId.isNotEmpty &&
+      aliyunAccessKeySecret.isNotEmpty &&
+      aliyunSmsSignName.isNotEmpty &&
+      aliyunSmsTemplateCode.isNotEmpty;
+
   bool get oidcRequirePkce =>
       (_env['OIDC_REQUIRE_PKCE'] ?? 'true').toLowerCase() == 'true';
   bool get trustProxyHeaders =>

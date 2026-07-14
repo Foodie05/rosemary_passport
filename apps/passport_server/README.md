@@ -14,6 +14,8 @@
 ## 主要 API
 
 - `POST /api/v1/auth/send-code`
+- `POST /api/v1/auth/send-phone-code`
+- `POST /api/v1/auth/verify-phone-code`
 - `POST /api/v1/auth/admin-login-code`
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
@@ -30,3 +32,28 @@
   - `GET /oidc/jwks`
   - `POST /oidc/introspect`
   - `POST /oidc/revoke`
+
+## 手机号验证码（阿里云号码认证）
+
+需配置以下环境变量后自动启用：
+
+- `ALIYUN_ACCESS_KEY_ID`
+- `ALIYUN_ACCESS_KEY_SECRET`
+- `ALIYUN_SMS_SIGN_NAME`
+- `ALIYUN_SMS_TEMPLATE_CODE`
+
+可选项：
+
+- `ALIYUN_SMS_SCHEME_NAME`
+- `ALIYUN_SMS_COUNTRY_CODE`（默认 `86`）
+- `ALIYUN_SMS_CODE_LENGTH`（默认 `6`）
+- `ALIYUN_SMS_VALID_TIME_SECONDS`（默认 `300`）
+- `ALIYUN_SMS_SEND_INTERVAL_SECONDS`（默认 `60`）
+- `ALIYUN_SMS_DUPLICATE_POLICY`（默认 `1`，覆盖旧验证码）
+
+接口：
+
+- `POST /api/v1/auth/send-phone-code`
+  - body: `{ "phone_number": "13800138000", "country_code": "86", "captcha_token": "..." }`
+- `POST /api/v1/auth/verify-phone-code`
+  - body: `{ "phone_number": "13800138000", "country_code": "86", "verify_code": "123456" }`

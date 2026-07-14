@@ -43,7 +43,7 @@ Future<Response> onRequest(RequestContext context) async {
 
   final authenticated = await context
       .read<OidcService>()
-      .authenticateControlClient(
+      .authenticateRevocationClient(
         clientId: clientId,
         clientSecret: clientSecret,
       );

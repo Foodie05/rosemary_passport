@@ -26,7 +26,7 @@ Future<Response> onRequest(RequestContext context) async {
     );
     final scopes = _readStringList(
       body['scopes'],
-      fallback: const ['openid', 'profile', 'email'],
+      fallback: const ['openid', 'profile', 'email', 'phone'],
     );
     final grantTypes = _readStringList(
       body['grant_types'],

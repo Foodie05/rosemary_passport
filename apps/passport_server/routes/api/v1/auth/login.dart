@@ -51,6 +51,7 @@ Future<Response> onRequest(RequestContext context) async {
     password: payload.password,
     factorType: payload.factorType,
     emailCode: payload.emailCode,
+    phoneCode: payload.phoneCode,
     authenticatorCode: payload.authenticatorCode,
     requestIp: requestIp,
   );

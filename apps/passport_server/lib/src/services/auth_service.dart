@@ -10,6 +10,7 @@ import 'audit_service.dart';
 import 'authenticator_service.dart';
 import 'captcha_service.dart';
 import 'email_code_service.dart';
+import 'phone_verification_service.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
 import 'token_validation_service.dart';
@@ -203,6 +204,7 @@ class AuthService {
     SecurityPolicyService? securityPolicyService,
     AuthenticatorService? authenticatorService,
     WebAuthnService? webAuthnService,
+    PhoneVerificationService? phoneVerificationService,
   }) : _users = userRepository,
        _passwordHasher = passwordHasher,
        _tokenService = tokenService,
@@ -215,7 +217,8 @@ class AuthService {
        _security = securityService,
        _policy = securityPolicyService,
        _authenticator = authenticatorService,
-       _webAuthn = webAuthnService;
+       _webAuthn = webAuthnService,
+       _phoneVerification = phoneVerificationService;
 
   final UserRepository _users;
   final PasswordHasher _passwordHasher;
@@ -230,6 +233,7 @@ class AuthService {
   final SecurityPolicyService? _policy;
   final AuthenticatorService? _authenticator;
   final WebAuthnService? _webAuthn;
+  final PhoneVerificationService? _phoneVerification;
   final _uuid = const Uuid();
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
@@ -684,6 +688,9 @@ class AuthService {
     }
 
     final factors = <String>['email_code'];
+    if ((user.phoneNumber ?? '').trim().isNotEmpty && user.isPhoneVerified) {
+      factors.insert(0, 'phone_code');
+    }
     if (user.hasAuthenticator) {
       factors.add('authenticator');
     }
@@ -826,11 +833,286 @@ class AuthService {
     return RegisterAttempt.success(authResult);
   }
 
+  Future<AdminLoginCodeAttempt> sendPhoneRegisterCode({
+    required String phoneNumber,
+    String? requestIp,
+  }) async {
+    final phoneService = _phoneVerification;
+    if (phoneService == null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'phone_verification_not_configured',
+        message: '手机号验证码服务尚未配置。',
+        statusCode: 503,
+      );
+    }
+    final normalized = phoneService.normalizePhone(phoneNumber);
+    if (normalized == null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'invalid_phone_number',
+        message: '手机号格式不正确。',
+      );
+    }
+    final existing = await _users.findByPhoneNumber(normalized);
+    if (existing != null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'phone_already_registered',
+        message: '该手机号已注册。',
+        statusCode: 409,
+      );
+    }
+    final sent = await phoneService.sendCode(
+      phoneNumber: normalized,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!sent.ok) {
+      return AdminLoginCodeAttempt.failure(
+        code: sent.code ?? 'temporary_issue',
+        message: sent.message ?? '验证码发送失败，请稍后重试。',
+        statusCode: sent.statusCode,
+      );
+    }
+    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+  }
+
+  Future<RegisterAttempt> registerWithPhoneCode({
+    required String phoneNumber,
+    required String nickname,
+    required String password,
+    required String verifyCode,
+    String? requestIp,
+  }) async {
+    final phoneService = _phoneVerification;
+    if (phoneService == null) {
+      return const RegisterAttempt.failure(
+        code: 'phone_verification_not_configured',
+        message: '手机号验证码服务尚未配置。',
+        statusCode: 503,
+      );
+    }
+    final normalized = phoneService.normalizePhone(phoneNumber);
+    if (normalized == null) {
+      return const RegisterAttempt.failure(
+        code: 'invalid_phone_number',
+        message: '手机号格式不正确。',
+      );
+    }
+    final exists = await _users.findByPhoneNumber(normalized);
+    if (exists != null) {
+      return const RegisterAttempt.failure(
+        code: 'phone_already_registered',
+        message: '该手机号已注册。',
+        statusCode: 409,
+      );
+    }
+    final checked = await phoneService.verifyCode(
+      phoneNumber: normalized,
+      verifyCode: verifyCode,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!checked.ok) {
+      return RegisterAttempt.failure(
+        code: checked.code ?? 'invalid_verify_code',
+        message: checked.message ?? '验证码无效或已过期。',
+        statusCode: checked.statusCode,
+      );
+    }
+
+    final userId = _uuid.v4();
+    final pseudoEmail = 'phone_$normalized@phone.local';
+    final passwordHash = await _passwordHasher.hash(password);
+    await _users.createUser(
+      userId: userId,
+      email: pseudoEmail,
+      nickname: nickname,
+      passwordHash: passwordHash,
+      isEmailVerified: false,
+    );
+    await _users.updatePhoneNumber(userId: userId, phoneNumber: normalized);
+    final user = await _users.findById(userId);
+    if (user == null) {
+      return const RegisterAttempt.failure(
+        code: 'register_failed',
+        message: '注册失败，请稍后重试。',
+        statusCode: 500,
+      );
+    }
+    final authResult = await _issueFirstPartyAuthResult(
+      user,
+      postRegistrationPasskeyBootstrap: true,
+    );
+    return RegisterAttempt.success(authResult);
+  }
+
+  Future<EmailActionAttempt> sendAccountRecoveryCode({
+    required String account,
+    required String method,
+    String? requestIp,
+  }) async {
+    final normalizedMethod = method.trim();
+    if (normalizedMethod == 'email') {
+      final email = account.trim().toLowerCase();
+      final user = await _users.findByEmail(email);
+      if (user != null) {
+        final policy = _policy == null
+            ? SecurityPolicyService.defaultPolicy
+            : await _policy.load();
+        final limited = await _enforceVerificationCodeSendGuards(
+          email: user.email,
+          requestIp: requestIp,
+          policy: policy,
+          emailScope: _verificationCodeResetEmailScope,
+          ipScope: _verificationCodeResetIpScope,
+          cooldownScope: _verificationCodeResetCooldownScope,
+          emailLimit: policy.adminLoginCodeEmailLimit,
+          ipLimit: policy.adminLoginCodeIpLimit,
+        );
+        if (limited != null) {
+          return EmailActionAttempt.failure(
+            code: limited.code,
+            message: limited.message,
+            statusCode: limited.statusCode,
+          );
+        }
+        await _emailCodeService.issuePasswordResetCode(user.email);
+        await _startVerificationCodeCooldown(
+          email: user.email,
+          seconds: policy.passwordResetCodeCooldownSeconds,
+          cooldownScope: _verificationCodeResetCooldownScope,
+        );
+      }
+      return const EmailActionAttempt.success();
+    }
+    if (normalizedMethod == 'phone') {
+      final phoneService = _phoneVerification;
+      if (phoneService == null) {
+        return const EmailActionAttempt.failure(
+          code: 'phone_verification_not_configured',
+          message: '手机号验证码服务尚未配置。',
+          statusCode: 503,
+        );
+      }
+      final normalized = phoneService.normalizePhone(account);
+      if (normalized == null) {
+        return const EmailActionAttempt.failure(
+          code: 'invalid_phone_number',
+          message: '手机号格式不正确。',
+        );
+      }
+      final user = await _users.findByPhoneNumber(normalized);
+      if (user != null) {
+        final sent = await phoneService.sendCode(
+          phoneNumber: normalized,
+          requestIp: _subjectOrEmpty(requestIp),
+        );
+        if (!sent.ok) {
+          return EmailActionAttempt.failure(
+            code: sent.code ?? 'temporary_issue',
+            message: sent.message ?? '验证码发送失败，请稍后重试。',
+            statusCode: sent.statusCode,
+          );
+        }
+      }
+      return const EmailActionAttempt.success();
+    }
+    return const EmailActionAttempt.failure(
+      code: 'invalid_request',
+      message: 'unsupported recovery method',
+      statusCode: 400,
+    );
+  }
+
+  Future<EmailActionAttempt> recoverPasswordWithCode({
+    required String account,
+    required String method,
+    required String code,
+    required String newPassword,
+    String? requestIp,
+  }) async {
+    if (newPassword.trim().isEmpty) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_request',
+        message: 'new_password is required.',
+      );
+    }
+    final normalizedMethod = method.trim();
+    UserRecord? user;
+    if (normalizedMethod == 'email') {
+      final email = account.trim().toLowerCase();
+      user = await _users.findByEmail(email);
+      if (user == null) {
+        return const EmailActionAttempt.failure(
+          code: 'invalid_code',
+          message: '验证码无效或已过期。',
+          statusCode: 401,
+        );
+      }
+      final ok = await _emailCodeService.verifyPasswordResetCode(
+        user.email,
+        code.trim(),
+      );
+      if (!ok) {
+        return const EmailActionAttempt.failure(
+          code: 'invalid_code',
+          message: '验证码无效或已过期。',
+          statusCode: 401,
+        );
+      }
+    } else if (normalizedMethod == 'phone') {
+      final phoneService = _phoneVerification;
+      if (phoneService == null) {
+        return const EmailActionAttempt.failure(
+          code: 'phone_verification_not_configured',
+          message: '手机号验证码服务尚未配置。',
+          statusCode: 503,
+        );
+      }
+      final normalized = phoneService.normalizePhone(account);
+      if (normalized == null) {
+        return const EmailActionAttempt.failure(
+          code: 'invalid_phone_number',
+          message: '手机号格式不正确。',
+        );
+      }
+      user = await _users.findByPhoneNumber(normalized);
+      if (user == null) {
+        return const EmailActionAttempt.failure(
+          code: 'invalid_code',
+          message: '验证码无效或已过期。',
+          statusCode: 401,
+        );
+      }
+      final checked = await phoneService.verifyCode(
+        phoneNumber: normalized,
+        verifyCode: code.trim(),
+        requestIp: _subjectOrEmpty(requestIp),
+      );
+      if (!checked.ok) {
+        return EmailActionAttempt.failure(
+          code: checked.code ?? 'invalid_code',
+          message: checked.message ?? '验证码无效或已过期。',
+          statusCode: checked.statusCode,
+        );
+      }
+    } else {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_request',
+        message: 'unsupported recovery method',
+        statusCode: 400,
+      );
+    }
+
+    final passwordHash = await _passwordHasher.hash(newPassword.trim());
+    await _users.updatePasswordHash(userId: user.id, passwordHash: passwordHash);
+    await _revokeAllRefreshTokens(user.id);
+    return const EmailActionAttempt.success();
+  }
+
   Future<LoginAttempt> login({
     required String email,
     required String password,
     String? factorType,
     String? emailCode,
+    String? phoneCode,
     String? authenticatorCode,
     String? requestIp,
   }) async {
@@ -927,6 +1209,35 @@ class AuthService {
       );
 
       return LoginAttempt.success(authResult);
+    } else if (normalizedFactor == 'phone_code') {
+      if (phoneCode == null || phoneCode.trim().isEmpty) {
+        return const LoginAttempt.failure(
+          code: 'mfa_required',
+          message: '登录需要手机验证码。',
+          statusCode: 401,
+        );
+      }
+      final phoneService = _phoneVerification;
+      final phone = user.phoneNumber?.trim() ?? '';
+      if (phoneService == null || phone.isEmpty || !user.isPhoneVerified) {
+        return const LoginAttempt.failure(
+          code: 'mfa_not_available',
+          message: '当前账户未配置手机号验证。',
+          statusCode: 400,
+        );
+      }
+      final checked = await phoneService.verifyCode(
+        phoneNumber: phone,
+        verifyCode: phoneCode.trim(),
+        requestIp: _subjectOrEmpty(requestIp),
+      );
+      if (!checked.ok) {
+        return LoginAttempt.failure(
+          code: checked.code ?? 'mfa_required',
+          message: checked.message ?? '手机验证码无效或已过期。',
+          statusCode: checked.statusCode,
+        );
+      }
     } else if (normalizedFactor == 'authenticator') {
       final authenticator = _authenticator;
       final secret =
@@ -1042,6 +1353,96 @@ class AuthService {
       ip: requestIp,
     );
 
+    return LoginAttempt.success(authResult);
+  }
+
+  Future<AdminLoginCodeAttempt> sendPhoneLoginCode({
+    required String phoneNumber,
+    String? requestIp,
+  }) async {
+    final phoneService = _phoneVerification;
+    if (phoneService == null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'phone_verification_not_configured',
+        message: '手机号验证码服务尚未配置。',
+        statusCode: 503,
+      );
+    }
+    final normalized = phoneService.normalizePhone(phoneNumber);
+    if (normalized == null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'invalid_phone_number',
+        message: '手机号格式不正确。',
+      );
+    }
+    final user = await _users.findByPhoneNumber(normalized);
+    if (user == null) {
+      return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+    }
+    final attempt = await phoneService.sendCode(
+      phoneNumber: normalized,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!attempt.ok) {
+      return AdminLoginCodeAttempt.failure(
+        code: attempt.code ?? 'temporary_issue',
+        message: attempt.message ?? '验证码发送失败，请稍后重试。',
+        statusCode: attempt.statusCode,
+      );
+    }
+    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+  }
+
+  Future<LoginAttempt> loginWithPhoneCode({
+    required String phoneNumber,
+    required String verifyCode,
+    String? requestIp,
+  }) async {
+    final phoneService = _phoneVerification;
+    if (phoneService == null) {
+      return const LoginAttempt.failure(
+        code: 'phone_verification_not_configured',
+        message: '手机号验证码服务尚未配置。',
+        statusCode: 503,
+      );
+    }
+    final normalized = phoneService.normalizePhone(phoneNumber);
+    if (normalized == null) {
+      return const LoginAttempt.failure(
+        code: 'invalid_phone_number',
+        message: '手机号格式不正确。',
+      );
+    }
+    final user = await _users.findByPhoneNumber(normalized);
+    if (user == null) {
+      return const LoginAttempt.failure(
+        code: 'login_failed',
+        message: '登录失败。',
+        statusCode: 401,
+      );
+    }
+    final checked = await phoneService.verifyCode(
+      phoneNumber: normalized,
+      verifyCode: verifyCode,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!checked.ok) {
+      return LoginAttempt.failure(
+        code: checked.code ?? 'mfa_required',
+        message: checked.message ?? '手机验证码无效或已过期。',
+        statusCode: checked.statusCode,
+      );
+    }
+    final authResult = await _issueFirstPartyAuthResult(user);
+    await _audit.log(
+      action: 'user.login.phone_code',
+      actorId: user.id,
+      actorType: 'user',
+      resourceType: 'user',
+      resourceId: user.id,
+      metadata: {'email': user.email, 'phone_code_login': true},
+      ip: requestIp,
+    );
     return LoginAttempt.success(authResult);
   }
 
@@ -1300,6 +1701,140 @@ class AuthService {
     if (await isBootstrapAdmin(user)) {
       await _settings.closeBootstrapLogin(boundEmail: targetEmail);
     }
+    return const EmailActionAttempt.success();
+  }
+
+  Future<EmailActionAttempt> sendBindPhoneCode({
+    required String userId,
+    required String phoneNumber,
+    required String currentPassword,
+    String? requestIp,
+  }) async {
+    final user = await _users.findById(userId);
+    if (user == null) {
+      return const EmailActionAttempt.failure(
+        code: 'not_found',
+        message: 'User not found.',
+        statusCode: 404,
+      );
+    }
+    if (currentPassword.trim().isEmpty) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_request',
+        message: 'current_password is required.',
+      );
+    }
+    final valid = await _passwordHasher.verify(user.passwordHash, currentPassword);
+    if (!valid) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_password',
+        message: '当前密码错误。',
+        statusCode: 401,
+      );
+    }
+    final phoneService = _phoneVerification;
+    if (phoneService == null) {
+      return const EmailActionAttempt.failure(
+        code: 'phone_verification_not_configured',
+        message: '手机号验证码服务尚未配置。',
+        statusCode: 503,
+      );
+    }
+    final normalized = phoneService.normalizePhone(phoneNumber);
+    if (normalized == null) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_phone_number',
+        message: '手机号格式不正确。',
+      );
+    }
+    final existing = await _users.findByPhoneNumber(normalized);
+    if (existing != null && existing.id != user.id) {
+      return const EmailActionAttempt.failure(
+        code: 'phone_exists',
+        message: '手机号已被占用。',
+        statusCode: 409,
+      );
+    }
+    final sent = await phoneService.sendCode(
+      phoneNumber: normalized,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!sent.ok) {
+      return EmailActionAttempt.failure(
+        code: sent.code ?? 'temporary_issue',
+        message: sent.message ?? '验证码发送失败，请稍后重试。',
+        statusCode: sent.statusCode,
+      );
+    }
+    return const EmailActionAttempt.success();
+  }
+
+  Future<EmailActionAttempt> bindPhoneWithCode({
+    required String userId,
+    required String phoneNumber,
+    required String currentPassword,
+    required String verifyCode,
+    String? requestIp,
+  }) async {
+    final user = await _users.findById(userId);
+    if (user == null) {
+      return const EmailActionAttempt.failure(
+        code: 'not_found',
+        message: 'User not found.',
+        statusCode: 404,
+      );
+    }
+    if (currentPassword.trim().isEmpty || verifyCode.trim().isEmpty) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_request',
+        message: 'current_password and verify_code are required.',
+      );
+    }
+    final valid = await _passwordHasher.verify(user.passwordHash, currentPassword);
+    if (!valid) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_password',
+        message: '当前密码错误。',
+        statusCode: 401,
+      );
+    }
+    final phoneService = _phoneVerification;
+    if (phoneService == null) {
+      return const EmailActionAttempt.failure(
+        code: 'phone_verification_not_configured',
+        message: '手机号验证码服务尚未配置。',
+        statusCode: 503,
+      );
+    }
+    final normalized = phoneService.normalizePhone(phoneNumber);
+    if (normalized == null) {
+      return const EmailActionAttempt.failure(
+        code: 'invalid_phone_number',
+        message: '手机号格式不正确。',
+      );
+    }
+    final existing = await _users.findByPhoneNumber(normalized);
+    if (existing != null && existing.id != user.id) {
+      return const EmailActionAttempt.failure(
+        code: 'phone_exists',
+        message: '手机号已被占用。',
+        statusCode: 409,
+      );
+    }
+    final checked = await phoneService.verifyCode(
+      phoneNumber: normalized,
+      verifyCode: verifyCode,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!checked.ok) {
+      return EmailActionAttempt.failure(
+        code: checked.code ?? 'invalid_code',
+        message: checked.message ?? '验证码无效或已过期。',
+        statusCode: checked.statusCode,
+      );
+    }
+    await _users.updatePhoneNumber(userId: user.id, phoneNumber: normalized);
+    await _revokeAllRefreshTokens(user.id);
     return const EmailActionAttempt.success();
   }
 
@@ -1700,7 +2235,11 @@ class AuthService {
   Future<Map<String, bool>> getSecurityState({required String userId}) async {
     final user = await _users.findById(userId);
     if (user == null) {
-      return const {'has_passkey': false, 'has_authenticator': false};
+      return const {
+        'has_passkey': false,
+        'has_authenticator': false,
+        'has_phone': false,
+      };
     }
     final hasPasskey = _webAuthn == null
         ? false
@@ -1708,6 +2247,7 @@ class AuthService {
     return {
       'has_passkey': hasPasskey,
       'has_authenticator': user.hasAuthenticator,
+      'has_phone': (user.phoneNumber ?? '').trim().isNotEmpty && user.isPhoneVerified,
     };
   }
 
