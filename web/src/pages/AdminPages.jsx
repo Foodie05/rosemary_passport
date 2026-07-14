@@ -81,6 +81,19 @@ function parseUniqueLines(value) {
     .reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
 }
 
+function isMobileCustomRedirectUri(value) {
+  const raw = `${value || ''}`.trim();
+  if (!raw) {
+    return false;
+  }
+  try {
+    const uri = new URL(raw);
+    return !['http:', 'https:'].includes(uri.protocol);
+  } catch {
+    return /^[a-z][a-z0-9+.-]*:\//i.test(raw);
+  }
+}
+
 function SectionHeader({ title, description, actions }) {
   return (
     <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -248,16 +261,18 @@ function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
 
 function Modal({ title, children, onClose, actions }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-sage-900/20 p-6 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-3xl border border-white/60 bg-white p-6 shadow-2xl">
-        <div className="mb-5 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-sage-900/20 p-3 backdrop-blur-sm sm:p-6">
+      <div className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]">
+        <div className="flex items-center justify-between border-b border-sage-100 px-6 py-4">
           <h3 className="text-xl font-bold text-sage-900">{title}</h3>
           <button type="button" className="rounded-xl p-2 text-sage-400 hover:bg-sage-50 hover:text-sage-700" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
-        <div className="space-y-5">{children}</div>
-        <div className="mt-6 flex justify-end gap-3">{actions}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div className="space-y-5">{children}</div>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-sage-100 bg-white px-6 py-4">{actions}</div>
       </div>
     </div>
   );
@@ -782,6 +797,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
       client_id: '',
       display_name: '',
       is_official: false,
+      enable_web: true,
+      enable_app: false,
+      web_redirect_uris: '',
+      app_redirect_uri: '',
       redirect_uris: '',
       scopes: 'openid\nprofile\nemail\nphone',
       grant_types: 'authorization_code\nrefresh_token',
@@ -794,11 +813,18 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
   }
 
   function openEditModal(client) {
+    const redirectUris = client.redirect_uris || [];
+    const appRedirectUris = redirectUris.filter(isMobileCustomRedirectUri);
+    const webRedirectUris = redirectUris.filter((uri) => !isMobileCustomRedirectUri(uri));
     setOidcForm({
       client_id: client.client_id || '',
       display_name: client.display_name || '',
       is_official: Boolean(client.is_official),
-      redirect_uris: (client.redirect_uris || []).join('\n'),
+      enable_web: webRedirectUris.length > 0,
+      enable_app: appRedirectUris.length > 0,
+      web_redirect_uris: webRedirectUris.join('\n'),
+      app_redirect_uri: appRedirectUris[0] || '',
+      redirect_uris: redirectUris.join('\n'),
       scopes: (client.scopes || []).join('\n'),
       grant_types: (client.grant_types || []).join('\n'),
       client_secret: '',
@@ -830,7 +856,12 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
       return {
         ...current,
         client_id: rawClientId,
-        redirect_uris: `${scheme}:/oidc/callback`,
+        enable_app: true,
+        app_redirect_uri: `${scheme}:/oidc/callback`,
+        redirect_uris: [
+          ...(current.enable_web ? parseUniqueLines(current.web_redirect_uris || current.redirect_uris) : []),
+          `${scheme}:/oidc/callback`,
+        ].join('\n'),
         scopes: 'openid\nprofile\nemail\nphone\naccountRule',
         grant_types: 'authorization_code\nrefresh_token',
         client_secret: '',
@@ -957,31 +988,46 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             </>
           )}
         >
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <ConfigField label="Client ID">
-              <input className="input-field" value={oidcForm.client_id} onChange={(event) => setOidcForm((current) => ({ ...current, client_id: event.target.value }))} required />
+              <input className="input-field" placeholder="例如 com.rosm.donut" value={oidcForm.client_id} onChange={(event) => setOidcForm((current) => ({ ...current, client_id: event.target.value }))} required />
             </ConfigField>
             <ConfigField label="展示名称">
               <input className="input-field" placeholder="例如 Donut App" value={oidcForm.display_name} onChange={(event) => setOidcForm((current) => ({ ...current, display_name: event.target.value }))} />
             </ConfigField>
-            <ConfigField label="Client Secret">
-              <input type="password" className="input-field" placeholder={editingClientId ? '留空表示保持原密钥' : ''} value={oidcForm.client_secret} onChange={(event) => setOidcForm((current) => ({ ...current, client_secret: event.target.value }))} />
-              <p className="mt-2 text-xs leading-5 text-sage-500">移动端 Public Client 必须留空，不要把 client_secret 写入 Flutter 包。</p>
-            </ConfigField>
-            <ConfigField label="Redirect URIs">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs leading-5 text-sage-500">Web 端使用 HTTPS；移动端 Public Client 可使用自定义 scheme，例如 com.example.app:/oidc/callback。</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+              <label className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
+                <span>启用 Web</span>
+                <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.enable_web)} onChange={(event) => setOidcForm((current) => ({ ...current, enable_web: event.target.checked }))} />
+              </label>
+              <p className="mt-2 text-xs leading-5 text-sage-500">Web 使用 HTTPS 或 loopback 回调。仅 Web 启用时可选择机密客户端。</p>
+              <textarea rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
+            </div>
+
+            <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+              <label className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
+                <span>启用 App</span>
+                <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.enable_app)} onChange={(event) => setOidcForm((current) => ({ ...current, enable_app: event.target.checked, is_confidential: event.target.checked ? false : current.is_confidential, client_secret: event.target.checked ? '' : current.client_secret }))} />
+              </label>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs leading-5 text-sage-500">App 使用自定义 scheme。启用后此 client 自动作为 Public Client。</p>
                 <button type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
                   <Smartphone size={14} />
-                  移动端 Public 模板
+                  生成
                 </button>
               </div>
-              <textarea rows="5" className="input-field" value={oidcForm.redirect_uris} onChange={(event) => setOidcForm((current) => ({ ...current, redirect_uris: event.target.value }))} />
-            </ConfigField>
+              <input className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
             <ConfigField label="Scopes">
-              <div className="max-h-56 space-y-3 overflow-y-auto rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+              <div className="grid max-h-44 grid-cols-1 gap-2 overflow-y-auto rounded-2xl border border-sage-100 bg-sage-50/70 p-3 sm:grid-cols-2">
                 {OIDC_SCOPE_OPTIONS.map((scope) => (
-                  <label key={scope.value} className="flex items-start gap-3 rounded-xl bg-white px-3 py-2">
+                  <label key={scope.value} className="flex items-start gap-2 rounded-xl bg-white px-3 py-2">
                     <input
                       type="checkbox"
                       className="mt-1 h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
@@ -990,33 +1036,38 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                     />
                     <span>
                       <span className="block text-sm font-semibold text-sage-800">{scope.label}</span>
-                      <span className="block text-xs leading-5 text-sage-500">{scope.description}</span>
+                      <span className="block text-xs leading-4 text-sage-500">{scope.description}</span>
                     </span>
                   </label>
                 ))}
               </div>
             </ConfigField>
-            <ConfigField label="Grant Types">
-              <textarea rows="4" className="input-field md:col-span-2" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
-            </ConfigField>
+            <div className="space-y-4">
+              <ConfigField label="Grant Types">
+                <textarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="Client Secret">
+                <input type="password" className="input-field" disabled={Boolean(oidcForm.enable_app)} placeholder={oidcForm.enable_app ? 'App 已启用，必须留空' : editingClientId ? '留空表示保持原密钥' : ''} value={oidcForm.enable_app ? '' : oidcForm.client_secret} onChange={(event) => setOidcForm((current) => ({ ...current, client_secret: event.target.value }))} />
+              </ConfigField>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-6">
+
+          <div className="flex flex-wrap gap-5 rounded-2xl border border-sage-100 bg-sage-50/80 p-4">
             <label className="flex items-center gap-2 text-sm text-sage-600">
               <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={oidcForm.is_official} onChange={(event) => setOidcForm((current) => ({ ...current, is_official: event.target.checked }))} />
               官方应用
             </label>
             <label className="flex items-center gap-2 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={oidcForm.is_confidential} onChange={(event) => setOidcForm((current) => ({ ...current, is_confidential: event.target.checked }))} />
+              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.is_confidential) && !oidcForm.enable_app} disabled={Boolean(oidcForm.enable_app)} onChange={(event) => setOidcForm((current) => ({ ...current, is_confidential: event.target.checked }))} />
               机密客户端
             </label>
             <label className="flex items-center gap-2 text-sm text-sage-600">
               <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={oidcForm.is_active} onChange={(event) => setOidcForm((current) => ({ ...current, is_active: event.target.checked }))} />
               启用应用
             </label>
-          </div>
-          <div className="rounded-2xl border border-sage-100 bg-sage-50/80 p-4 text-xs leading-6 text-sage-600">
-            <p>移动端原生 SDK 必须使用 Public Client：关闭“机密客户端”、不填写 Client Secret，并登记与 Flutter 初始化完全一致的自定义 scheme Redirect URI。</p>
-            <p>Web 后台或服务端回调如果仍依赖 client_secret，请保留为单独的 Confidential Client，不要和移动端共用同一个 client_id。</p>
+            <p className="basis-full text-xs leading-5 text-sage-500">
+              同一个包名可以同时启用 Web/App。启用 App 后，此 client 会按 Public Client 保存；Web 如需严格保密的 client_secret，可单独建立只启用 Web 的机密客户端。
+            </p>
           </div>
         </Modal>
       )}
@@ -1336,7 +1387,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
             <p>把 <InlineCode>state</InlineCode> 当成必填项，防止回调串改。</p>
             <p>生产环境固定使用 HTTPS，并确认 <InlineCode>issuer</InlineCode>、JWKS 与回调域名都对外可访问。</p>
             <p>应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。</p>
-            <p>如果使用 Flutter SDK，请单独创建移动端 Public Client，关闭 <InlineCode>client_secret</InlineCode>，并确保 redirect URI 与应用侧自定义 scheme 完全一致。</p>
+            <p>如果使用 Flutter SDK，请在同一个包名应用中启用 App，关闭 <InlineCode>client_secret</InlineCode>，并确保 redirect URI 与应用侧自定义 scheme 完全一致。</p>
           </div>
         </div>
 
@@ -1386,17 +1437,19 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">1. 在管理端创建移动端客户端</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">移动端应用属于 Public Client。不要给 Flutter 包内置 <InlineCode>client_secret</InlineCode>，所有授权请求都使用 Authorization Code + PKCE S256。Web 后台或服务端回调如果仍需要机密客户端，请保留为单独 client，不要和移动端共用。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">移动端应用属于 Public Client。一个包名可以同时启用 Web 和 App；只要启用 App，这个 client 就会作为 Public Client 使用，不要给 Flutter 包内置 <InlineCode>client_secret</InlineCode>，所有授权请求都使用 Authorization Code + PKCE S256。Web 如果必须依赖 client_secret，可另建只启用 Web 的机密客户端。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="Client ID" value="com.cruos.zion.mobile" />
+          <InfoRow label="Client ID" value="com.cruos.zion" />
           <InfoRow label="Display Name" value="展示给用户看的应用名" />
           <InfoRow label="Redirect URI" value="com.cruos.zion:/oidc/callback" />
           <InfoRow label="Scopes" value="openid profile email phone accountRule" />
           <InfoRow label="Grant Types" value="authorization_code, refresh_token" />
           <InfoRow label="Confidential" value="关闭，移动端必须作为 Public Client" />
         </div>
-        <CodeBlock>{`Client ID: com.cruos.zion.mobile
+        <CodeBlock>{`Client ID: com.cruos.zion
+Enable Web: 按需
+Enable App: true
 Redirect URI: com.cruos.zion:/oidc/callback
 Confidential: false
 Client Secret: 留空
@@ -1430,7 +1483,7 @@ Scopes:
         </div>
         <CodeBlock>{`final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer}'),
-  clientId: 'com.cruos.zion.mobile',
+  clientId: 'com.cruos.zion',
   redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('${webAuthnOrigin}'),
@@ -1565,7 +1618,7 @@ await passport.signOut();`}</CodeBlock>
         <h3 className="text-lg font-bold text-sage-900">9. 检查清单</h3>
         <div className="space-y-2 text-sm leading-7 text-sage-600">
           <p>客户端必须关闭 <InlineCode>Confidential</InlineCode>，移动端不保存 <InlineCode>client_secret</InlineCode>。</p>
-          <p>移动端建议使用独立 client_id，例如 <InlineCode>com.cruos.zion.mobile</InlineCode>；不要复用旧 Web 登录的机密客户端。</p>
+          <p>同一个包名可以同时启用 Web/App；启用 App 后该 client 会作为 Public Client 保存。</p>
           <p><InlineCode>Redirect URI</InlineCode> 必须和 Flutter 初始化的自定义 scheme 完全一致。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
           <p>使用通行密钥时，iOS Associated Domains、Android Digital Asset Links 与 <InlineCode>webAuthnOrigin</InlineCode> 必须指向同一个 HTTPS 登录域名边界。</p>

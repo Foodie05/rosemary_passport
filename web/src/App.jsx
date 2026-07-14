@@ -355,6 +355,10 @@ function App() {
     client_id: '',
     display_name: '',
     is_official: false,
+    enable_web: true,
+    enable_app: false,
+    web_redirect_uris: '',
+    app_redirect_uri: '',
     redirect_uris: '',
     scopes: 'openid\nprofile\nemail\nphone',
     grant_types: 'authorization_code\nrefresh_token',
@@ -1681,6 +1685,11 @@ function App() {
         .map((item) => item.trim())
         .filter(Boolean)
         .reduce((items, item) => (items.includes(item) ? items : [...items, item]), fallback);
+    const combinedRedirectUris = [
+      ...(oidcForm.enable_web ? parseLines(oidcForm.web_redirect_uris || oidcForm.redirect_uris) : []),
+      ...(oidcForm.enable_app ? parseLines(oidcForm.app_redirect_uri) : []),
+    ].reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
+    const appEnabled = Boolean(oidcForm.enable_app);
     try {
       await api(`/api/v1/admin/oidc/clients/${encodeURIComponent(oidcForm.client_id.trim())}`, {
         method: 'PUT',
@@ -1689,11 +1698,11 @@ function App() {
           client_id: oidcForm.client_id.trim(),
           display_name: oidcForm.display_name.trim(),
           is_official: Boolean(oidcForm.is_official),
-          redirect_uris: parseLines(oidcForm.redirect_uris),
+          redirect_uris: combinedRedirectUris,
           scopes: parseLines(oidcForm.scopes, ['openid', 'profile', 'email', 'phone']),
           grant_types: parseLines(oidcForm.grant_types, ['authorization_code', 'refresh_token']),
-          client_secret: oidcForm.client_secret,
-          is_confidential: Boolean(oidcForm.is_confidential),
+          client_secret: appEnabled ? '' : oidcForm.client_secret,
+          is_confidential: appEnabled ? false : Boolean(oidcForm.is_confidential),
           is_active: Boolean(oidcForm.is_active),
         },
       });

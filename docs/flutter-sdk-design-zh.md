@@ -144,7 +144,7 @@ SDK 随后调用 `/oidc/token`：
 ```dart
 final passport = RosmPassportClient(
   issuer: Uri.parse('https://auth.example.com'),
-  clientId: 'com.cruos.zion.mobile',
+  clientId: 'com.cruos.zion',
   redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('https://auth.example.com'),
@@ -212,8 +212,8 @@ await passport.completePasskeyRegistration(
 
 ## 接入流程
 
-1. 后台创建独立的 OIDC public client，例如 `com.cruos.zion.mobile`。不要复用旧 Web 登录使用的 confidential client。
-2. 配置 native redirect URI，例如 `com.cruos.zion:/oidc/callback`，并确保与 Flutter 初始化值完全一致。
+1. 后台创建或编辑包名式 OIDC client，例如 `com.cruos.zion`，勾选启用 App，并保持为 public client。
+2. 配置 native redirect URI，例如 `com.cruos.zion:/oidc/callback`，并确保与 Flutter 初始化值完全一致。Web 和 App 可共用同一个包名 client；如果 Web 必须要求 `client_secret`，再单独创建只启用 Web 的 confidential client。
 3. Flutter 初始化 `RosmPassportClient`。
 4. SDK 生成 `state`、`nonce`、PKCE。
 5. SDK 调用 `native/start` 获取 client 与 scope 展示信息。

@@ -7,7 +7,7 @@ This package is intentionally UI-free. Apps provide their own screens for code i
 ```dart
 final passport = RosmPassportClient(
   issuer: Uri.parse('https://auth.example.com'),
-  clientId: 'com.cruos.zion.mobile',
+  clientId: 'com.cruos.zion',
   redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('https://auth.example.com'),
@@ -32,7 +32,7 @@ final user = await passport.userInfo();
 print('Signed in as ${session.user.nickname}; subject=${user.sub}');
 ```
 
-Native mobile clients must be configured as public OIDC clients and use PKCE S256. If an app already has a web or server-side confidential client, create a separate mobile client instead of reusing the same `client_id`.
+Native mobile clients must be configured as public OIDC clients and use PKCE S256. A single package-style `client_id` can enable both Web and App redirects; if App is enabled, keep that client public. Use a separate Web-only confidential client only when the web callback must require `client_secret`.
 
 ## Password recovery
 
@@ -112,8 +112,8 @@ await passport.deletePasskey(passkeys.credentials.first.credentialId);
 
 ## Required configuration
 
-- Create the mobile app as a public OIDC client, for example `com.cruos.zion.mobile`. Do not ship `client_secret` in Flutter.
-- Keep web/server callbacks on a separate confidential client when they need `client_secret`.
+- Create or edit the package-style OIDC client, for example `com.cruos.zion`, enable App, and keep it public. Do not ship `client_secret` in Flutter.
+- Web and App can be enabled on the same package client. If Web must require `client_secret`, use a separate Web-only confidential client.
 - Enable Authorization Code and Refresh Token grants, and require PKCE S256.
 - Register the app redirect URI exactly, for example `com.cruos.zion:/oidc/callback`.
 - Configure Associated Domains on iOS and Digital Asset Links on Android for the WebAuthn relying party domain.
