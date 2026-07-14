@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'rosm_native_passkeys.dart';
 import 'rosm_passport_client.dart';
 
 typedef RosmCaptchaTokenProvider = Future<String?> Function();
@@ -280,11 +281,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   }
 
   Future<void> _loginWithPasskeyForPasswordMfa() async {
-    final authenticator = widget.config.authenticatePasskey;
-    if (authenticator == null) {
-      setState(() => _error = '当前应用尚未接入系统通行密钥能力。');
-      return;
-    }
+    final authenticator =
+        widget.config.authenticatePasskey ?? authenticateRosmPasskey;
     await _run(() async {
       final email = _passwordEmail.text.trim();
       final options = await widget.client.beginWebAuthnLogin(email: email);
@@ -298,11 +296,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   }
 
   Future<void> _loginWithPasskey() async {
-    final authenticator = widget.config.authenticatePasskey;
-    if (authenticator == null) {
-      setState(() => _error = '当前应用尚未接入系统通行密钥能力。');
-      return;
-    }
+    final authenticator =
+        widget.config.authenticatePasskey ?? authenticateRosmPasskey;
     await _run(() async {
       final email = _email.text.trim().isEmpty ? null : _email.text.trim();
       final options = await widget.client.beginWebAuthnLogin(email: email);

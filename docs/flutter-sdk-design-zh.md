@@ -191,10 +191,6 @@ final result = await showRosmPassportSignIn(
       'https://api.example.com/auth/rosm/sdk/complete',
     ),
     requestCaptchaToken: () => captchaProvider(),
-    authenticatePasskey: (options) async {
-      final response = await passkeyPlugin.authenticate(options.options);
-      return RosmWebAuthnCredential(response);
-    },
   ),
 );
 
@@ -284,24 +280,33 @@ await passport.resetPasswordByCode(
 );
 ```
 
-通行密钥登录与添加：
+通行密钥登录与添加默认由 SDK 内置原生适配层完成。SDK 会把后端返回的 WebAuthn options 转换为平台请求，调起系统通行密钥面板，并把响应封装回 `RosmWebAuthnCredential`；接入方不需要手写 WebAuthn JSON，也不需要再接第三方 passkey 插件。
 
 ```dart
 final options = await passport.beginWebAuthnLogin(email: 'user@example.com');
-final response = await passkeyPlugin.authenticate(options.options);
+final credential = await authenticateRosmPasskey(options);
 await passport.completeWebAuthnLogin(
   email: 'user@example.com',
-  credential: RosmWebAuthnCredential(response),
+  credential: credential,
 );
 
 final registerOptions = await passport.beginPasskeyRegistration(
   currentPassword: currentPassword,
 );
-final registerResponse = await passkeyPlugin.register(registerOptions.options);
+final registerCredential = await registerRosmPasskey(registerOptions);
 await passport.completePasskeyRegistration(
-  credential: RosmWebAuthnCredential(registerResponse),
+  credential: registerCredential,
 );
 ```
+
+内置适配支持 Android、iOS、macOS、Web 和 Windows。Linux 取决于底层 Flutter passkey 插件，目前不可用。接入方如果必须使用自定义平台实现，可以通过 `RosmPassportSignInConfig.authenticatePasskey` 和 `RosmPassportAccountConfig.registerPasskey` 覆盖默认实现。
+
+平台配置要求：
+
+- iOS/macOS：为 App 增加 Associated Domains entitlement，配置 `webcredentials:<rp-domain>`，并在该域名提供 Apple App Site Association 文件。
+- Android：在 WebAuthn RP 域名提供 Digital Asset Links，绑定 App package name 与签名证书 fingerprint。
+- Web：必须使用 HTTPS origin，且 origin/RP ID 与 ROSM Passport 签发的 WebAuthn options 保持一致。
+- Windows：不需要移动端 entitlement，但仍需保证 RP ID 与 origin 由服务端按同一域名生成。
 
 核心类：
 

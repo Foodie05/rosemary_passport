@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'rosm_native_passkeys.dart';
 import 'rosm_passport_client.dart';
 
 class RosmPassportAccountConfig {
@@ -279,19 +280,14 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         passkeys: _passkeys,
         currentPassword: _currentPassword,
         busy: _busy,
-        canRegister: widget.config.registerPasskey != null,
+        canRegister: true,
         onRefresh: () => _run(() async {
           final passkeys = await widget.client.listPasskeys();
           setState(() => _passkeys = passkeys);
         }),
         onRegister: () => _run(() async {
-          final registrar = widget.config.registerPasskey;
-          if (registrar == null) {
-            throw const RosmApiException(
-              'passkey_not_configured',
-              '当前应用尚未接入系统通行密钥注册能力。',
-            );
-          }
+          final registrar =
+              widget.config.registerPasskey ?? registerRosmPasskey;
           final options = await widget.client.beginPasskeyRegistration(
             currentPassword: _currentPassword.text,
           );
