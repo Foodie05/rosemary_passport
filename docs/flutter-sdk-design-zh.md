@@ -18,17 +18,30 @@ SDK 覆盖：
 - 独立 Passkey 登录
 - 忘记密码：邮箱/手机找回验证码与重置密码
 - 登录后添加、列出、删除 Passkey
-- 原生授权确认
+- SDK 内置 Rosemary 风格登录与授权确认 UI
+- 服务端交接模式：把已授权的登录请求交给接入方服务器完成换票和业务会话
 
 ## 安全模型
 
-Flutter 应用只能作为 public client 接入：
+推荐生产应用使用服务端交接模式：
 
 - 不允许在移动端内置 `client_secret`
+- 接入方自己的服务器是机密边界，保存 OIDC `client_secret`
+- SDK 在 App 内完成登录 UI、授权确认、PKCE 和授权码获取
+- SDK 将 `code`、`code_verifier`、`state`、`nonce`、`redirect_uri` 交给接入方服务器
+- 接入方服务器调用 `/oidc/token`，校验 `id_token`，再签发自己的 App 会话
+
+Public 直连模式仍可用于轻量应用：
+
+- OIDC client 必须配置为 public
+- 使用移动端自定义 scheme redirect URI
+- ROSM token 由 SDK 存入平台安全存储，例如 iOS Keychain / Android Keystore
+
+所有模式都必须满足：
+
 - 所有原生授权请求必须使用 PKCE `S256`
 - `scope` 包含 `openid` 时必须传 `nonce`
 - SDK 在本地生成并校验 `state`、`nonce`、`code_verifier`
-- refresh token 存入平台安全存储，例如 iOS Keychain / Android Keystore
 - Passkey 走系统能力，不在 SDK 中自行处理私钥
 - Passkey 的 relying party 域名必须通过 iOS Associated Domains / Android Digital Asset Links 与应用绑定
 
@@ -57,7 +70,8 @@ POST /api/v1/oidc/native/cancel
   "state": "generated-state",
   "nonce": "generated-nonce",
   "code_challenge": "pkce-s256-challenge",
-  "code_challenge_method": "S256"
+  "code_challenge_method": "S256",
+  "server_handoff": true
 }
 ```
 
@@ -79,7 +93,8 @@ POST /api/v1/oidc/native/cancel
   "client": {
     "client_id": "my_flutter_app",
     "display_name": "Example App",
-    "is_official": false
+    "is_official": false,
+    "is_confidential": true
   },
   "scopes": [
     {"name": "openid", "description": "确认你的登录身份"},
@@ -87,7 +102,8 @@ POST /api/v1/oidc/native/cancel
     {"name": "email", "description": "电子邮箱"},
     {"name": "phone", "description": "电话号码"}
   ],
-  "pkce_required": true
+  "pkce_required": true,
+  "server_handoff": true
 }
 ```
 
@@ -113,17 +129,34 @@ POST /api/v1/oidc/native/cancel
 }
 ```
 
-SDK 随后调用 `/oidc/token`：
+服务端交接模式下，SDK 不在设备上换 token，而是调用接入方服务器：
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "client_id": "my_flutter_app",
+  "code": "authorization-code",
+  "state": "generated-state",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "code_verifier": "original-code-verifier",
+  "nonce": "generated-nonce"
+}
+```
+
+接入方服务器随后调用 `/oidc/token`：
 
 ```json
 {
   "grant_type": "authorization_code",
   "code": "authorization-code",
   "client_id": "my_flutter_app",
-  "redirect_uri": "com.example.app:/oidc/callback",
+  "client_secret": "server-only-secret",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
   "code_verifier": "original-code-verifier"
 }
 ```
+
+Public 直连模式下，SDK 可直接调用 `/oidc/token` 并把 token 写入安全存储。
 
 ### cancel
 
@@ -145,22 +178,27 @@ SDK 随后调用 `/oidc/token`：
 final passport = RosmPassportClient(
   issuer: Uri.parse('https://auth.example.com'),
   clientId: 'com.cruos.zion',
-  redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
+  redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('https://auth.example.com'),
 );
 
-final result = await passport.signInWithEmailCode(
-  email: 'user@example.com',
-  codeProvider: (challenge) async {
-    await challenge.send();
-    return showCodeInput();
-  },
+final result = await showRosmPassportSignIn(
+  context,
+  client: passport,
+  config: RosmPassportSignInConfig(
+    serverHandoffEndpoint: Uri.parse(
+      'https://api.example.com/auth/rosm/sdk/complete',
+    ),
+    requestCaptchaToken: () => captchaProvider(),
+    authenticatePasskey: (options) async {
+      final response = await passkeyPlugin.authenticate(options.options);
+      return RosmWebAuthnCredential(response);
+    },
+  ),
 );
 
-final user = await passport.userInfo();
-await passport.refresh();
-await passport.signOut();
+final appSession = result?.serverPayload;
 ```
 
 SDK 对应用侧暴露 Dart 类型，例如 `RosmAuthorizationRequest`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 编解码只在 SDK 内部完成，模型层使用 `json_serializable` 生成。
@@ -212,17 +250,18 @@ await passport.completePasskeyRegistration(
 
 ## 接入流程
 
-1. 后台创建或编辑包名式 OIDC client，例如 `com.cruos.zion`，勾选启用 App，并保持为 public client。
-2. 配置 native redirect URI，例如 `com.cruos.zion:/oidc/callback`，并确保与 Flutter 初始化值完全一致。Web 和 App 可共用同一个包名 client；如果 Web 必须要求 `client_secret`，再单独创建只启用 Web 的 confidential client。
+1. 后台创建或编辑包名式 OIDC client，例如 `com.cruos.zion`。
+2. 推荐服务端交接模式：client 配置为 confidential，redirect URI 使用接入方服务器 HTTPS 回调，例如 `https://api.example.com/auth/rosm/callback`，`client_secret` 只保存于接入方服务器。
+3. 备用 Public 直连模式：client 配置为 public，redirect URI 使用自定义 scheme，例如 `com.cruos.zion:/oidc/callback`。
 3. Flutter 初始化 `RosmPassportClient`。
 4. SDK 生成 `state`、`nonce`、PKCE。
 5. SDK 调用 `native/start` 获取 client 与 scope 展示信息。
 6. 用户选择登录方式并完成登录。
 7. SDK 展示原生授权确认。
 8. SDK 调用 `native/approve` 获取 authorization code。
-9. SDK 调用 `/oidc/token` 换取 token。
-10. SDK 校验 `state`、`nonce`、`id_token` 关键 claims。
-11. SDK 将 refresh token 写入安全存储。
+9. 服务端交接模式下，SDK 调用接入方服务器 handoff endpoint，服务器带 `client_secret` 和 `code_verifier` 调用 `/oidc/token`。
+10. 接入方服务器校验 `state`、`nonce`、`issuer`、`aud`、过期时间和 redirect URI，并签发自己的 App 会话。
+11. Public 直连模式下，SDK 可直接调用 `/oidc/token` 并把 refresh token 写入安全存储。
 
 ## 后续增强
 

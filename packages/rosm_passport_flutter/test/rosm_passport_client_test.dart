@@ -101,6 +101,68 @@ void main() {
     expect(jsonDecode(captured.body), {'email': 'user@example.com'});
   });
 
+  test(
+    'completes server handoff with authorization code and verifier',
+    () async {
+      late http.Request captured;
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://auth.example.com'),
+        clientId: 'com.example.app',
+        redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
+        tokenStore: _MemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          captured = request;
+          return http.Response(
+            jsonEncode({'session_token': 'app-session'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final authRequest = client.createAuthorizationRequest(
+        state: 'state-1',
+        nonce: 'nonce-1',
+        serverHandoff: true,
+      );
+      final approval = RosmAuthorizationApproval(
+        code: 'code-1',
+        state: 'state-1',
+        redirectUri: authRequest.redirectUri,
+        callbackUrl: authRequest.redirectUri.replace(
+          queryParameters: {'code': 'code-1', 'state': 'state-1'},
+        ),
+      );
+
+      final result = await client.completeServerHandoff(
+        endpoint: Uri.parse('https://api.example.com/auth/rosm/sdk/complete'),
+        request: authRequest,
+        approval: approval,
+        headers: const {'x-app': 'zion'},
+        extra: const {'device_id': 'device-1'},
+      );
+
+      final body = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(result.payload['session_token'], 'app-session');
+      expect(captured.method, 'POST');
+      expect(
+        captured.url.toString(),
+        'https://api.example.com/auth/rosm/sdk/complete',
+      );
+      expect(captured.headers['x-app'], 'zion');
+      expect(body['issuer'], 'https://auth.example.com');
+      expect(body['client_id'], 'com.example.app');
+      expect(
+        body['redirect_uri'],
+        'https://api.example.com/auth/rosm/callback',
+      );
+      expect(body['code'], 'code-1');
+      expect(body['state'], 'state-1');
+      expect(body['nonce'], 'nonce-1');
+      expect(body['code_verifier'], authRequest.codeVerifier);
+      expect(body['extra'], {'device_id': 'device-1'});
+    },
+  );
+
   test('lists and deletes passkeys', () async {
     final requests = <http.Request>[];
     final client = RosmPassportClient(

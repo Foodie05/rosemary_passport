@@ -17,6 +17,7 @@ Map<String, dynamic> _$RosmAuthorizationRequestToJson(
   'nonce': instance.nonce,
   'code_challenge': instance.codeChallenge,
   'code_challenge_method': instance.codeChallengeMethod,
+  'server_handoff': instance.serverHandoff,
 };
 
 RosmNativeAuthorizationRequest _$RosmNativeAuthorizationRequestFromJson(
@@ -32,6 +33,7 @@ RosmNativeAuthorizationRequest _$RosmNativeAuthorizationRequestFromJson(
   nonce: json['nonce'] as String?,
   codeChallenge: json['code_challenge'] as String?,
   codeChallengeMethod: json['code_challenge_method'] as String?,
+  serverHandoff: json['server_handoff'] as bool? ?? false,
 );
 
 RosmAuthorizationStart _$RosmAuthorizationStartFromJson(
@@ -66,6 +68,7 @@ RosmClientInfo _$RosmClientInfoFromJson(Map<String, dynamic> json) =>
       clientId: json['client_id'] as String,
       displayName: json['display_name'] as String,
       isOfficial: json['is_official'] as bool,
+      isConfidential: json['is_confidential'] as bool? ?? false,
     );
 
 RosmScopeInfo _$RosmScopeInfoFromJson(Map<String, dynamic> json) =>

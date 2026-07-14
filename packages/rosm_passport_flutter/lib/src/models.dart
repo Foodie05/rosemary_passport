@@ -28,6 +28,7 @@ class RosmAuthorizationRequest {
     required this.codeVerifier,
     required this.codeChallenge,
     required this.codeChallengeMethod,
+    this.serverHandoff = false,
   });
 
   final String clientId;
@@ -41,6 +42,7 @@ class RosmAuthorizationRequest {
   final String codeVerifier;
   final String codeChallenge;
   final String codeChallengeMethod;
+  final bool serverHandoff;
 
   Map<String, dynamic> toJson() => _$RosmAuthorizationRequestToJson(this);
 }
@@ -60,6 +62,7 @@ class RosmNativeAuthorizationRequest {
     this.nonce,
     this.codeChallenge,
     this.codeChallengeMethod,
+    this.serverHandoff = false,
   });
 
   factory RosmNativeAuthorizationRequest.fromJson(Map<String, dynamic> json) =>
@@ -74,6 +77,7 @@ class RosmNativeAuthorizationRequest {
   final String? nonce;
   final String? codeChallenge;
   final String? codeChallengeMethod;
+  final bool serverHandoff;
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
@@ -127,6 +131,7 @@ class RosmClientInfo {
     required this.clientId,
     required this.displayName,
     required this.isOfficial,
+    this.isConfidential = false,
   });
 
   factory RosmClientInfo.fromJson(Map<String, dynamic> json) =>
@@ -135,6 +140,7 @@ class RosmClientInfo {
   final String clientId;
   final String displayName;
   final bool isOfficial;
+  final bool isConfidential;
 }
 
 @JsonSerializable(createToJson: false)
@@ -146,6 +152,16 @@ class RosmScopeInfo {
 
   final String name;
   final String description;
+}
+
+class RosmServerHandoffResult {
+  const RosmServerHandoffResult({
+    required this.authorization,
+    required this.payload,
+  });
+
+  final RosmAuthorizationApproval authorization;
+  final Map<String, dynamic> payload;
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, includeIfNull: false)

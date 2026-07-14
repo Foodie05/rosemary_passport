@@ -34,6 +34,7 @@ class RosmPassportClient {
     Set<String>? scopes,
     String? state,
     String? nonce,
+    bool serverHandoff = false,
   }) {
     final codeVerifier = randomUrlSafeString(64);
     return RosmAuthorizationRequest(
@@ -46,6 +47,7 @@ class RosmPassportClient {
       codeVerifier: codeVerifier,
       codeChallenge: s256Challenge(codeVerifier),
       codeChallengeMethod: 'S256',
+      serverHandoff: serverHandoff,
     );
   }
 
@@ -86,13 +88,47 @@ class RosmPassportClient {
     final json = await _postJson('/oidc/token', {
       'grant_type': 'authorization_code',
       'code': approval.code,
-      'client_id': clientId,
-      'redirect_uri': redirectUri.toString(),
+      'client_id': request.clientId,
+      'redirect_uri': request.redirectUri.toString(),
       'code_verifier': request.codeVerifier,
     });
     final tokens = RosmTokenSet.fromJson(json);
     await _tokenStore.save(tokens);
     return tokens;
+  }
+
+  Future<RosmServerHandoffResult> completeServerHandoff({
+    required Uri endpoint,
+    required RosmAuthorizationRequest request,
+    required RosmAuthorizationApproval approval,
+    Map<String, String> headers = const {},
+    Map<String, Object?> extra = const {},
+  }) async {
+    if (!request.serverHandoff) {
+      throw const RosmApiException(
+        'server_handoff_required',
+        'Create the authorization request with serverHandoff: true.',
+      );
+    }
+    if (approval.state != request.state) {
+      throw const RosmApiException(
+        'invalid_state',
+        'Authorization response state did not match the request.',
+      );
+    }
+    final json = await _postAbsoluteJson(endpoint, {
+      'issuer': issuer.toString(),
+      'client_id': request.clientId,
+      'redirect_uri': request.redirectUri.toString(),
+      'code': approval.code,
+      'state': approval.state,
+      'callback_url': approval.callbackUrl.toString(),
+      'code_verifier': request.codeVerifier,
+      'scope': request.scope,
+      'nonce': request.nonce,
+      if (extra.isNotEmpty) 'extra': extra,
+    }, headers: headers);
+    return RosmServerHandoffResult(authorization: approval, payload: json);
   }
 
   Future<RosmTokenSet> refresh() async {
@@ -349,6 +385,19 @@ class RosmPassportClient {
     if (ignoreApiError && response.statusCode >= 400) {
       return const {};
     }
+    return _decodeJsonResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _postAbsoluteJson(
+    Uri endpoint,
+    Map<String, Object?> body, {
+    Map<String, String> headers = const {},
+  }) async {
+    final response = await _http.post(
+      endpoint,
+      headers: {'content-type': 'application/json', ...headers},
+      body: jsonEncode(body),
+    );
     return _decodeJsonResponse(response);
   }
 

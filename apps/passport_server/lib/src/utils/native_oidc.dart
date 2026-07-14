@@ -13,6 +13,7 @@ class NativeAuthorizationRequest {
     required this.nonce,
     required this.codeChallenge,
     required this.codeChallengeMethod,
+    this.serverHandoff = false,
     this.state,
   });
 
@@ -23,6 +24,7 @@ class NativeAuthorizationRequest {
   final String? nonce;
   final String? codeChallenge;
   final String? codeChallengeMethod;
+  final bool serverHandoff;
   final String? state;
 }
 
@@ -51,6 +53,7 @@ class NativeAuthorizationDescription {
           'code_challenge': request.codeChallenge,
         if (request.codeChallengeMethod != null)
           'code_challenge_method': request.codeChallengeMethod,
+        if (request.serverHandoff) 'server_handoff': true,
       },
       'client': {
         'client_id': request.clientId,
@@ -58,9 +61,11 @@ class NativeAuthorizationDescription {
             ? request.clientId
             : displayName,
         'is_official': client['is_official'] == true,
+        'is_confidential': client['is_confidential'] == true,
       },
       'scopes': requestedScopes.map(scopeDescription).toList(),
       'pkce_required': true,
+      'server_handoff': request.serverHandoff,
     };
   }
 }
@@ -103,6 +108,7 @@ NativeAuthorizationRequest? parseNativeAuthorizationRequest(
         codeChallengeMethod == null || codeChallengeMethod.isEmpty
         ? null
         : codeChallengeMethod,
+    serverHandoff: body['server_handoff'] == true,
   );
 }
 
@@ -112,7 +118,14 @@ Future<NativeAuthorizationDescription?> describeNativeAuthorization(
 ) async {
   final oidc = context.read<OidcService>();
   final client = await oidc.findClient(request.clientId);
-  if (client == null || client['is_confidential'] == true) {
+  if (client == null) {
+    return null;
+  }
+  final isConfidential = client['is_confidential'] == true;
+  if (isConfidential && !request.serverHandoff) {
+    return null;
+  }
+  if (isConfidential && !_isServerRedirectUri(request.redirectUri)) {
     return null;
   }
 
@@ -144,6 +157,22 @@ Future<NativeAuthorizationDescription?> describeNativeAuthorization(
     client: client,
     requestedScopes: requestedScopes,
   );
+}
+
+bool _isServerRedirectUri(String redirectUri) {
+  final uri = Uri.tryParse(redirectUri);
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    return false;
+  }
+  if (uri.scheme == 'https') {
+    return true;
+  }
+  if (uri.scheme != 'http') {
+    return false;
+  }
+  return uri.host == 'localhost' ||
+      uri.host == '127.0.0.1' ||
+      uri.host == '::1';
 }
 
 Map<String, String> scopeDescription(String scope) {

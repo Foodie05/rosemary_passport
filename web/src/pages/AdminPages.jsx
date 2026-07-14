@@ -1010,10 +1010,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
               <label className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
                 <span>启用 App</span>
-                <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.enable_app)} onChange={(event) => setOidcForm((current) => ({ ...current, enable_app: event.target.checked, is_confidential: event.target.checked ? false : current.is_confidential, client_secret: event.target.checked ? '' : current.client_secret }))} />
+                <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.enable_app)} onChange={(event) => setOidcForm((current) => ({ ...current, enable_app: event.target.checked }))} />
               </label>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs leading-5 text-sage-500">App 使用自定义 scheme。启用后此 client 自动作为 Public Client。</p>
+                <p className="text-xs leading-5 text-sage-500">Public 直连使用自定义 scheme；服务端交接使用上方 HTTPS 回调并可保持机密客户端。</p>
                 <button type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
                   <Smartphone size={14} />
                   生成
@@ -1047,7 +1047,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                 <textarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
               </ConfigField>
               <ConfigField label="Client Secret">
-                <input type="password" className="input-field" disabled={Boolean(oidcForm.enable_app)} placeholder={oidcForm.enable_app ? 'App 已启用，必须留空' : editingClientId ? '留空表示保持原密钥' : ''} value={oidcForm.enable_app ? '' : oidcForm.client_secret} onChange={(event) => setOidcForm((current) => ({ ...current, client_secret: event.target.value }))} />
+                <input type="password" className="input-field" placeholder={editingClientId ? '留空表示保持原密钥' : '机密客户端必填，Public 可留空'} value={oidcForm.client_secret} onChange={(event) => setOidcForm((current) => ({ ...current, client_secret: event.target.value }))} />
               </ConfigField>
             </div>
           </div>
@@ -1058,7 +1058,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               官方应用
             </label>
             <label className="flex items-center gap-2 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.is_confidential) && !oidcForm.enable_app} disabled={Boolean(oidcForm.enable_app)} onChange={(event) => setOidcForm((current) => ({ ...current, is_confidential: event.target.checked }))} />
+              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.is_confidential)} onChange={(event) => setOidcForm((current) => ({ ...current, is_confidential: event.target.checked }))} />
               机密客户端
             </label>
             <label className="flex items-center gap-2 text-sm text-sage-600">
@@ -1066,7 +1066,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               启用应用
             </label>
             <p className="basis-full text-xs leading-5 text-sage-500">
-              同一个包名可以同时启用 Web/App。启用 App 后，此 client 会按 Public Client 保存；Web 如需严格保密的 client_secret，可单独建立只启用 Web 的机密客户端。
+              同一个包名可以同时启用 Web/App。服务端交接模式可使用机密客户端和 HTTPS 回调；Public 直连模式必须关闭机密客户端并使用自定义 scheme。
             </p>
           </div>
         </Modal>
@@ -1137,16 +1137,16 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     '',
     `SDK 地址：${FLUTTER_SDK_GITHUB_URL}`,
     '',
-    '移动端 Flutter 应用建议使用 ROSM Passport Flutter SDK，以原生页面完成登录、授权确认、token 交换、刷新和登出，不需要跳转到 Web 登录页。',
+    '移动端 Flutter 应用建议使用 ROSM Passport Flutter SDK，以原生 Rosemary 风格页面完成登录和授权确认，不需要跳转到 Web 登录页。生产业务应用推荐使用服务端交接模式：SDK 只取得授权码并交给接入方服务器，接入方服务器作为机密客户端换 token 并创建业务会话。',
     '',
     '管理端配置建议：',
     '',
     '- `Client ID`：例如 `my-flutter-app`',
     '- `Display Name`：填写展示给用户看的应用名',
-    '- `Redirect URI`：使用应用自定义 scheme，例如 `com.example.app:/oidc/callback`',
+    '- `Redirect URI`：服务端交接模式使用接入方服务器 HTTPS 回调，例如 `https://api.example.com/auth/rosm/callback`；Public 直连模式才使用自定义 scheme，例如 `com.example.app:/oidc/callback`',
     '- `Scopes`：至少包含 `openid profile`，按需增加 `email`、`phone`、`accountRule`',
     '- `Grant Types`：启用 `authorization_code` 和 `refresh_token`',
-    '- `Confidential`：关闭。移动端是 public client，不能内置 `client_secret`',
+    '- `Confidential`：服务端交接模式开启，secret 只放接入方服务器；Public 直连模式关闭',
     '- `Active`：开启',
     '',
     'Flutter 侧依赖：',
@@ -1163,28 +1163,23 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     `final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer || 'https://auth.example.com'}'),
   clientId: 'my-flutter-app',
-  redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+  redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone'},
 );
 
-final request = passport.createAuthorizationRequest();
-final start = await passport.startNativeAuthorization(request);
-
-await passport.sendEmailLoginCode(email: 'user@example.com');
-final session = await passport.loginWithEmailCode(
-  email: 'user@example.com',
-  emailCode: '123456',
+final result = await showRosmPassportSignIn(
+  context,
+  client: passport,
+  config: RosmPassportSignInConfig(
+    serverHandoffEndpoint: Uri.parse(
+      'https://api.example.com/auth/rosm/sdk/complete',
+    ),
+  ),
 );
-
-final approval = await passport.approveNativeAuthorization(request);
-final tokens = await passport.exchangeCode(
-  request: request,
-  approval: approval,
-);
-final userInfo = await passport.userInfo();`,
+final appSession = result?.serverPayload;`,
     '```',
     '',
-    'SDK 对应用侧暴露 Dart 类型和方法，例如 `RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 请求和响应只在 SDK 内部处理。',
+    'SDK 对应用侧暴露 Dart 类型和方法，例如 `RosmPassportSignInConfig`、`RosmPassportUiResult`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 请求和响应只在 SDK 内部处理。',
     '',
     '## 5. Web / 服务端接入步骤',
     '',
@@ -1229,7 +1224,7 @@ Authorization: Bearer ACCESS_TOKEN`,
     '- 把 `state` 当成必填项，防止回调串改。',
     '- 生产环境固定使用 HTTPS，并确认 `issuer`、JWKS 与回调域名都对外可访问。',
     '- 应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。',
-    '- 如果使用 Flutter SDK，请将客户端配置为 Public，并确保 redirect URI 与应用侧自定义 scheme 完全一致。',
+    '- 如果使用 Flutter SDK，推荐配置为服务端交接模式：机密客户端使用 HTTPS 回调，secret 只放接入方服务器；只有 Public 直连模式才使用自定义 scheme。',
     '',
     '## 7. 管理员检查清单',
     '',
@@ -1387,7 +1382,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
             <p>把 <InlineCode>state</InlineCode> 当成必填项，防止回调串改。</p>
             <p>生产环境固定使用 HTTPS，并确认 <InlineCode>issuer</InlineCode>、JWKS 与回调域名都对外可访问。</p>
             <p>应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。</p>
-            <p>如果使用 Flutter SDK，请在同一个包名应用中启用 App，关闭 <InlineCode>client_secret</InlineCode>，并确保 redirect URI 与应用侧自定义 scheme 完全一致。</p>
+            <p>如果使用 Flutter SDK，推荐使用服务端交接模式：机密客户端使用 HTTPS 回调，<InlineCode>client_secret</InlineCode> 只放接入方服务器；只有 Public 直连模式才使用自定义 scheme。</p>
           </div>
         </div>
 
@@ -1421,7 +1416,7 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
       <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="Flutter SDK 接入"
-        description="面向移动端应用的原生接入说明。应用侧使用 Dart 类和 SDK 方法完成登录授权，JSON 请求由 SDK 内部处理。"
+        description="面向移动端应用的原生接入说明。SDK 内置 Rosemary 风格登录 UI，应用侧使用 Dart 类和方法完成登录授权，JSON 请求由 SDK 内部处理。"
         actions={(
           <>
             <Link to="/admin/oidc/docs" className="btn-secondary">
@@ -1436,20 +1431,27 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">1. 在管理端创建移动端客户端</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">移动端应用属于 Public Client。一个包名可以同时启用 Web 和 App；只要启用 App，这个 client 就会作为 Public Client 使用，不要给 Flutter 包内置 <InlineCode>client_secret</InlineCode>，所有授权请求都使用 Authorization Code + PKCE S256。Web 如果必须依赖 client_secret，可另建只启用 Web 的机密客户端。</p>
+          <h3 className="text-lg font-bold text-sage-900">1. 选择客户端模式</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">推荐生产应用使用“服务端交接”模式：Flutter SDK 在 App 内完成 Rosemary 风格登录 UI 和授权确认，但 <InlineCode>client_secret</InlineCode> 仍只放在接入方自己的服务器。SDK 获取一次性授权码后，把授权码和 PKCE verifier 交给接入方服务器，由服务器作为机密客户端换取 token 并创建业务会话。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="Client ID" value="com.cruos.zion" />
           <InfoRow label="Display Name" value="展示给用户看的应用名" />
-          <InfoRow label="Redirect URI" value="com.cruos.zion:/oidc/callback" />
+          <InfoRow label="推荐 Redirect URI" value="https://api.example.com/auth/rosm/callback" />
+          <InfoRow label="备用 App URI" value="com.cruos.zion:/oidc/callback" />
           <InfoRow label="Scopes" value="openid profile email phone accountRule" />
           <InfoRow label="Grant Types" value="authorization_code, refresh_token" />
-          <InfoRow label="Confidential" value="关闭，移动端必须作为 Public Client" />
+          <InfoRow label="Confidential" value="服务端交接模式开启；Public 直连模式关闭" />
         </div>
-        <CodeBlock>{`Client ID: com.cruos.zion
-Enable Web: 按需
-Enable App: true
+        <CodeBlock>{`推荐：服务端交接 / Confidential
+Client ID: com.cruos.zion
+Redirect URI: https://api.example.com/auth/rosm/callback
+Confidential: true
+Client Secret: 只保存在 api.example.com 服务器
+SDK serverHandoff: true
+
+备用：Public 直连
+Client ID: com.cruos.zion
 Redirect URI: com.cruos.zion:/oidc/callback
 Confidential: false
 Client Secret: 留空
@@ -1478,48 +1480,69 @@ Scopes:
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">3. 初始化客户端</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">应用侧只使用 Dart 类，不需要自己拼接 JSON 请求。SDK 会生成 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>code_verifier</InlineCode> 和 <InlineCode>code_challenge</InlineCode>。</p>
+          <h3 className="text-lg font-bold text-sage-900">3. 使用 SDK 内置 UI</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、密码、忘记密码、通行密钥登录、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
         </div>
         <CodeBlock>{`final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer}'),
   clientId: 'com.cruos.zion',
-  redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
+  redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('${webAuthnOrigin}'),
 );
 
-final request = passport.createAuthorizationRequest();
-final start = await passport.startNativeAuthorization(request);
+final result = await showRosmPassportSignIn(
+  context,
+  client: passport,
+  config: RosmPassportSignInConfig(
+    serverHandoffEndpoint: Uri.parse(
+      'https://api.example.com/auth/rosm/sdk/complete',
+    ),
+    requestCaptchaToken: () => yourCaptchaProvider(),
+    authenticatePasskey: (options) async {
+      final response = await passkeyPlugin.authenticate(options.options);
+      return RosmWebAuthnCredential(response);
+    },
+  ),
+);
 
-// start.client.displayName 和 start.scopes 可用于渲染原生授权确认页。
-print(start.client.displayName);`}</CodeBlock>
+final appSession = result?.serverPayload;`}</CodeBlock>
       </div>
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">4. 完成登录与授权</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 提供邮箱验证码、手机号验证码、密码登录和 Passkey/WebAuthn 登录方法。应用可以使用自己的 UI 收集验证码或展示授权确认。</p>
+          <h3 className="text-lg font-bold text-sage-900">4. 接入方服务器完成换票</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">服务端交接接口由接入方实现。SDK 会把授权码、PKCE verifier、state、nonce 和 redirect URI 发给该接口；接入方服务器再带自己的 <InlineCode>client_secret</InlineCode> 调用 ROSM token 端点，校验 ID Token 后创建自己的 App 会话。</p>
         </div>
-        <CodeBlock>{`await passport.sendEmailLoginCode(email: 'user@example.com');
+        <CodeBlock>{`POST https://api.example.com/auth/rosm/sdk/complete
+Content-Type: application/json
 
-final session = await passport.loginWithEmailCode(
-  email: 'user@example.com',
-  emailCode: '123456',
-);
+{
+  "issuer": "${issuer}",
+  "client_id": "com.cruos.zion",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "code": "AUTHORIZATION_CODE",
+  "state": "STATE",
+  "code_verifier": "ORIGINAL_PKCE_VERIFIER",
+  "scope": "openid profile email phone accountRule",
+  "nonce": "NONCE"
+}
 
-final approval = await passport.approveNativeAuthorization(request);
-final tokens = await passport.exchangeCode(
-  request: request,
-  approval: approval,
-);
-
-final userInfo = await passport.userInfo();`}</CodeBlock>
+// 接入方服务器随后调用：
+POST ${tokenEndpoint}
+{
+  "grant_type": "authorization_code",
+  "code": "AUTHORIZATION_CODE",
+  "client_id": "com.cruos.zion",
+  "client_secret": "SERVER_ONLY_SECRET",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "code_verifier": "ORIGINAL_PKCE_VERIFIER"
+}`}</CodeBlock>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="登录结果类型" value="RosmAuthResult，包含 RosmUser 与 RosmSecurityState" />
-          <InfoRow label="Token 类型" value="RosmTokenSet，包含 access_token / refresh_token / id_token" />
-          <InfoRow label="UserInfo 类型" value="RosmUserInfo，按 scope 返回邮箱、手机号、昵称和角色" />
-          <InfoRow label="本地存储" value="默认使用 flutter_secure_storage，可替换 RosmTokenStore" />
+          <InfoRow label="SDK 返回" value="RosmPassportUiResult.serverPayload，内容由接入方服务器决定" />
+          <InfoRow label="ROSM Token" value="只在接入方服务器换取和校验" />
+          <InfoRow label="安全校验" value="校验 state、nonce、issuer、aud、过期时间与回调 URI" />
+          <InfoRow label="业务会话" value="由接入方服务器签发自己的 App session" />
         </div>
       </div>
 
@@ -1598,8 +1621,8 @@ await passport.completePasskeyRegistration(
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">8. 刷新、登出与端点</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内部会调用 ROSM 的 OIDC token、userinfo、revoke 与 native bridge 端点，应用侧只需要调用方法。</p>
+          <h3 className="text-lg font-bold text-sage-900">8. Public 直连模式与端点</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">如果应用明确不经过自己的服务器，可以把 OIDC client 配成 Public，并使用自定义 scheme redirect URI。此时 SDK 会在设备上换取和保存 ROSM token；生产业务 App 更推荐上面的服务端交接模式。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="Native Start" value={nativeStartEndpoint} />
@@ -1609,7 +1632,16 @@ await passport.completePasskeyRegistration(
           <InfoRow label="Revoke" value={revocationEndpoint} />
           <InfoRow label="SDK" value={FLUTTER_SDK_GITHUB_URL} />
         </div>
-        <CodeBlock>{`final refreshed = await passport.refresh();
+        <CodeBlock>{`final passport = RosmPassportClient(
+  issuer: Uri.parse('${issuer}'),
+  clientId: 'com.cruos.zion',
+  redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
+);
+
+final result = await showRosmPassportSignIn(context, client: passport);
+final tokens = result?.tokens;
+
+final refreshed = await passport.refresh();
 final userInfo = await passport.userInfo();
 await passport.signOut();`}</CodeBlock>
       </div>
@@ -1617,9 +1649,10 @@ await passport.signOut();`}</CodeBlock>
       <div className="glass-card space-y-4 rounded-3xl p-8">
         <h3 className="text-lg font-bold text-sage-900">9. 检查清单</h3>
         <div className="space-y-2 text-sm leading-7 text-sage-600">
-          <p>客户端必须关闭 <InlineCode>Confidential</InlineCode>，移动端不保存 <InlineCode>client_secret</InlineCode>。</p>
-          <p>同一个包名可以同时启用 Web/App；启用 App 后该 client 会作为 Public Client 保存。</p>
-          <p><InlineCode>Redirect URI</InlineCode> 必须和 Flutter 初始化的自定义 scheme 完全一致。</p>
+          <p>生产推荐使用服务端交接：Flutter SDK 设置 <InlineCode>serverHandoff</InlineCode>，接入方服务器保存 <InlineCode>client_secret</InlineCode> 并完成 token exchange。</p>
+          <p>机密客户端的 <InlineCode>Redirect URI</InlineCode> 必须是接入方服务器 HTTPS 回调，不能是移动端自定义 scheme。</p>
+          <p>只有 Public 直连模式才使用自定义 scheme，例如 <InlineCode>com.cruos.zion:/oidc/callback</InlineCode>。</p>
+          <p>接入方服务器必须校验 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>issuer</InlineCode>、<InlineCode>aud</InlineCode>、过期时间和 redirect URI。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
           <p>使用通行密钥时，iOS Associated Domains、Android Digital Asset Links 与 <InlineCode>webAuthnOrigin</InlineCode> 必须指向同一个 HTTPS 登录域名边界。</p>
           <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
