@@ -20,6 +20,7 @@ class RosmPassportSignInConfig {
     this.enablePhoneCode = true,
     this.enablePassword = true,
     this.enablePasskey = true,
+    this.enableRegistration = true,
   });
 
   final Uri? serverHandoffEndpoint;
@@ -33,6 +34,7 @@ class RosmPassportSignInConfig {
   final bool enablePhoneCode;
   final bool enablePassword;
   final bool enablePasskey;
+  final bool enableRegistration;
 }
 
 class RosmPassportUiResult {
@@ -98,7 +100,13 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   final _recoveryAccount = TextEditingController();
   final _recoveryCode = TextEditingController();
   final _newPassword = TextEditingController();
+  final _registerEmail = TextEditingController();
+  final _registerNickname = TextEditingController();
+  final _registerPassword = TextEditingController();
+  final _registerCode = TextEditingController();
   var _recoveryMode = false;
+  var _registerMode = false;
+  var _registerCodeSent = false;
 
   @override
   void initState() {
@@ -121,6 +129,10 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     _recoveryAccount.dispose();
     _recoveryCode.dispose();
     _newPassword.dispose();
+    _registerEmail.dispose();
+    _registerNickname.dispose();
+    _registerPassword.dispose();
+    _registerCode.dispose();
     super.dispose();
   }
 
@@ -241,6 +253,32 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     });
   }
 
+  Future<void> _sendRegisterCode() async {
+    await _run(() async {
+      final captchaToken = await widget.config.requestCaptchaToken?.call();
+      if (captchaToken == null || captchaToken.isEmpty) {
+        throw const RosmApiException('captcha_required', '请先完成人机验证。');
+      }
+      await widget.client.sendRegisterCode(
+        email: _registerEmail.text.trim(),
+        captchaToken: captchaToken,
+      );
+      setState(() => _registerCodeSent = true);
+    });
+  }
+
+  Future<void> _registerWithEmail() async {
+    await _run(() async {
+      final auth = await widget.client.registerWithEmail(
+        email: _registerEmail.text.trim(),
+        nickname: _registerNickname.text.trim(),
+        password: _registerPassword.text,
+        emailCode: _registerCode.text.trim(),
+      );
+      _showConsent(auth);
+    });
+  }
+
   void _showConsent(RosmAuthResult auth) {
     if (!mounted) return;
     setState(() {
@@ -248,6 +286,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       _error = null;
       _sent = false;
       _recoveryMode = false;
+      _registerMode = false;
     });
   }
 
@@ -367,7 +406,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             ),
             textStyle: const TextStyle(
               fontSize: 17,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
             elevation: 3,
             shadowColor: const Color(0x33577557),
@@ -381,7 +420,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
       ),
@@ -434,9 +473,13 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _buildModeTabs(),
-                              const SizedBox(height: 36),
-                              _buildModeBody(),
+                              if (_registerMode)
+                                _buildRegister()
+                              else ...[
+                                _buildModeTabs(),
+                                const SizedBox(height: 36),
+                                _buildModeBody(),
+                              ],
                             ],
                           ),
                       ],
@@ -472,7 +515,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           BorderSide(color: _RosmColors.sage200, width: 1.2),
         ),
         textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+          TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         padding: const WidgetStatePropertyAll(
           EdgeInsets.symmetric(horizontal: 12, vertical: 15),
@@ -545,7 +588,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _busy ? null : _loginWithPassword,
-            child: Text(_busy ? '处理中...' : '登录并授权  →'),
+            child: _ButtonContent(busy: _busy, label: '登录并授权  →', light: true),
           ),
           TextButton(
             onPressed: _busy
@@ -553,6 +596,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 : () => setState(() => _recoveryMode = true),
             child: const Text('忘记密码'),
           ),
+          if (widget.config.enableRegistration)
+            _RegisterPrompt(onTap: _openRegister),
         ],
       );
     }
@@ -572,8 +617,14 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _busy ? null : _loginWithPasskey,
-            child: Text(_busy ? '处理中...' : '使用通行密钥登录  →'),
+            child: _ButtonContent(
+              busy: _busy,
+              label: '使用通行密钥登录  →',
+              light: true,
+            ),
           ),
+          if (widget.config.enableRegistration)
+            _RegisterPrompt(onTap: _openRegister),
         ],
       );
     }
@@ -622,17 +673,124 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         const SizedBox(height: 24),
         FilledButton(
           onPressed: _busy ? null : (_sent ? _loginWithCode : _sendCode),
-          child: Text(
-            _busy
-                ? '处理中...'
-                : _sent
+          child: _ButtonContent(
+            busy: _busy,
+            label: _sent
                 ? '登录并授权  →'
                 : isEmail
                 ? '发送邮箱验证码  →'
                 : '发送登录验证码  →',
+            light: true,
           ),
         ),
+        if (widget.config.enableRegistration)
+          _RegisterPrompt(onTap: _openRegister),
       ],
+    );
+  }
+
+  void _openRegister() {
+    setState(() {
+      _registerMode = true;
+      _recoveryMode = false;
+      _error = null;
+      _sent = false;
+    });
+  }
+
+  Widget _buildRegister() {
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '创建 ROSM 账号',
+            style: TextStyle(
+              color: _RosmColors.ink,
+              fontSize: 21,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '使用邮箱验证码完成注册，随后继续确认授权。',
+            style: TextStyle(
+              color: _RosmColors.sage500,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _registerEmail,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: '邮箱',
+              prefixIcon: Icon(Icons.mail_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _registerCode,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '验证码',
+                    prefixIcon: Icon(Icons.pin_outlined),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 106,
+                child: OutlinedButton(
+                  onPressed: _busy ? null : _sendRegisterCode,
+                  child: _ButtonContent(
+                    busy: _busy,
+                    label: _registerCodeSent ? '重发' : '发送',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _registerNickname,
+            decoration: const InputDecoration(
+              labelText: '昵称',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _registerPassword,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: '密码',
+              prefixIcon: Icon(Icons.lock_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 22),
+          FilledButton(
+            onPressed: _busy ? null : _registerWithEmail,
+            child: _ButtonContent(busy: _busy, label: '注册并继续  →', light: true),
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _registerMode = false;
+                    _registerCodeSent = false;
+                    _error = null;
+                  }),
+            child: const Text('已有账号，返回登录'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -642,7 +800,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       children: [
         const Text(
           '重置密码',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -663,7 +821,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             const SizedBox(width: 12),
             OutlinedButton(
               onPressed: _busy ? null : _sendRecoveryCode,
-              child: Text(_sent ? '重发' : '发送'),
+              child: _ButtonContent(busy: _busy, label: _sent ? '重发' : '发送'),
             ),
           ],
         ),
@@ -676,7 +834,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         const SizedBox(height: 16),
         FilledButton(
           onPressed: _busy ? null : _resetPassword,
-          child: Text(_busy ? '处理中...' : '重置密码'),
+          child: _ButtonContent(busy: _busy, label: '重置密码', light: true),
         ),
         TextButton(
           onPressed: _busy ? null : () => setState(() => _recoveryMode = false),
@@ -708,7 +866,7 @@ class _Header extends StatelessWidget {
           style: TextStyle(
             color: _RosmColors.sage600,
             fontSize: 13,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             letterSpacing: 0,
           ),
         ),
@@ -740,7 +898,7 @@ class _Header extends StatelessWidget {
           style: const TextStyle(
             color: _RosmColors.ink,
             fontSize: 34,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.08,
           ),
         ),
@@ -753,7 +911,7 @@ class _Header extends StatelessWidget {
             color: _RosmColors.sage500,
             fontSize: 16,
             height: 1.45,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -795,7 +953,7 @@ class _ConsentPage extends StatelessWidget {
                 style: const TextStyle(
                   color: _RosmColors.ink,
                   fontSize: 22,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   height: 1.15,
                 ),
               ),
@@ -805,7 +963,7 @@ class _ConsentPage extends StatelessWidget {
                 style: TextStyle(
                   color: _RosmColors.sage500,
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                   height: 1.45,
                 ),
               ),
@@ -828,7 +986,7 @@ class _ConsentPage extends StatelessWidget {
                           style: const TextStyle(
                             color: _RosmColors.ink,
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w500,
                             height: 1.35,
                           ),
                         ),
@@ -842,7 +1000,7 @@ class _ConsentPage extends StatelessWidget {
         const SizedBox(height: 24),
         FilledButton(
           onPressed: busy ? null : onApprove,
-          child: Text(busy ? '处理中...' : '确认授权并继续  →'),
+          child: _ButtonContent(busy: busy, label: '确认授权并继续  →', light: true),
         ),
         const SizedBox(height: 10),
         OutlinedButton(
@@ -894,6 +1052,62 @@ class _Message extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE8B8B0)),
       ),
       child: Text(text, style: const TextStyle(color: Color(0xFFB42318))),
+    );
+  }
+}
+
+class _ButtonContent extends StatelessWidget {
+  const _ButtonContent({
+    required this.busy,
+    required this.label,
+    this.light = false,
+  });
+
+  final bool busy;
+  final String label;
+  final bool light;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!busy) {
+      return Text(label);
+    }
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(
+        strokeWidth: 2.2,
+        valueColor: AlwaysStoppedAnimation<Color>(
+          light ? Colors.white : _RosmColors.sage600,
+        ),
+      ),
+    );
+  }
+}
+
+class _RegisterPrompt extends StatelessWidget {
+  const _RegisterPrompt({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 28),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            '还没有账号？',
+            style: TextStyle(
+              color: _RosmColors.sage500,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          TextButton(onPressed: onTap, child: const Text('立即注册')),
+        ],
+      ),
     );
   }
 }

@@ -260,6 +260,37 @@ class RosmPassportClient {
     return RosmAuthResult.fromJson(json);
   }
 
+  Future<void> sendRegisterCode({
+    required String email,
+    required String captchaToken,
+  }) async {
+    await _postJson(
+      '/api/v1/auth/send-code',
+      RosmRegisterCodeRequest(
+        email: email,
+        captchaToken: captchaToken,
+      ).toJson(),
+    );
+  }
+
+  Future<RosmAuthResult> registerWithEmail({
+    required String email,
+    required String nickname,
+    required String password,
+    required String emailCode,
+  }) async {
+    final json = await _postJson(
+      '/api/v1/auth/register',
+      RosmEmailRegisterRequest(
+        email: email,
+        nickname: nickname,
+        password: password,
+        emailCode: emailCode,
+      ).toJson(),
+    );
+    return RosmAuthResult.fromJson(json);
+  }
+
   Future<RosmWebAuthnOptions> beginWebAuthnLogin({
     String? email,
     Uri? origin,

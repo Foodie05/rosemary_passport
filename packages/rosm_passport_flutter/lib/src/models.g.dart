@@ -197,6 +197,22 @@ Map<String, dynamic> _$RosmPasswordLoginRequestToJson(
   'captcha_token': ?instance.captchaToken,
 };
 
+Map<String, dynamic> _$RosmRegisterCodeRequestToJson(
+  RosmRegisterCodeRequest instance,
+) => <String, dynamic>{
+  'email': instance.email,
+  'captcha_token': instance.captchaToken,
+};
+
+Map<String, dynamic> _$RosmEmailRegisterRequestToJson(
+  RosmEmailRegisterRequest instance,
+) => <String, dynamic>{
+  'email': instance.email,
+  'nickname': instance.nickname,
+  'password': instance.password,
+  'email_code': instance.emailCode,
+};
+
 Map<String, dynamic> _$RosmWebAuthnLoginOptionsRequestToJson(
   RosmWebAuthnLoginOptionsRequest instance,
 ) => <String, dynamic>{'email': ?instance.email};

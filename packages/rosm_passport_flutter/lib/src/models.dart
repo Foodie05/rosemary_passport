@@ -454,6 +454,44 @@ class RosmPasswordLoginRequest {
   includeIfNull: false,
   createFactory: false,
 )
+class RosmRegisterCodeRequest {
+  const RosmRegisterCodeRequest({
+    required this.email,
+    required this.captchaToken,
+  });
+
+  final String email;
+  final String captchaToken;
+
+  Map<String, dynamic> toJson() => _$RosmRegisterCodeRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.snake,
+  includeIfNull: false,
+  createFactory: false,
+)
+class RosmEmailRegisterRequest {
+  const RosmEmailRegisterRequest({
+    required this.email,
+    required this.nickname,
+    required this.password,
+    required this.emailCode,
+  });
+
+  final String email;
+  final String nickname;
+  final String password;
+  final String emailCode;
+
+  Map<String, dynamic> toJson() => _$RosmEmailRegisterRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.snake,
+  includeIfNull: false,
+  createFactory: false,
+)
 class RosmWebAuthnLoginOptionsRequest {
   const RosmWebAuthnLoginOptionsRequest({this.email});
 

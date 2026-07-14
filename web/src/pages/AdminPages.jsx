@@ -1174,10 +1174,13 @@ final result = await showRosmPassportSignIn(
     serverHandoffEndpoint: Uri.parse(
       'https://api.example.com/auth/rosm/sdk/complete',
     ),
+    enableRegistration: true,
   ),
 );
 final appSession = result?.serverPayload;`,
     '```',
+    '',
+    'SDK 内置 UI 支持验证码登录、手机号登录、密码登录、忘记密码、通行密钥登录、邮箱注册和最终授权确认。注册默认开启；如果某个应用不允许新用户注册，可以设置 `enableRegistration: false`。',
     '',
     'SDK 对应用侧暴露 Dart 类型和方法，例如 `RosmPassportSignInConfig`、`RosmPassportUiResult`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 请求和响应只在 SDK 内部处理。',
     '',
@@ -1500,7 +1503,7 @@ Scopes:
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">3. 使用 SDK 内置 UI</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、密码、忘记密码、通行密钥登录、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、手机、密码、注册、忘记密码、通行密钥登录、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
         </div>
         <CodeBlock>{`final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer}'),
@@ -1518,6 +1521,7 @@ final result = await showRosmPassportSignIn(
       'https://api.example.com/auth/rosm/sdk/complete',
     ),
     requestCaptchaToken: () => yourCaptchaProvider(),
+    enableRegistration: true,
     authenticatePasskey: (options) async {
       final response = await passkeyPlugin.authenticate(options.options);
       return RosmWebAuthnCredential(response);
@@ -1526,6 +1530,13 @@ final result = await showRosmPassportSignIn(
 );
 
 final appSession = result?.serverPayload;`}</CodeBlock>
+        <p className="text-sm leading-relaxed text-sage-600">
+          注册功能默认开启，用户可在内置 UI 中使用邮箱验证码创建 ROSM 账号，然后进入同一套授权确认和服务端交接流程。注册发码需要
+          <InlineCode>requestCaptchaToken</InlineCode>
+          返回有效人机验证 token；不希望开放注册的应用可以设置
+          <InlineCode>enableRegistration: false</InlineCode>
+          。
+        </p>
       </div>
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
