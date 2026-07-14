@@ -243,20 +243,17 @@ class AuthService {
       'verification-code:register:cooldown:email';
   static const _verificationCodeLoginEmailScope =
       'verification-code:login:email';
-  static const _verificationCodeLoginIpScope =
-      'verification-code:login:ip';
+  static const _verificationCodeLoginIpScope = 'verification-code:login:ip';
   static const _verificationCodeLoginCooldownScope =
       'verification-code:login:cooldown:email';
   static const _verificationCodeMfaEmailScope =
       'verification-code:mfa-login:email';
-  static const _verificationCodeMfaIpScope =
-      'verification-code:mfa-login:ip';
+  static const _verificationCodeMfaIpScope = 'verification-code:mfa-login:ip';
   static const _verificationCodeMfaCooldownScope =
       'verification-code:mfa-login:cooldown:email';
   static const _verificationCodeBindEmailScope =
       'verification-code:bind-email:email';
-  static const _verificationCodeBindIpScope =
-      'verification-code:bind-email:ip';
+  static const _verificationCodeBindIpScope = 'verification-code:bind-email:ip';
   static const _verificationCodeBindCooldownScope =
       'verification-code:bind-email:cooldown:email';
   static const _verificationCodeResetEmailScope =
@@ -411,12 +408,10 @@ class AuthService {
           )
         : null;
     final ipSubject = _subjectOrEmpty(requestIp);
-    final ipRetry = ipSubject.isEmpty || !policy.ipRateLimitEnabled || ipLimit < 1
+    final ipRetry =
+        ipSubject.isEmpty || !policy.ipRateLimitEnabled || ipLimit < 1
         ? null
-        : await security.retryAfterSeconds(
-            scope: ipScope,
-            subject: ipSubject,
-          );
+        : await security.retryAfterSeconds(scope: ipScope, subject: ipSubject);
     final cooldownRetry = await verificationCodeCooldownRetryAfter(
       email: email,
       cooldownScope: cooldownScope,
@@ -632,6 +627,56 @@ class AuthService {
       cooldownScope: _verificationCodeMfaCooldownScope,
     );
     return const AdminLoginCodeAttempt.success();
+  }
+
+  Future<AdminLoginCodeAttempt> sendPasswordPhoneLoginCode({
+    required String email,
+    required String password,
+    String? requestIp,
+  }) async {
+    final user = await _users.findByEmail(email);
+    if (user == null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'login_failed',
+        message: '账号或密码错误。',
+        statusCode: 401,
+      );
+    }
+
+    final passwordValid = await _passwordHasher.verify(
+      user.passwordHash,
+      password,
+    );
+    if (!passwordValid) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'login_failed',
+        message: '账号或密码错误。',
+        statusCode: 401,
+      );
+    }
+
+    final phoneService = _phoneVerification;
+    final phone = user.phoneNumber?.trim() ?? '';
+    if (phoneService == null || phone.isEmpty || !user.isPhoneVerified) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'mfa_not_available',
+        message: '当前账户未配置手机号验证。',
+        statusCode: 400,
+      );
+    }
+
+    final sent = await phoneService.sendCode(
+      phoneNumber: phone,
+      requestIp: _subjectOrEmpty(requestIp),
+    );
+    if (!sent.ok) {
+      return AdminLoginCodeAttempt.failure(
+        code: sent.code ?? 'temporary_issue',
+        message: sent.message ?? '验证码发送失败，请稍后重试。',
+        statusCode: sent.statusCode,
+      );
+    }
+    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
   }
 
   Future<PasswordLoginPreparation> preparePasswordLogin({
@@ -1102,7 +1147,10 @@ class AuthService {
     }
 
     final passwordHash = await _passwordHasher.hash(newPassword.trim());
-    await _users.updatePasswordHash(userId: user.id, passwordHash: passwordHash);
+    await _users.updatePasswordHash(
+      userId: user.id,
+      passwordHash: passwordHash,
+    );
     await _revokeAllRefreshTokens(user.id);
     return const EmailActionAttempt.success();
   }
@@ -1724,7 +1772,10 @@ class AuthService {
         message: 'current_password is required.',
       );
     }
-    final valid = await _passwordHasher.verify(user.passwordHash, currentPassword);
+    final valid = await _passwordHasher.verify(
+      user.passwordHash,
+      currentPassword,
+    );
     if (!valid) {
       return const EmailActionAttempt.failure(
         code: 'invalid_password',
@@ -1790,7 +1841,10 @@ class AuthService {
         message: 'current_password and verify_code are required.',
       );
     }
-    final valid = await _passwordHasher.verify(user.passwordHash, currentPassword);
+    final valid = await _passwordHasher.verify(
+      user.passwordHash,
+      currentPassword,
+    );
     if (!valid) {
       return const EmailActionAttempt.failure(
         code: 'invalid_password',
@@ -2247,7 +2301,8 @@ class AuthService {
     return {
       'has_passkey': hasPasskey,
       'has_authenticator': user.hasAuthenticator,
-      'has_phone': (user.phoneNumber ?? '').trim().isNotEmpty && user.isPhoneVerified,
+      'has_phone':
+          (user.phoneNumber ?? '').trim().isNotEmpty && user.isPhoneVerified,
     };
   }
 
@@ -2532,24 +2587,22 @@ class AuthService {
     // returned by self-registration. Later logins and refreshed sessions do
     // not receive it, so the no-password onboarding flow cannot become a
     // general-purpose bypass for adding new passkeys.
-    final bootstrapUntilEpochSeconds =
-        postRegistrationPasskeyBootstrap
+    final bootstrapUntilEpochSeconds = postRegistrationPasskeyBootstrap
         ? DateTime.now()
-              .toUtc()
-              .add(
-                const Duration(
-                  seconds: _postRegistrationPasskeyBootstrapSeconds,
-                ),
-              )
-              .millisecondsSinceEpoch ~/
-            1000
+                  .toUtc()
+                  .add(
+                    const Duration(
+                      seconds: _postRegistrationPasskeyBootstrapSeconds,
+                    ),
+                  )
+                  .millisecondsSinceEpoch ~/
+              1000
         : null;
     final tokens = _tokenService.issueTokenPair(
       user.toAuthenticatedUser(),
       additionalAccessClaims: {
         if (bootstrapUntilEpochSeconds != null)
-          'post_register_passkey_bootstrap_until':
-              bootstrapUntilEpochSeconds,
+          'post_register_passkey_bootstrap_until': bootstrapUntilEpochSeconds,
       },
     );
     await _oidcRepository.storeAccessToken(

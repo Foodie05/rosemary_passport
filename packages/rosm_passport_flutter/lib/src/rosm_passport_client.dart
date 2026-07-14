@@ -218,6 +218,23 @@ class RosmPassportClient {
     return RosmAuthResult.fromJson(json);
   }
 
+  Future<void> sendPasswordMfaCode({
+    required String email,
+    required String password,
+    required String factorType,
+    String? captchaToken,
+  }) async {
+    await _postJson(
+      '/api/v1/auth/send-login-code',
+      RosmPasswordLoginRequest(
+        email: email,
+        password: password,
+        factorType: factorType,
+        captchaToken: captchaToken,
+      ).toJson(),
+    );
+  }
+
   Future<void> sendEmailLoginCode({
     required String email,
     String? captchaToken,

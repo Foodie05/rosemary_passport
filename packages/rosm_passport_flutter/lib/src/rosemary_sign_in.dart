@@ -96,6 +96,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   final _phone = TextEditingController();
   final _passwordEmail = TextEditingController();
   final _password = TextEditingController();
+  final _mfaCode = TextEditingController();
   final _code = TextEditingController();
   final _recoveryAccount = TextEditingController();
   final _recoveryCode = TextEditingController();
@@ -107,6 +108,10 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   var _recoveryMode = false;
   var _registerMode = false;
   var _registerCodeSent = false;
+  var _passwordMfaMode = false;
+  var _passwordMfaCodeSent = false;
+  List<String> _passwordMfaFactors = const [];
+  String? _selectedPasswordMfaFactor;
 
   @override
   void initState() {
@@ -125,6 +130,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     _phone.dispose();
     _passwordEmail.dispose();
     _password.dispose();
+    _mfaCode.dispose();
     _code.dispose();
     _recoveryAccount.dispose();
     _recoveryCode.dispose();
@@ -186,12 +192,98 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     });
   }
 
-  Future<void> _loginWithPassword() async {
+  Future<void> _preparePasswordLogin() async {
+    await _run(() async {
+      final factors = await widget.client.passwordFactors(
+        email: _passwordEmail.text.trim(),
+        password: _password.text,
+        captchaToken: await widget.config.requestCaptchaToken?.call(),
+      );
+      if (factors.directLogin) {
+        final auth = await widget.client.loginWithPassword(
+          email: _passwordEmail.text.trim(),
+          password: _password.text,
+        );
+        _showConsent(auth);
+        return;
+      }
+      setState(() {
+        _passwordMfaFactors = factors.factors;
+        _selectedPasswordMfaFactor = null;
+        _passwordMfaCodeSent = false;
+        _passwordMfaMode = true;
+        _mfaCode.clear();
+      });
+    });
+  }
+
+  Future<void> _selectPasswordMfaFactor(String factor) async {
+    setState(() {
+      _selectedPasswordMfaFactor = factor;
+      _passwordMfaCodeSent = false;
+      _error = null;
+      _mfaCode.clear();
+    });
+    if (factor == 'email_code' || factor == 'phone_code') {
+      await _sendPasswordMfaCode();
+    }
+  }
+
+  Future<void> _sendPasswordMfaCode() async {
+    final factor = _selectedPasswordMfaFactor;
+    if (factor != 'email_code' && factor != 'phone_code') {
+      return;
+    }
+    final factorType = factor!;
+    await _run(() async {
+      await widget.client.sendPasswordMfaCode(
+        email: _passwordEmail.text.trim(),
+        password: _password.text,
+        factorType: factorType,
+        captchaToken: await widget.config.requestCaptchaToken?.call(),
+      );
+      setState(() => _passwordMfaCodeSent = true);
+    });
+  }
+
+  Future<void> _completePasswordMfa() async {
+    final factor = _selectedPasswordMfaFactor;
+    if (factor == null) {
+      return;
+    }
+    if (factor == 'webauthn') {
+      await _loginWithPasskeyForPasswordMfa();
+      return;
+    }
     await _run(() async {
       final auth = await widget.client.loginWithPassword(
         email: _passwordEmail.text.trim(),
         password: _password.text,
+        factorType: factor,
+        emailCode: factor == 'email_code' ? _mfaCode.text.trim() : null,
+        phoneCode: factor == 'phone_code' ? _mfaCode.text.trim() : null,
+        authenticatorCode: factor == 'authenticator'
+            ? _mfaCode.text.trim()
+            : null,
         captchaToken: await widget.config.requestCaptchaToken?.call(),
+      );
+      _showConsent(auth);
+    });
+  }
+
+  Future<void> _loginWithPasskeyForPasswordMfa() async {
+    final authenticator = widget.config.authenticatePasskey;
+    if (authenticator == null) {
+      setState(() => _error = '当前应用尚未接入系统通行密钥能力。');
+      return;
+    }
+    await _run(() async {
+      final email = _passwordEmail.text.trim();
+      final options = await widget.client.beginWebAuthnLogin(email: email);
+      final credential = await authenticator(options);
+      final auth = await widget.client.completeWebAuthnLogin(
+        email: email,
+        credential: credential,
       );
       _showConsent(auth);
     });
@@ -287,6 +379,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       _sent = false;
       _recoveryMode = false;
       _registerMode = false;
+      _passwordMfaMode = false;
     });
   }
 
@@ -469,6 +562,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                           )
                         else if (_recoveryMode)
                           _Card(child: _buildRecovery())
+                        else if (_passwordMfaMode)
+                          _Card(child: _buildPasswordMfa())
                         else
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -539,6 +634,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               setState(() {
                 _mode = selected.first;
                 _sent = false;
+                _passwordMfaMode = false;
                 _error = null;
               });
             },
@@ -587,8 +683,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           ),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: _busy ? null : _loginWithPassword,
-            child: _ButtonContent(busy: _busy, label: '登录并授权  →', light: true),
+            onPressed: _busy ? null : _preparePasswordLogin,
+            child: _ButtonContent(busy: _busy, label: '继续登录  →', light: true),
           ),
           TextButton(
             onPressed: _busy
@@ -689,10 +785,122 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     );
   }
 
+  Widget _buildPasswordMfa() {
+    final factor = _selectedPasswordMfaFactor;
+    final title = factor == null ? '选择验证方式' : _passwordMfaTitle(factor);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: _RosmColors.ink,
+            fontSize: 21,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          factor == null ? '为了保护账号安全，请选择一种二次验证方式。' : _passwordMfaIntro(factor),
+          style: const TextStyle(
+            color: _RosmColors.sage500,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (factor == null)
+          for (final item in _passwordMfaFactors)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _FactorButton(
+                icon: _passwordMfaIcon(item),
+                title: _passwordMfaTitle(item),
+                subtitle: _passwordMfaIntro(item),
+                onTap: _busy ? null : () => _selectPasswordMfaFactor(item),
+              ),
+            )
+        else ...[
+          if (factor == 'email_code' || factor == 'phone_code') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _mfaCode,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: factor == 'email_code' ? '邮箱验证码' : '手机验证码',
+                      prefixIcon: const Icon(Icons.pin_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 106,
+                  child: OutlinedButton(
+                    onPressed: _busy ? null : _sendPasswordMfaCode,
+                    child: _ButtonContent(
+                      busy: _busy,
+                      label: _passwordMfaCodeSent ? '重发' : '发送',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (factor == 'authenticator') ...[
+            TextField(
+              controller: _mfaCode,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '动态验证码',
+                prefixIcon: Icon(Icons.shield_outlined),
+              ),
+            ),
+          ],
+          const SizedBox(height: 22),
+          FilledButton(
+            onPressed: _busy ? null : _completePasswordMfa,
+            child: _ButtonContent(
+              busy: _busy,
+              label: factor == 'webauthn' ? '使用通行密钥验证  →' : '完成登录  →',
+              light: true,
+            ),
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _selectedPasswordMfaFactor = null;
+                    _passwordMfaCodeSent = false;
+                    _mfaCode.clear();
+                    _error = null;
+                  }),
+            child: const Text('更换验证方式'),
+          ),
+        ],
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () => setState(() {
+                  _passwordMfaMode = false;
+                  _selectedPasswordMfaFactor = null;
+                  _passwordMfaCodeSent = false;
+                  _mfaCode.clear();
+                  _error = null;
+                }),
+          child: const Text('返回密码登录'),
+        ),
+      ],
+    );
+  }
+
   void _openRegister() {
     setState(() {
       _registerMode = true;
       _recoveryMode = false;
+      _passwordMfaMode = false;
       _error = null;
       _sent = false;
     });
@@ -1056,6 +1264,65 @@ class _Message extends StatelessWidget {
   }
 }
 
+class _FactorButton extends StatelessWidget {
+  const _FactorButton({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: _RosmColors.ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: _RosmColors.sage500,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, size: 22),
+        ],
+      ),
+    );
+  }
+}
+
 class _ButtonContent extends StatelessWidget {
   const _ButtonContent({
     required this.busy,
@@ -1120,6 +1387,36 @@ String _labelFor(_SignInMode mode) {
     _SignInMode.email => '验证码',
     _SignInMode.passkey => '通行密钥',
     _SignInMode.password => '密码',
+  };
+}
+
+String _passwordMfaTitle(String factor) {
+  return switch (factor) {
+    'email_code' => '邮箱验证码',
+    'phone_code' => '手机验证码',
+    'authenticator' => 'Authenticator 验证器',
+    'webauthn' => '系统通行密钥',
+    _ => '二次验证',
+  };
+}
+
+String _passwordMfaIntro(String factor) {
+  return switch (factor) {
+    'email_code' => '发送一次登录验证码到当前账户邮箱。',
+    'phone_code' => '发送一次登录验证码到当前账户已绑定手机号。',
+    'authenticator' => '输入动态口令应用中当前显示的 6 位验证码。',
+    'webauthn' => '使用系统通行密钥完成本次安全验证。',
+    _ => '完成账号安全验证后继续登录。',
+  };
+}
+
+IconData _passwordMfaIcon(String factor) {
+  return switch (factor) {
+    'email_code' => Icons.mail_outline_rounded,
+    'phone_code' => Icons.phone_iphone_rounded,
+    'authenticator' => Icons.shield_outlined,
+    'webauthn' => Icons.fingerprint_rounded,
+    _ => Icons.verified_user_outlined,
   };
 }
 
