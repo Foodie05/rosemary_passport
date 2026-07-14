@@ -1181,6 +1181,25 @@ final appSession = result?.serverPayload;`,
     '',
     'SDK 对应用侧暴露 Dart 类型和方法，例如 `RosmPassportSignInConfig`、`RosmPassportUiResult`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 请求和响应只在 SDK 内部处理。',
     '',
+    '接入方服务器必须实现的 SDK handoff 契约：',
+    '',
+    '- `serverHandoffEndpoint` 不是传统浏览器 OIDC callback。传统 callback 接收 query 里的 `code/state`；SDK complete endpoint 接收 App 发来的 JSON POST。',
+    '- 建议提供 `POST /auth/rosm/sdk/start` 创建登录 challenge，返回 `state`、`nonce`、`client_id`、`redirect_uri`、`scope` 和 complete endpoint。',
+    '- `POST /auth/rosm/sdk/complete` 必须校验 challenge 未过期、未消费、与当前设备/会话绑定，并校验 `issuer`、`client_id`、`redirect_uri`、`scope`、`state`、`nonce` 都匹配。',
+    '- 服务器用 `code`、`code_verifier`、`client_secret` 调用 ROSM token 端点；随后用 JWKS 校验 ID Token 签名和 `iss`、`aud`、`exp`、`iat`、`nonce`。',
+    '- 授权码和 challenge 都按一次性使用处理。完成后由接入方服务器签发自己的 App session；不要把 `client_secret` 返回给 App，通常也不要把 ROSM refresh token 下发到 App。',
+    '',
+    '```json',
+    `{
+  "client_id": "com.cruos.zion",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "scope": "openid profile email phone accountRule",
+  "state": "SERVER_GENERATED_STATE",
+  "nonce": "SERVER_GENERATED_NONCE",
+  "handoff_endpoint": "https://api.example.com/auth/rosm/sdk/complete"
+}`,
+    '```',
+    '',
     '## 5. Web / 服务端接入步骤',
     '',
     '步骤一：读取 Discovery',
@@ -1544,6 +1563,34 @@ POST ${tokenEndpoint}
           <InfoRow label="安全校验" value="校验 state、nonce、issuer、aud、过期时间与回调 URI" />
           <InfoRow label="业务会话" value="由接入方服务器签发自己的 App session" />
         </div>
+        <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-5">
+          <p className="text-sm font-bold text-sage-900">接入方服务器必须实现的契约</p>
+          <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
+            <p><InlineCode>serverHandoffEndpoint</InlineCode> 不是传统浏览器 OIDC callback。传统 callback 接收 query 里的 <InlineCode>code/state</InlineCode>；SDK complete endpoint 接收 App 发来的 JSON POST。</p>
+            <p>建议提供 <InlineCode>POST /auth/rosm/sdk/start</InlineCode> 创建登录 challenge，返回 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>client_id</InlineCode>、<InlineCode>redirect_uri</InlineCode>、<InlineCode>scope</InlineCode> 和 complete endpoint。</p>
+            <p><InlineCode>POST /auth/rosm/sdk/complete</InlineCode> 必须校验 challenge 未过期、未消费、与当前设备/会话绑定，并校验 <InlineCode>issuer</InlineCode>、<InlineCode>client_id</InlineCode>、<InlineCode>redirect_uri</InlineCode>、<InlineCode>scope</InlineCode>、<InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode> 都匹配。</p>
+            <p>服务器用 <InlineCode>code</InlineCode>、<InlineCode>code_verifier</InlineCode>、<InlineCode>client_secret</InlineCode> 调用 ROSM token 端点；随后用 JWKS 校验 ID Token 签名和 <InlineCode>iss</InlineCode>、<InlineCode>aud</InlineCode>、<InlineCode>exp</InlineCode>、<InlineCode>iat</InlineCode>、<InlineCode>nonce</InlineCode>。</p>
+            <p>授权码和 challenge 都按一次性使用处理。完成后由接入方服务器签发自己的 App session；不要把 <InlineCode>client_secret</InlineCode> 返回给 App，通常也不要把 ROSM refresh token 下发到 App。</p>
+          </div>
+        </div>
+        <CodeBlock>{`// 建议的 start 响应，由接入方服务器生成并保存 challenge
+{
+  "client_id": "com.cruos.zion",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "scope": "openid profile email phone accountRule",
+  "state": "SERVER_GENERATED_STATE",
+  "nonce": "SERVER_GENERATED_NONCE",
+  "handoff_endpoint": "https://api.example.com/auth/rosm/sdk/complete"
+}
+
+// complete 成功后返回给 SDK 的业务会话示例
+{
+  "session_token": "APP_SESSION_TOKEN",
+  "user": {
+    "id": "app-user-id",
+    "nickname": "Rosemary"
+  }
+}`}</CodeBlock>
       </div>
 
       <div className="glass-card space-y-6 rounded-3xl p-8">

@@ -203,6 +203,70 @@ final appSession = result?.serverPayload;
 
 SDK 对应用侧暴露 Dart 类型，例如 `RosmAuthorizationRequest`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 编解码只在 SDK 内部完成，模型层使用 `json_serializable` 生成。
 
+## 接入方服务器契约
+
+服务端交接模式要求接入方服务器实现自己的 SDK handoff 接口。它不是传统浏览器 OIDC callback：
+
+- 浏览器 callback 接收 redirect query 中的 `code` / `state`。
+- SDK complete endpoint 接收 Flutter App 发来的 JSON POST。
+
+推荐接入方服务器提供两个接口：
+
+```text
+POST /auth/rosm/sdk/start
+POST /auth/rosm/sdk/complete
+```
+
+`start` 用于创建接入方自己的登录 challenge，并把 SDK 初始化所需参数返回给 App。服务器应保存 `state`、`nonce`、`client_id`、`redirect_uri`、`scope`、过期时间、设备/会话绑定信息和 consumed 标记。
+
+```json
+{
+  "client_id": "com.cruos.zion",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "scope": "openid profile email phone accountRule",
+  "state": "SERVER_GENERATED_STATE",
+  "nonce": "SERVER_GENERATED_NONCE",
+  "handoff_endpoint": "https://api.example.com/auth/rosm/sdk/complete"
+}
+```
+
+`complete` 接收 SDK 传入的授权结果：
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "client_id": "com.cruos.zion",
+  "redirect_uri": "https://api.example.com/auth/rosm/callback",
+  "code": "AUTHORIZATION_CODE",
+  "state": "SERVER_GENERATED_STATE",
+  "callback_url": "https://api.example.com/auth/rosm/callback?code=...",
+  "code_verifier": "ORIGINAL_PKCE_VERIFIER",
+  "scope": "openid profile email phone accountRule",
+  "nonce": "SERVER_GENERATED_NONCE"
+}
+```
+
+接入方服务器必须：
+
+1. 校验 HTTPS、设备/会话绑定、challenge 未过期且未消费。
+2. 校验 `issuer`、`client_id`、`redirect_uri`、`scope`、`state`、`nonce` 与 `start` 时保存的 challenge 完全匹配。
+3. 使用 `code`、`code_verifier`、`client_secret` 调用 ROSM `/oidc/token`。
+4. 使用 ROSM JWKS 校验 ID Token 签名，并校验 `iss`、`aud`、`exp`、`iat`、`nonce`。
+5. 将授权码和 challenge 按一次性使用处理，避免重放。
+6. 签发接入方自己的 App session，并返回给 SDK。不要把 `client_secret` 返回给 App，通常也不要把 ROSM refresh token 下发给 App。
+
+成功响应由接入方定义，例如：
+
+```json
+{
+  "session_token": "APP_SESSION_TOKEN",
+  "user": {
+    "id": "app-user-id",
+    "nickname": "Rosemary"
+  }
+}
+```
+
 忘记密码：
 
 ```dart
