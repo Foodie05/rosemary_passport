@@ -173,6 +173,12 @@ function AppRoutes({
         />
         <Route path="/forgot-password" element={isLoggedIn ? <Navigate to={defaultAuthedPath} replace /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} authNext={forgotNext} />} />
 
+        <Route path="/docs" element={<Navigate to="/docs/oidc" replace />} />
+        <Route path="/docs/oidc" element={<AdminOidcDocsPage discovery={discovery} />} />
+        <Route path="/docs/flutter-sdk" element={<AdminFlutterSdkDocsPage discovery={discovery} />} />
+        <Route path="/admin/oidc/docs" element={<AdminOidcDocsPage discovery={discovery} />} />
+        <Route path="/admin/oidc/docs/flutter-sdk" element={<AdminFlutterSdkDocsPage discovery={discovery} />} />
+
         <Route path="/admin" element={isLoggedIn ? <AdminLayout session={session} logout={logout} mustBindEmail={mustBindEmail} /> : <Navigate to="/login" replace />}>
           <Route index element={<Navigate to="/admin/account" replace />} />
           <Route
@@ -213,8 +219,6 @@ function AppRoutes({
             }
           />
           <Route path="oidc" element={<AdminOIDCConfig discovery={discovery} oidcSettings={systemSettings?.oidc} loadDiscovery={loadDiscovery} oidcClients={oidcClients} loadOidcClients={loadOidcClients} safely={safely} oidcForm={oidcForm} setOidcForm={setOidcForm} saveOidcClient={saveOidcClient} deleteOidcClient={deleteOidcClient} />} />
-          <Route path="oidc/docs" element={<AdminOidcDocsPage discovery={discovery} oidcSettings={systemSettings?.oidc} />} />
-          <Route path="oidc/docs/flutter-sdk" element={<AdminFlutterSdkDocsPage discovery={discovery} oidcSettings={systemSettings?.oidc} />} />
           <Route
             path="security"
             element={
@@ -672,6 +676,12 @@ function App() {
     const data = await api('/.well-known/openid-configuration');
     setDiscovery(data);
   }, []);
+
+  useEffect(() => {
+    void loadDiscovery().catch(() => {
+      setDiscovery(null);
+    });
+  }, [loadDiscovery]);
 
   function ensureHcaptchaScript() {
     return new Promise((resolve, reject) => {
