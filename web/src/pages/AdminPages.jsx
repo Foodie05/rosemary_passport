@@ -1325,6 +1325,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
 
 export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
   const issuer = oidcSettings?.issuer || discovery?.issuer || 'https://auth.example.com';
+  const webAuthnOrigin = typeof window === 'undefined' ? 'https://auth.example.com' : window.location.origin;
   const tokenEndpoint = oidcSettings?.token_endpoint || discovery?.token_endpoint || `${issuer}/oidc/token`;
   const userinfoEndpoint = oidcSettings?.userinfo_endpoint || discovery?.userinfo_endpoint || `${issuer}/oidc/userinfo`;
   const revocationEndpoint = oidcSettings?.revocation_endpoint || discovery?.revocation_endpoint || `${issuer}/oidc/revoke`;
@@ -1386,6 +1387,7 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
   clientId: 'my-flutter-app',
   redirectUri: Uri.parse('com.example.app:/oidc/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone'},
+  webAuthnOrigin: Uri.parse('${webAuthnOrigin}'),
 );
 
 final request = passport.createAuthorizationRequest();
@@ -1398,7 +1400,7 @@ print(start.client.displayName);`}</CodeBlock>
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">4. 完成登录与授权</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 提供邮箱验证码、手机号验证码、密码登录和 Passkey/WebAuthn 方法。应用可以使用自己的 UI 收集验证码或展示授权确认。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 提供邮箱验证码、手机号验证码、密码登录和 Passkey/WebAuthn 登录方法。应用可以使用自己的 UI 收集验证码或展示授权确认。</p>
         </div>
         <CodeBlock>{`await passport.sendEmailLoginCode(email: 'user@example.com');
 
@@ -1424,7 +1426,80 @@ final userInfo = await passport.userInfo();`}</CodeBlock>
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">5. 刷新、登出与端点</h3>
+          <h3 className="text-lg font-bold text-sage-900">5. 忘记密码</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">应用侧先完成人机验证，再调用 SDK 发送找回验证码。邮箱找回和手机找回都使用同一组 Dart 方法，通过 RosmPasswordRecoveryMethod 区分。</p>
+        </div>
+        <CodeBlock>{`await passport.sendPasswordRecoveryCode(
+  account: 'user@example.com',
+  method: RosmPasswordRecoveryMethod.email,
+  captchaToken: captchaToken,
+);
+
+await passport.resetPasswordByCode(
+  account: 'user@example.com',
+  method: RosmPasswordRecoveryMethod.email,
+  code: '123456',
+  newPassword: newPassword,
+);`}</CodeBlock>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoRow label="邮箱找回" value="account 填邮箱，method 使用 email" />
+          <InfoRow label="手机找回" value="account 填手机号，method 使用 phone" />
+        </div>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">6. 通行密钥登录与添加</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 负责获取和验证 WebAuthn options，系统通行密钥弹窗由应用通过平台 passkey 插件触发。插件返回的 credential response 直接包装为 RosmWebAuthnCredential 传回 SDK。</p>
+        </div>
+        <CodeBlock>{`final loginOptions = await passport.beginWebAuthnLogin(
+  email: 'user@example.com',
+);
+
+final loginCredential = await passkeyPlugin.authenticate(
+  loginOptions.options,
+);
+
+final session = await passport.completeWebAuthnLogin(
+  email: 'user@example.com',
+  credential: RosmWebAuthnCredential(loginCredential),
+);
+
+final registerOptions = await passport.beginPasskeyRegistration(
+  currentPassword: currentPassword,
+);
+
+final registerCredential = await passkeyPlugin.register(
+  registerOptions.options,
+);
+
+await passport.completePasskeyRegistration(
+  credential: RosmWebAuthnCredential(registerCredential),
+);`}</CodeBlock>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoRow label="登录" value="beginWebAuthnLogin + completeWebAuthnLogin" />
+          <InfoRow label="添加" value="beginPasskeyRegistration + completePasskeyRegistration" />
+          <InfoRow label="注册后引导" value="postRegisterPasskeyBootstrap 为 true 时可免当前密码添加" />
+          <InfoRow label="管理" value="listPasskeys 与 deletePasskey" />
+        </div>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">7. 通行密钥平台配置</h3>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">Passkey 必须绑定 HTTPS relying party 域名。移动端需要完成系统级域名关联，并让 SDK 请求 options 时携带同一个 Origin。</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoRow label="iOS" value="配置 Associated Domains，例如 webcredentials:auth.example.com" />
+          <InfoRow label="Android" value="配置 Digital Asset Links，并声明应用包名和签名证书指纹" />
+          <InfoRow label="SDK Origin" value={`webAuthnOrigin 使用服务端 WebAuthn RP 对应的 HTTPS origin，例如 ${webAuthnOrigin}`} />
+          <InfoRow label="服务端域名" value="issuer、RP ID、平台关联文件必须指向同一登录域名边界" />
+        </div>
+      </div>
+
+      <div className="glass-card space-y-6 rounded-3xl p-8">
+        <div>
+          <h3 className="text-lg font-bold text-sage-900">8. 刷新、登出与端点</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内部会调用 ROSM 的 OIDC token、userinfo、revoke 与 native bridge 端点，应用侧只需要调用方法。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1441,11 +1516,13 @@ await passport.signOut();`}</CodeBlock>
       </div>
 
       <div className="glass-card space-y-4 rounded-3xl p-8">
-        <h3 className="text-lg font-bold text-sage-900">6. 检查清单</h3>
+        <h3 className="text-lg font-bold text-sage-900">9. 检查清单</h3>
         <div className="space-y-2 text-sm leading-7 text-sage-600">
           <p>客户端必须关闭 <InlineCode>Confidential</InlineCode>，移动端不保存 <InlineCode>client_secret</InlineCode>。</p>
           <p><InlineCode>Redirect URI</InlineCode> 必须和 Flutter 初始化的自定义 scheme 完全一致。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
+          <p>使用通行密钥时，iOS Associated Domains、Android Digital Asset Links 与 <InlineCode>webAuthnOrigin</InlineCode> 必须指向同一个 HTTPS 登录域名边界。</p>
+          <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
           <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>
         </div>

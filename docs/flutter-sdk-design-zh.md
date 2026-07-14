@@ -16,6 +16,8 @@ SDK 覆盖：
 - 密码登录
 - 密码后的二次验证：邮箱验证码、手机号验证码、TOTP、Passkey
 - 独立 Passkey 登录
+- 忘记密码：邮箱/手机找回验证码与重置密码
+- 登录后添加、列出、删除 Passkey
 - 原生授权确认
 
 ## 安全模型
@@ -28,6 +30,7 @@ Flutter 应用只能作为 public client 接入：
 - SDK 在本地生成并校验 `state`、`nonce`、`code_verifier`
 - refresh token 存入平台安全存储，例如 iOS Keychain / Android Keystore
 - Passkey 走系统能力，不在 SDK 中自行处理私钥
+- Passkey 的 relying party 域名必须通过 iOS Associated Domains / Android Digital Asset Links 与应用绑定
 
 ## 服务端 Native Bridge
 
@@ -144,6 +147,7 @@ final passport = RosmPassportClient(
   clientId: 'my_flutter_app',
   redirectUri: Uri.parse('com.example.app:/oidc/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone'},
+  webAuthnOrigin: Uri.parse('https://auth.example.com'),
 );
 
 final result = await passport.signInWithEmailCode(
@@ -160,6 +164,42 @@ await passport.signOut();
 ```
 
 SDK 对应用侧暴露 Dart 类型，例如 `RosmAuthorizationRequest`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 编解码只在 SDK 内部完成，模型层使用 `json_serializable` 生成。
+
+忘记密码：
+
+```dart
+await passport.sendPasswordRecoveryCode(
+  account: 'user@example.com',
+  method: RosmPasswordRecoveryMethod.email,
+  captchaToken: captchaToken,
+);
+
+await passport.resetPasswordByCode(
+  account: 'user@example.com',
+  method: RosmPasswordRecoveryMethod.email,
+  code: '123456',
+  newPassword: newPassword,
+);
+```
+
+通行密钥登录与添加：
+
+```dart
+final options = await passport.beginWebAuthnLogin(email: 'user@example.com');
+final response = await passkeyPlugin.authenticate(options.options);
+await passport.completeWebAuthnLogin(
+  email: 'user@example.com',
+  credential: RosmWebAuthnCredential(response),
+);
+
+final registerOptions = await passport.beginPasskeyRegistration(
+  currentPassword: currentPassword,
+);
+final registerResponse = await passkeyPlugin.register(registerOptions.options);
+await passport.completePasskeyRegistration(
+  credential: RosmWebAuthnCredential(registerResponse),
+);
+```
 
 核心类：
 

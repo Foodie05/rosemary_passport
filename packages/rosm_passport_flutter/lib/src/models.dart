@@ -292,6 +292,37 @@ class RosmPasswordFactors {
   final bool directLogin;
 }
 
+enum RosmPasswordRecoveryMethod {
+  email,
+  phone;
+
+  String get wireName => switch (this) {
+    RosmPasswordRecoveryMethod.email => 'email',
+    RosmPasswordRecoveryMethod.phone => 'phone',
+  };
+}
+
+class RosmPasswordRecoveryMethodConverter
+    implements JsonConverter<RosmPasswordRecoveryMethod, String> {
+  const RosmPasswordRecoveryMethodConverter();
+
+  @override
+  RosmPasswordRecoveryMethod fromJson(String json) {
+    return switch (json) {
+      'email' => RosmPasswordRecoveryMethod.email,
+      'phone' => RosmPasswordRecoveryMethod.phone,
+      _ => throw ArgumentError.value(
+        json,
+        'json',
+        'Unsupported recovery method',
+      ),
+    };
+  }
+
+  @override
+  String toJson(RosmPasswordRecoveryMethod object) => object.wireName;
+}
+
 class RosmWebAuthnOptions {
   const RosmWebAuthnOptions(this.options);
 
@@ -305,6 +336,55 @@ class RosmWebAuthnCredential {
   const RosmWebAuthnCredential(this.response);
 
   final Map<String, dynamic> response;
+}
+
+@JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
+class RosmOperationResult {
+  const RosmOperationResult({
+    this.sent = false,
+    this.updated = false,
+    this.deleted = false,
+    this.message,
+  });
+
+  factory RosmOperationResult.fromJson(Map<String, dynamic> json) =>
+      _$RosmOperationResultFromJson(json);
+
+  final bool sent;
+  final bool updated;
+  final bool deleted;
+  final String? message;
+}
+
+@JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
+class RosmWebAuthnCredentialInfo {
+  const RosmWebAuthnCredentialInfo({
+    required this.credentialId,
+    required this.createdAt,
+    this.deviceType,
+    this.backedUp = false,
+    this.transports = const [],
+  });
+
+  factory RosmWebAuthnCredentialInfo.fromJson(Map<String, dynamic> json) =>
+      _$RosmWebAuthnCredentialInfoFromJson(json);
+
+  final String credentialId;
+  final String? deviceType;
+  final bool backedUp;
+  final List<String> transports;
+  final DateTime createdAt;
+}
+
+@JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
+class RosmPasskeyList {
+  const RosmPasskeyList({required this.credentials, required this.maxCount});
+
+  factory RosmPasskeyList.fromJson(Map<String, dynamic> json) =>
+      _$RosmPasskeyListFromJson(json);
+
+  final List<RosmWebAuthnCredentialInfo> credentials;
+  final int maxCount;
 }
 
 @JsonSerializable(
@@ -351,6 +431,81 @@ class RosmPasswordLoginRequest {
   final String? captchaToken;
 
   Map<String, dynamic> toJson() => _$RosmPasswordLoginRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.snake,
+  includeIfNull: false,
+  createFactory: false,
+)
+class RosmWebAuthnLoginOptionsRequest {
+  const RosmWebAuthnLoginOptionsRequest({this.email});
+
+  final String? email;
+
+  Map<String, dynamic> toJson() =>
+      _$RosmWebAuthnLoginOptionsRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.snake,
+  includeIfNull: false,
+  createFactory: false,
+)
+class RosmPasswordRecoveryCodeRequest {
+  const RosmPasswordRecoveryCodeRequest({
+    required this.account,
+    required this.method,
+    required this.captchaToken,
+  });
+
+  final String account;
+  @RosmPasswordRecoveryMethodConverter()
+  final RosmPasswordRecoveryMethod method;
+  final String captchaToken;
+
+  Map<String, dynamic> toJson() =>
+      _$RosmPasswordRecoveryCodeRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.snake,
+  includeIfNull: false,
+  createFactory: false,
+)
+class RosmPasswordResetByCodeRequest {
+  const RosmPasswordResetByCodeRequest({
+    required this.account,
+    required this.method,
+    required this.code,
+    required this.newPassword,
+  });
+
+  final String account;
+  @RosmPasswordRecoveryMethodConverter()
+  final RosmPasswordRecoveryMethod method;
+  final String code;
+  final String newPassword;
+
+  Map<String, dynamic> toJson() => _$RosmPasswordResetByCodeRequestToJson(this);
+}
+
+@JsonSerializable(
+  fieldRename: FieldRename.snake,
+  includeIfNull: false,
+  createFactory: false,
+)
+class RosmPasskeyRegistrationOptionsRequest {
+  const RosmPasskeyRegistrationOptionsRequest({
+    this.currentPassword,
+    this.postRegisterBootstrap = false,
+  });
+
+  final String? currentPassword;
+  final bool postRegisterBootstrap;
+
+  Map<String, dynamic> toJson() =>
+      _$RosmPasskeyRegistrationOptionsRequestToJson(this);
 }
 
 class RosmApiException implements Exception {
