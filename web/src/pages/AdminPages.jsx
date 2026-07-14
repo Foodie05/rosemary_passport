@@ -1178,7 +1178,8 @@ Authorization: Bearer ACCESS_TOKEN`,
   }
 
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="min-h-screen bg-sage-50 p-6 lg:p-10">
+      <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="OIDC 接入文档"
         description="面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。"
@@ -1318,6 +1319,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
@@ -1330,7 +1332,8 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
   const nativeApproveEndpoint = `${issuer}/api/v1/oidc/native/approve`;
 
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="min-h-screen bg-sage-50 p-6 lg:p-10">
+      <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="Flutter SDK 接入"
         description="面向移动端应用的原生接入说明。应用侧使用 Dart 类和 SDK 方法完成登录授权，JSON 请求由 SDK 内部处理。"
@@ -1447,6 +1450,7 @@ await passport.signOut();`}</CodeBlock>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>
         </div>
       </div>
+    </div>
     </div>
   );
 }
