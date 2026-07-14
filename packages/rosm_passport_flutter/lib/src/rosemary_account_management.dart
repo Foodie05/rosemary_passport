@@ -62,6 +62,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   RosmAuthenticatorSetup? _authenticatorSetup;
 
   final _cooldowns = <_AccountCooldown, int>{};
+  final _cooldownRefreshers = <_AccountCooldown, VoidCallback>{};
   Timer? _cooldownTimer;
 
   @override
@@ -130,6 +131,49 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     }
   }
 
+  Future<void> _runInSheet(
+    StateSetter setSheetState,
+    Future<void> Function() action,
+  ) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    _refreshSheet(setSheetState);
+    try {
+      await action();
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _messageFor(error));
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+        _refreshSheet(setSheetState);
+      }
+    }
+  }
+
+  void _refreshSheet(StateSetter setSheetState) {
+    try {
+      setSheetState(() {});
+    } on FlutterError {
+      // The sheet may have just been closed by a successful submit action.
+    }
+  }
+
+  void _bindSheetCooldown(_AccountCooldown kind, StateSetter setSheetState) {
+    _cooldownRefreshers[kind] = () => _refreshSheet(setSheetState);
+  }
+
+  Future<String> _captchaToken() async {
+    final token = await widget.config.requestCaptchaToken?.call();
+    if (token == null || token.trim().isEmpty) {
+      throw const RosmApiException('captcha_required', '请先完成人机验证。');
+    }
+    return token;
+  }
+
   Future<void> _saveNickname() async {
     final nickname = _nickname.text.trim();
     if (nickname.isEmpty) return;
@@ -143,97 +187,142 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     _email.text = _account?.user.email ?? '';
     _currentPassword.clear();
     _code.clear();
-    await _showSheet(
-      title: '绑定邮箱',
-      child: _EmailSheet(
-        email: _email,
-        currentPassword: _currentPassword,
-        code: _code,
-        busy: _busy,
-        cooldownLabel: _cooldownLabel(_AccountCooldown.email, '发送'),
-        sendDisabled: _coolingDown(_AccountCooldown.email),
-        onSend: () => _run(() async {
-          final result = await widget.client.sendBindEmailCode(
-            email: _email.text.trim(),
-            currentPassword: _currentPassword.text,
-            captchaToken: await widget.config.requestCaptchaToken?.call(),
-          );
-          _startCooldown(_AccountCooldown.email, result.retryAfter ?? 45);
-        }),
-        onSubmit: () => _run(() async {
-          await widget.client.bindEmail(
-            email: _email.text.trim(),
-            currentPassword: _currentPassword.text,
-            emailCode: _code.text.trim(),
-          );
-          if (mounted) Navigator.of(context).pop();
-          await _load();
-        }),
-      ),
-    );
+    try {
+      await _showSheet(
+        title: '绑定邮箱',
+        child: StatefulBuilder(
+          builder: (context, setSheetState) {
+            _bindSheetCooldown(_AccountCooldown.email, setSheetState);
+            return _SheetBody(
+              error: _error,
+              child: _EmailSheet(
+                email: _email,
+                currentPassword: _currentPassword,
+                code: _code,
+                busy: _busy,
+                cooldownLabel: _cooldownLabel(_AccountCooldown.email, '发送'),
+                sendDisabled: _coolingDown(_AccountCooldown.email),
+                onSend: () => _runInSheet(setSheetState, () async {
+                  final result = await widget.client.sendBindEmailCode(
+                    email: _email.text.trim(),
+                    currentPassword: _currentPassword.text,
+                    captchaToken: await _captchaToken(),
+                  );
+                  _startCooldown(
+                    _AccountCooldown.email,
+                    result.retryAfter ?? 45,
+                  );
+                }),
+                onSubmit: () => _runInSheet(setSheetState, () async {
+                  await widget.client.bindEmail(
+                    email: _email.text.trim(),
+                    currentPassword: _currentPassword.text,
+                    emailCode: _code.text.trim(),
+                  );
+                  if (mounted) Navigator.of(context).pop();
+                  await _load();
+                }),
+              ),
+            );
+          },
+        ),
+      );
+    } finally {
+      _cooldownRefreshers.remove(_AccountCooldown.email);
+    }
   }
 
   Future<void> _openPhoneDialog() async {
     _phone.text = _account?.user.phoneNumber ?? '';
     _currentPassword.clear();
     _code.clear();
-    await _showSheet(
-      title: '绑定手机号',
-      child: _PhoneSheet(
-        phone: _phone,
-        currentPassword: _currentPassword,
-        code: _code,
-        busy: _busy,
-        cooldownLabel: _cooldownLabel(_AccountCooldown.phone, '发送'),
-        sendDisabled: _coolingDown(_AccountCooldown.phone),
-        onSend: () => _run(() async {
-          final result = await widget.client.sendBindPhoneCode(
-            phoneNumber: _phone.text.trim(),
-            currentPassword: _currentPassword.text,
-            captchaToken: await widget.config.requestCaptchaToken?.call(),
-          );
-          _startCooldown(_AccountCooldown.phone, result.retryAfter ?? 60);
-        }),
-        onSubmit: () => _run(() async {
-          await widget.client.bindPhone(
-            phoneNumber: _phone.text.trim(),
-            currentPassword: _currentPassword.text,
-            verifyCode: _code.text.trim(),
-          );
-          if (mounted) Navigator.of(context).pop();
-          await _load();
-        }),
-      ),
-    );
+    try {
+      await _showSheet(
+        title: '绑定手机号',
+        child: StatefulBuilder(
+          builder: (context, setSheetState) {
+            _bindSheetCooldown(_AccountCooldown.phone, setSheetState);
+            return _SheetBody(
+              error: _error,
+              child: _PhoneSheet(
+                phone: _phone,
+                currentPassword: _currentPassword,
+                code: _code,
+                busy: _busy,
+                cooldownLabel: _cooldownLabel(_AccountCooldown.phone, '发送'),
+                sendDisabled: _coolingDown(_AccountCooldown.phone),
+                onSend: () => _runInSheet(setSheetState, () async {
+                  final result = await widget.client.sendBindPhoneCode(
+                    phoneNumber: _phone.text.trim(),
+                    currentPassword: _currentPassword.text,
+                    captchaToken: await _captchaToken(),
+                  );
+                  _startCooldown(
+                    _AccountCooldown.phone,
+                    result.retryAfter ?? 60,
+                  );
+                }),
+                onSubmit: () => _runInSheet(setSheetState, () async {
+                  await widget.client.bindPhone(
+                    phoneNumber: _phone.text.trim(),
+                    currentPassword: _currentPassword.text,
+                    verifyCode: _code.text.trim(),
+                  );
+                  if (mounted) Navigator.of(context).pop();
+                  await _load();
+                }),
+              ),
+            );
+          },
+        ),
+      );
+    } finally {
+      _cooldownRefreshers.remove(_AccountCooldown.phone);
+    }
   }
 
   Future<void> _openPasswordDialog() async {
     _newPassword.clear();
     _code.clear();
-    await _showSheet(
-      title: '重置密码',
-      child: _PasswordSheet(
-        newPassword: _newPassword,
-        code: _code,
-        email: _account?.user.email ?? '-',
-        busy: _busy,
-        cooldownLabel: _cooldownLabel(_AccountCooldown.password, '发送'),
-        sendDisabled: _coolingDown(_AccountCooldown.password),
-        onSend: () => _run(() async {
-          final result = await widget.client.sendOwnPasswordResetCode(
-            captchaToken: await widget.config.requestCaptchaToken?.call(),
-          );
-          _startCooldown(_AccountCooldown.password, result.retryAfter ?? 45);
-        }),
-        onSubmit: () => _run(() async {
-          await widget.client.resetOwnPassword(
-            newPassword: _newPassword.text,
-            emailCode: _code.text.trim(),
-          );
-          if (mounted) Navigator.of(context).pop();
-        }),
-      ),
-    );
+    try {
+      await _showSheet(
+        title: '重置密码',
+        child: StatefulBuilder(
+          builder: (context, setSheetState) {
+            _bindSheetCooldown(_AccountCooldown.password, setSheetState);
+            return _SheetBody(
+              error: _error,
+              child: _PasswordSheet(
+                newPassword: _newPassword,
+                code: _code,
+                email: _account?.user.email ?? '-',
+                busy: _busy,
+                cooldownLabel: _cooldownLabel(_AccountCooldown.password, '发送'),
+                sendDisabled: _coolingDown(_AccountCooldown.password),
+                onSend: () => _runInSheet(setSheetState, () async {
+                  final result = await widget.client.sendOwnPasswordResetCode(
+                    captchaToken: await _captchaToken(),
+                  );
+                  _startCooldown(
+                    _AccountCooldown.password,
+                    result.retryAfter ?? 45,
+                  );
+                }),
+                onSubmit: () => _runInSheet(setSheetState, () async {
+                  await widget.client.resetOwnPassword(
+                    newPassword: _newPassword.text,
+                    emailCode: _code.text.trim(),
+                  );
+                  if (mounted) Navigator.of(context).pop();
+                }),
+              ),
+            );
+          },
+        ),
+      );
+    } finally {
+      _cooldownRefreshers.remove(_AccountCooldown.password);
+    }
   }
 
   Future<void> _openAuthenticatorDialog() async {
@@ -370,11 +459,20 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     return remaining > 0 ? '${remaining}秒' : label;
   }
 
-  void _startCooldown(_AccountCooldown kind, int seconds) {
+  void _startCooldown(
+    _AccountCooldown kind,
+    int seconds, {
+    VoidCallback? onTick,
+  }) {
     if (seconds <= 0) return;
+    if (onTick != null) {
+      _cooldownRefreshers[kind] = onTick;
+    }
     setState(() => _cooldowns[kind] = seconds);
+    _cooldownRefreshers[kind]?.call();
     _cooldownTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      final active = <_AccountCooldown>[];
       setState(() {
         final done = <_AccountCooldown>[];
         for (final entry in _cooldowns.entries) {
@@ -383,16 +481,21 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
             done.add(entry.key);
           } else {
             _cooldowns[entry.key] = next;
+            active.add(entry.key);
           }
         }
         for (final kind in done) {
           _cooldowns.remove(kind);
+          active.add(kind);
         }
         if (_cooldowns.isEmpty) {
           _cooldownTimer?.cancel();
           _cooldownTimer = null;
         }
       });
+      for (final kind in active) {
+        _cooldownRefreshers[kind]?.call();
+      }
     });
   }
 
@@ -706,6 +809,28 @@ class _PasswordSheet extends StatelessWidget {
           onPressed: busy ? null : onSubmit,
           child: _BusyText(busy: busy, text: '重置密码'),
         ),
+      ],
+    );
+  }
+}
+
+class _SheetBody extends StatelessWidget {
+  const _SheetBody({required this.child, this.error});
+
+  final Widget child;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (message != null && message.isNotEmpty) ...[
+          _AccountMessage(text: message),
+          const SizedBox(height: 12),
+        ],
+        child,
       ],
     );
   }
