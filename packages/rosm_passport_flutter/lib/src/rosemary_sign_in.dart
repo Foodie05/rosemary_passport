@@ -150,13 +150,31 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _loadAuthorization() async {
     try {
+      widget.client.logger.info(
+        'Native authorization loading started.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'authorization.load.start',
+      );
       final start = await widget.client.startNativeAuthorization(_request);
       if (!mounted) return;
       setState(() {
         _start = start;
         _loading = false;
       });
-    } on Object catch (error) {
+      widget.client.logger.info(
+        'Native authorization loaded.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'authorization.load.success',
+      );
+    } on Object catch (error, stackTrace) {
+      widget.client.logger.error(
+        'Native authorization loading failed.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'authorization.load.failure',
+        context: _errorContext(error),
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       setState(() {
         _error = _messageFor(error);
@@ -282,14 +300,39 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _loginWithPasskeyForPasswordMfa() async {
     final authenticator =
-        widget.config.authenticatePasskey ?? authenticateRosmPasskey;
+        widget.config.authenticatePasskey ??
+        (options) => RosmNativePasskeys(
+          logger: widget.client.logger,
+        ).authenticate(options);
     await _run(() async {
       final email = _passwordEmail.text.trim();
+      widget.client.logger.info(
+        'Password MFA passkey options request started.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.mfa.options.start',
+        context: {'has_email': email.isNotEmpty},
+      );
       final options = await widget.client.beginWebAuthnLogin(email: email);
+      widget.client.logger.info(
+        'Password MFA passkey options received.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.mfa.options.success',
+      );
       final credential = await authenticator(options);
+      widget.client.logger.info(
+        'Password MFA passkey credential received; verifying with server.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.mfa.verify.start',
+        context: _credentialSummary(credential),
+      );
       final auth = await widget.client.completeWebAuthnLogin(
         email: email,
         credential: credential,
+      );
+      widget.client.logger.info(
+        'Password MFA passkey verification completed.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.mfa.verify.success',
       );
       _showConsent(auth);
     });
@@ -297,14 +340,39 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _loginWithPasskey() async {
     final authenticator =
-        widget.config.authenticatePasskey ?? authenticateRosmPasskey;
+        widget.config.authenticatePasskey ??
+        (options) => RosmNativePasskeys(
+          logger: widget.client.logger,
+        ).authenticate(options);
     await _run(() async {
       final email = _email.text.trim().isEmpty ? null : _email.text.trim();
+      widget.client.logger.info(
+        'Passkey login options request started.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.login.options.start',
+        context: {'has_email': email != null},
+      );
       final options = await widget.client.beginWebAuthnLogin(email: email);
+      widget.client.logger.info(
+        'Passkey login options received.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.login.options.success',
+      );
       final credential = await authenticator(options);
+      widget.client.logger.info(
+        'Passkey login credential received; verifying with server.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.login.verify.start',
+        context: _credentialSummary(credential),
+      );
       final auth = await widget.client.completeWebAuthnLogin(
         email: email,
         credential: credential,
+      );
+      widget.client.logger.info(
+        'Passkey login verification completed.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'passkey.login.verify.success',
       );
       _showConsent(auth);
     });
@@ -378,6 +446,12 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   void _showConsent(RosmAuthResult auth) {
     if (!mounted) return;
+    widget.client.logger.info(
+      'Login completed; showing consent.',
+      source: 'rosm_passport.ui.sign_in',
+      event: 'login.success',
+      context: {'user_id': auth.user.id},
+    );
     setState(() {
       _pendingAuth = auth;
       _error = null;
@@ -407,6 +481,11 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   }
 
   Future<void> _finish(RosmAuthResult auth) async {
+    widget.client.logger.info(
+      'Authorization approval started.',
+      source: 'rosm_passport.ui.sign_in',
+      event: 'authorization.approve.start',
+    );
     final approval = await widget.client.approveNativeAuthorization(_request);
     final endpoint = widget.config.serverHandoffEndpoint;
     if (endpoint == null) {
@@ -421,6 +500,11 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           authorization: approval,
           tokens: tokens,
         ),
+      );
+      widget.client.logger.info(
+        'Authorization finished with direct token exchange.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'authorization.approve.success',
       );
       return;
     }
@@ -439,6 +523,11 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         serverPayload: handoff.payload,
       ),
     );
+    widget.client.logger.info(
+      'Authorization finished with server handoff.',
+      source: 'rosm_passport.ui.sign_in',
+      event: 'authorization.approve.success',
+    );
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -449,7 +538,15 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     });
     try {
       await action();
-    } on Object catch (error) {
+    } on Object catch (error, stackTrace) {
+      widget.client.logger.warning(
+        'Sign-in action failed.',
+        source: 'rosm_passport.ui.sign_in',
+        event: 'ui.action.failure',
+        context: _errorContext(error),
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       setState(() => _error = _messageFor(error));
     } finally {
@@ -457,6 +554,30 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  Map<String, Object?> _errorContext(Object error) {
+    if (error is RosmApiException) {
+      return {
+        'error_code': error.code,
+        if (error.statusCode != null) 'status_code': error.statusCode,
+      };
+    }
+    return {'error_type': error.runtimeType.toString()};
+  }
+
+  Map<String, Object?> _credentialSummary(RosmWebAuthnCredential credential) {
+    final response = credential.response['response'];
+    final responseMap = response is Map ? response : const {};
+    return {
+      'credential_id_length': credential.response['id']?.toString().length ?? 0,
+      'raw_id_length': credential.response['rawId']?.toString().length ?? 0,
+      'type': credential.response['type']?.toString(),
+      'has_client_data_json': responseMap.containsKey('clientDataJSON'),
+      'has_authenticator_data': responseMap.containsKey('authenticatorData'),
+      'has_signature': responseMap.containsKey('signature'),
+      'has_attestation_object': responseMap.containsKey('attestationObject'),
+    };
   }
 
   int _cooldownFor(_CooldownKind kind) => _cooldowns[kind] ?? 0;

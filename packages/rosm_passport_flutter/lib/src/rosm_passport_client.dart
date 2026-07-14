@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import 'models.dart';
 import 'pkce.dart';
+import 'rosm_passport_logger.dart';
 import 'token_store.dart';
 
 class RosmPassportClient {
@@ -15,17 +16,20 @@ class RosmPassportClient {
     Uri? webAuthnOrigin,
     http.Client? httpClient,
     RosmTokenStore? tokenStore,
+    RosmPassportLogger? logger,
   }) : scopes = Set.unmodifiable(scopes),
        webAuthnOrigin =
            webAuthnOrigin ?? issuer.replace(path: '', query: '', fragment: ''),
        _http = httpClient ?? http.Client(),
-       _tokenStore = tokenStore ?? RosmSecureTokenStore();
+       _tokenStore = tokenStore ?? RosmSecureTokenStore(),
+       logger = logger ?? RosmPassportLogging.logger;
 
   final Uri issuer;
   final String clientId;
   final Uri redirectUri;
   final Set<String> scopes;
   final Uri webAuthnOrigin;
+  final RosmPassportLogger logger;
   final http.Client _http;
   final RosmTokenStore _tokenStore;
   final Map<String, String> _cookies = {};
@@ -524,12 +528,21 @@ class RosmPassportClient {
     String path, {
     Map<String, String> headers = const {},
   }) async {
-    final response = await _http.get(
-      issuer.resolve(path),
-      headers: {...await _authHeaders(), ...headers},
-    );
-    _storeCookies(response);
-    return _decodeJsonResponse(response);
+    final uri = issuer.resolve(path);
+    final stopwatch = _startHttpLog('GET', uri);
+    try {
+      final response = await _http.get(
+        uri,
+        headers: {...await _authHeaders(), ...headers},
+      );
+      _storeCookies(response);
+      final json = _decodeJsonResponse(response);
+      _finishHttpLog('GET', uri, response.statusCode, stopwatch);
+      return json;
+    } on Object catch (error, stackTrace) {
+      _failHttpLog('GET', uri, stopwatch, error, stackTrace);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> _postJson(
@@ -538,20 +551,30 @@ class RosmPassportClient {
     Map<String, String> headers = const {},
     bool ignoreApiError = false,
   }) async {
-    final response = await _http.post(
-      issuer.resolve(path),
-      headers: {
-        'content-type': 'application/json',
-        ...await _authHeaders(),
-        ...headers,
-      },
-      body: jsonEncode(body),
-    );
-    _storeCookies(response);
-    if (ignoreApiError && response.statusCode >= 400) {
-      return const {};
+    final uri = issuer.resolve(path);
+    final stopwatch = _startHttpLog('POST', uri);
+    try {
+      final response = await _http.post(
+        uri,
+        headers: {
+          'content-type': 'application/json',
+          ...await _authHeaders(),
+          ...headers,
+        },
+        body: jsonEncode(body),
+      );
+      _storeCookies(response);
+      if (ignoreApiError && response.statusCode >= 400) {
+        _finishHttpLog('POST', uri, response.statusCode, stopwatch);
+        return const {};
+      }
+      final json = _decodeJsonResponse(response);
+      _finishHttpLog('POST', uri, response.statusCode, stopwatch);
+      return json;
+    } on Object catch (error, stackTrace) {
+      _failHttpLog('POST', uri, stopwatch, error, stackTrace);
+      rethrow;
     }
-    return _decodeJsonResponse(response);
   }
 
   Future<Map<String, dynamic>> _patchJson(
@@ -559,17 +582,26 @@ class RosmPassportClient {
     Map<String, Object?> body, {
     Map<String, String> headers = const {},
   }) async {
-    final response = await _http.patch(
-      issuer.resolve(path),
-      headers: {
-        'content-type': 'application/json',
-        ...await _authHeaders(),
-        ...headers,
-      },
-      body: jsonEncode(body),
-    );
-    _storeCookies(response);
-    return _decodeJsonResponse(response);
+    final uri = issuer.resolve(path);
+    final stopwatch = _startHttpLog('PATCH', uri);
+    try {
+      final response = await _http.patch(
+        uri,
+        headers: {
+          'content-type': 'application/json',
+          ...await _authHeaders(),
+          ...headers,
+        },
+        body: jsonEncode(body),
+      );
+      _storeCookies(response);
+      final json = _decodeJsonResponse(response);
+      _finishHttpLog('PATCH', uri, response.statusCode, stopwatch);
+      return json;
+    } on Object catch (error, stackTrace) {
+      _failHttpLog('PATCH', uri, stopwatch, error, stackTrace);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> _postAbsoluteJson(
@@ -577,25 +609,108 @@ class RosmPassportClient {
     Map<String, Object?> body, {
     Map<String, String> headers = const {},
   }) async {
-    final response = await _http.post(
-      endpoint,
-      headers: {'content-type': 'application/json', ...headers},
-      body: jsonEncode(body),
-    );
-    return _decodeJsonResponse(response);
+    final stopwatch = _startHttpLog('POST', endpoint);
+    try {
+      final response = await _http.post(
+        endpoint,
+        headers: {'content-type': 'application/json', ...headers},
+        body: jsonEncode(body),
+      );
+      final json = _decodeJsonResponse(response);
+      _finishHttpLog('POST', endpoint, response.statusCode, stopwatch);
+      return json;
+    } on Object catch (error, stackTrace) {
+      _failHttpLog('POST', endpoint, stopwatch, error, stackTrace);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> _deleteJson(String path) async {
-    final response = await _http.delete(
-      issuer.resolve(path),
-      headers: await _authHeaders(),
-    );
-    _storeCookies(response);
-    return _decodeJsonResponse(response);
+    final uri = issuer.resolve(path);
+    final stopwatch = _startHttpLog('DELETE', uri);
+    try {
+      final response = await _http.delete(uri, headers: await _authHeaders());
+      _storeCookies(response);
+      final json = _decodeJsonResponse(response);
+      _finishHttpLog('DELETE', uri, response.statusCode, stopwatch);
+      return json;
+    } on Object catch (error, stackTrace) {
+      _failHttpLog('DELETE', uri, stopwatch, error, stackTrace);
+      rethrow;
+    }
   }
 
   Map<String, String> _webAuthnHeaders(Uri? origin) {
     return {'origin': (origin ?? webAuthnOrigin).toString()};
+  }
+
+  Stopwatch _startHttpLog(String method, Uri uri) {
+    logger.debug(
+      'HTTP request started.',
+      source: 'rosm_passport.client',
+      event: 'http.request',
+      context: {'method': method, 'path': uri.path},
+    );
+    return Stopwatch()..start();
+  }
+
+  void _finishHttpLog(
+    String method,
+    Uri uri,
+    int statusCode,
+    Stopwatch stopwatch,
+  ) {
+    stopwatch.stop();
+    final context = {
+      'method': method,
+      'path': uri.path,
+      'status_code': statusCode,
+      'duration_ms': stopwatch.elapsedMilliseconds,
+    };
+    final message = statusCode >= 400
+        ? 'HTTP request failed.'
+        : 'HTTP request completed.';
+    if (statusCode >= 400) {
+      logger.warning(
+        message,
+        source: 'rosm_passport.client',
+        event: 'http.response',
+        context: context,
+      );
+    } else {
+      logger.info(
+        message,
+        source: 'rosm_passport.client',
+        event: 'http.response',
+        context: context,
+      );
+    }
+  }
+
+  void _failHttpLog(
+    String method,
+    Uri uri,
+    Stopwatch stopwatch,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    stopwatch.stop();
+    final context = {
+      'method': method,
+      'path': uri.path,
+      'duration_ms': stopwatch.elapsedMilliseconds,
+      if (error is RosmApiException) 'error_code': error.code,
+      if (error is RosmApiException && error.statusCode != null)
+        'status_code': error.statusCode,
+    };
+    logger.error(
+      'HTTP request threw an error.',
+      source: 'rosm_passport.client',
+      event: 'http.error',
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   Map<String, dynamic> _decodeJsonResponse(http.Response response) {

@@ -2,18 +2,26 @@ import 'package:passkeys/authenticator.dart';
 import 'package:passkeys/types.dart';
 
 import 'models.dart';
+import 'rosm_passport_logger.dart';
 
 class RosmNativePasskeys {
-  RosmNativePasskeys({bool debugMode = false})
-    : _authenticator = PasskeyAuthenticator(debugMode: debugMode);
+  RosmNativePasskeys({bool debugMode = false, RosmPassportLogger? logger})
+    : _authenticator = PasskeyAuthenticator(debugMode: debugMode),
+      _logger = logger ?? RosmPassportLogging.logger;
 
   final PasskeyAuthenticator _authenticator;
+  final RosmPassportLogger _logger;
 
   Future<RosmWebAuthnCredential> authenticate(
     RosmWebAuthnOptions options, {
     MediationType mediation = MediationType.Required,
     bool preferImmediatelyAvailableCredentials = true,
   }) async {
+    _logger.info(
+      'Passkey authentication started.',
+      source: 'rosm_passport.passkeys',
+      event: 'passkey.authenticate.start',
+    );
     try {
       final request = AuthenticateRequestType.fromJson(
         _optionsMap(options),
@@ -21,21 +29,128 @@ class RosmNativePasskeys {
         preferImmediatelyAvailableCredentials:
             preferImmediatelyAvailableCredentials,
       );
+      _logger.debug(
+        'Passkey authentication options parsed.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.authenticate.options',
+        context: {
+          'rp_id': request.relyingPartyId,
+          'challenge_length': request.challenge.length,
+          'allow_credentials_count': request.allowCredentials?.length ?? 0,
+          'user_verification': request.userVerification ?? 'preferred',
+          'mediation': request.mediation.name,
+          'prefer_immediately_available_credentials':
+              request.preferImmediatelyAvailableCredentials,
+        },
+      );
+      _logger.debug(
+        'Calling native passkey authenticator.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.authenticate.native.start',
+      );
       final response = await _authenticator.authenticate(request);
+      _logger.debug(
+        'Native passkey authenticator returned credential.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.authenticate.native.success',
+        context: {
+          'credential_id_length': response.id.length,
+          'raw_id_length': response.rawId.length,
+          'has_user_handle': response.userHandle.isNotEmpty,
+          'client_data_json_length': response.clientDataJSON.length,
+          'authenticator_data_length': response.authenticatorData.length,
+          'signature_length': response.signature.length,
+        },
+      );
+      _logger.info(
+        'Passkey authentication completed.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.authenticate.success',
+      );
       return RosmWebAuthnCredential(response.toJson());
-    } on Object catch (error) {
-      throw _passkeyException(error, registration: false);
+    } on Object catch (error, stackTrace) {
+      final exception = _passkeyException(error, registration: false);
+      _logger.warning(
+        'Passkey authentication failed.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.authenticate.failure',
+        context: {'error_code': _errorCode(exception)},
+        error: exception,
+        stackTrace: stackTrace,
+      );
+      throw exception;
     }
   }
 
   Future<RosmWebAuthnCredential> register(RosmWebAuthnOptions options) async {
+    _logger.info(
+      'Passkey registration started.',
+      source: 'rosm_passport.passkeys',
+      event: 'passkey.register.start',
+    );
     try {
       final request = RegisterRequestType.fromJson(_optionsMap(options));
+      _logger.debug(
+        'Passkey registration options parsed.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.register.options',
+        context: {
+          'rp_id': request.relyingParty.id,
+          'rp_name': request.relyingParty.name,
+          'challenge_length': request.challenge.length,
+          'user_id_length': request.user.id.length,
+          'exclude_credentials_count': request.excludeCredentials.length,
+          'pub_key_cred_params_count': request.pubKeyCredParams?.length ?? 0,
+          'authenticator_attachment':
+              request.authSelectionType?.authenticatorAttachment,
+          'resident_key': request.authSelectionType?.residentKey,
+          'user_verification': request.authSelectionType?.userVerification,
+          'attestation': request.attestation ?? 'none',
+        },
+      );
+      _logger.debug(
+        'Calling native passkey registrar.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.register.native.start',
+      );
       final response = await _authenticator.register(request);
+      _logger.debug(
+        'Native passkey registrar returned credential.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.register.native.success',
+        context: {
+          'credential_id_length': response.id.length,
+          'raw_id_length': response.rawId.length,
+          'client_data_json_length': response.clientDataJSON.length,
+          'attestation_object_length': response.attestationObject.length,
+          'transports_count': response.transports.whereType<String>().length,
+          'transports': response.transports.whereType<String>().toList(),
+        },
+      );
+      _logger.info(
+        'Passkey registration completed.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.register.success',
+      );
       return RosmWebAuthnCredential(response.toJson());
-    } on Object catch (error) {
-      throw _passkeyException(error, registration: true);
+    } on Object catch (error, stackTrace) {
+      final exception = _passkeyException(error, registration: true);
+      _logger.warning(
+        'Passkey registration failed.',
+        source: 'rosm_passport.passkeys',
+        event: 'passkey.register.failure',
+        context: {'error_code': _errorCode(exception)},
+        error: exception,
+        stackTrace: stackTrace,
+      );
+      throw exception;
     }
+  }
+
+  String _errorCode(Object error) {
+    return error is RosmApiException
+        ? error.code
+        : error.runtimeType.toString();
   }
 
   Map<String, dynamic> _optionsMap(RosmWebAuthnOptions options) {
@@ -118,16 +233,21 @@ class RosmNativePasskeys {
   }
 }
 
-final RosmNativePasskeys rosmNativePasskeys = RosmNativePasskeys();
+RosmNativePasskeys get rosmNativePasskeys =>
+    RosmNativePasskeys(logger: RosmPassportLogging.logger);
 
 Future<RosmWebAuthnCredential> authenticateRosmPasskey(
   RosmWebAuthnOptions options,
 ) {
-  return rosmNativePasskeys.authenticate(options);
+  return RosmNativePasskeys(
+    logger: RosmPassportLogging.logger,
+  ).authenticate(options);
 }
 
 Future<RosmWebAuthnCredential> registerRosmPasskey(
   RosmWebAuthnOptions options,
 ) {
-  return rosmNativePasskeys.register(options);
+  return RosmNativePasskeys(
+    logger: RosmPassportLogging.logger,
+  ).register(options);
 }

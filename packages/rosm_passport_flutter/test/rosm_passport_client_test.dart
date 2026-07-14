@@ -6,6 +6,59 @@ import 'package:http/testing.dart';
 import 'package:rosm_passport_flutter/rosm_passport_flutter.dart';
 
 void main() {
+  test('logger filters levels and forwards records to sinks', () {
+    final records = <RosmLogRecord>[];
+    final logger = RosmPassportLogger(
+      minLevel: RosmLogLevel.warning,
+      sinks: [records.add],
+    );
+
+    logger.debug('debug ignored', event: 'debug');
+    logger.info('info ignored', event: 'info');
+    logger.warning('warning kept', event: 'warning');
+    logger.error('error kept', event: 'error');
+
+    expect(records.map((record) => record.level), [
+      RosmLogLevel.warning,
+      RosmLogLevel.error,
+    ]);
+    expect(records.first.event, 'warning');
+    expect(records.last.toJson()['message'], 'error kept');
+  });
+
+  test('client emits safe HTTP logs', () async {
+    final records = <RosmLogRecord>[];
+    final client = RosmPassportClient(
+      issuer: Uri.parse('https://api.example.com'),
+      clientId: 'app',
+      redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+      tokenStore: _MemoryTokenStore(),
+      logger: RosmPassportLogger(
+        minLevel: RosmLogLevel.debug,
+        sinks: [records.add],
+      ),
+      httpClient: MockClient((request) async {
+        return http.Response(
+          jsonEncode({'sent': true, 'message': 'ok'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    await client.sendPasswordRecoveryCode(
+      account: 'user@example.com',
+      method: RosmPasswordRecoveryMethod.email,
+      captchaToken: 'captcha-secret',
+    );
+
+    expect(records.map((record) => record.event), contains('http.request'));
+    expect(records.map((record) => record.event), contains('http.response'));
+    final serialized = records.map((record) => record.toString()).join('\n');
+    expect(serialized, isNot(contains('captcha-secret')));
+    expect(serialized, isNot(contains('user@example.com')));
+  });
+
   test('sends password recovery code with typed request body', () async {
     late http.Request captured;
     final client = RosmPassportClient(

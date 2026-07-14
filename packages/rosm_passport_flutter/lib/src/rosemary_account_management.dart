@@ -90,11 +90,21 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
       _error = null;
     });
     try {
+      widget.client.logger.info(
+        'Account management state loading started.',
+        source: 'rosm_passport.ui.account',
+        event: 'account.load.start',
+      );
       final account = await widget.client.account();
       RosmPasskeyList? passkeys;
       try {
         passkeys = await widget.client.listPasskeys();
       } on Object {
+        widget.client.logger.warning(
+          'Passkey list loading failed while loading account state.',
+          source: 'rosm_passport.ui.account',
+          event: 'passkey.list.failure',
+        );
         passkeys = null;
       }
       if (!mounted) return;
@@ -104,7 +114,21 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         _nickname.text = account.user.nickname;
         _loading = false;
       });
-    } on Object catch (error) {
+      widget.client.logger.info(
+        'Account management state loaded.',
+        source: 'rosm_passport.ui.account',
+        event: 'account.load.success',
+        context: {'passkeys_count': passkeys?.credentials.length},
+      );
+    } on Object catch (error, stackTrace) {
+      widget.client.logger.error(
+        'Account management state loading failed.',
+        source: 'rosm_passport.ui.account',
+        event: 'account.load.failure',
+        context: _errorContext(error),
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       setState(() {
         _error = _messageFor(error);
@@ -121,7 +145,15 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     });
     try {
       await action();
-    } on Object catch (error) {
+    } on Object catch (error, stackTrace) {
+      widget.client.logger.warning(
+        'Account management action failed.',
+        source: 'rosm_passport.ui.account',
+        event: 'ui.action.failure',
+        context: _errorContext(error),
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       setState(() => _error = _messageFor(error));
     } finally {
@@ -143,7 +175,15 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     _refreshSheet(setSheetState);
     try {
       await action();
-    } on Object catch (error) {
+    } on Object catch (error, stackTrace) {
+      widget.client.logger.warning(
+        'Account management sheet action failed.',
+        source: 'rosm_passport.ui.account',
+        event: 'ui.sheet_action.failure',
+        context: _errorContext(error),
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       setState(() => _error = _messageFor(error));
     } finally {
@@ -376,13 +416,37 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         }),
         onRegister: () => _run(() async {
           final registrar =
-              widget.config.registerPasskey ?? registerRosmPasskey;
+              widget.config.registerPasskey ??
+              (options) => RosmNativePasskeys(
+                logger: widget.client.logger,
+              ).register(options);
+          widget.client.logger.info(
+            'Passkey registration options request started.',
+            source: 'rosm_passport.ui.account',
+            event: 'passkey.register.options.start',
+          );
           final options = await widget.client.beginPasskeyRegistration(
             currentPassword: _currentPassword.text,
           );
+          widget.client.logger.info(
+            'Passkey registration options received.',
+            source: 'rosm_passport.ui.account',
+            event: 'passkey.register.options.success',
+          );
           final credential = await registrar(options);
+          widget.client.logger.info(
+            'Passkey registration credential received; verifying with server.',
+            source: 'rosm_passport.ui.account',
+            event: 'passkey.register.verify.start',
+            context: _credentialSummary(credential),
+          );
           await widget.client.completePasskeyRegistration(
             credential: credential,
+          );
+          widget.client.logger.info(
+            'Passkey registration verification completed.',
+            source: 'rosm_passport.ui.account',
+            event: 'passkey.register.verify.success',
           );
           final passkeys = await widget.client.listPasskeys();
           setState(() => _passkeys = passkeys);
@@ -397,6 +461,30 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         }),
       ),
     );
+  }
+
+  Map<String, Object?> _errorContext(Object error) {
+    if (error is RosmApiException) {
+      return {
+        'error_code': error.code,
+        if (error.statusCode != null) 'status_code': error.statusCode,
+      };
+    }
+    return {'error_type': error.runtimeType.toString()};
+  }
+
+  Map<String, Object?> _credentialSummary(RosmWebAuthnCredential credential) {
+    final response = credential.response['response'];
+    final responseMap = response is Map ? response : const {};
+    return {
+      'credential_id_length': credential.response['id']?.toString().length ?? 0,
+      'raw_id_length': credential.response['rawId']?.toString().length ?? 0,
+      'type': credential.response['type']?.toString(),
+      'has_client_data_json': responseMap.containsKey('clientDataJSON'),
+      'has_authenticator_data': responseMap.containsKey('authenticatorData'),
+      'has_signature': responseMap.containsKey('signature'),
+      'has_attestation_object': responseMap.containsKey('attestationObject'),
+    };
   }
 
   Future<void> _showSheet({required String title, required Widget child}) {
