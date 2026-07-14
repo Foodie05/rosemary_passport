@@ -164,11 +164,11 @@ class EmailCodeService {
     final expectedHash = item['code_hash'] as String;
     final inputHash = _digest(email: email, code: code);
     if (expectedHash != inputHash) {
-      await _repository.markFailed(item['id'] as String);
+      await _repository.markFailed(item['id'].toString());
       return null;
     }
 
-    return item['id'] as String;
+    return item['id'].toString();
   }
 
   String _generateCode() {
