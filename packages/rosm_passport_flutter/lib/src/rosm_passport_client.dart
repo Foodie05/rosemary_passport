@@ -166,6 +166,120 @@ class RosmPassportClient {
     return RosmUserInfo.fromJson(json);
   }
 
+  Future<RosmAccountState> account() async {
+    final json = await _getJson('/api/v1/me');
+    return RosmAccountState.fromJson(json);
+  }
+
+  Future<RosmOperationResult> updateAccount({
+    String? nickname,
+    String? currentPassword,
+    String? newEmail,
+    String? newPassword,
+  }) async {
+    final json = await _patchJson('/api/v1/me', {
+      if (nickname != null) 'nickname': nickname,
+      if (currentPassword != null) 'current_password': currentPassword,
+      if (newEmail != null) 'email': newEmail,
+      if (newPassword != null) 'new_password': newPassword,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmOperationResult> sendBindEmailCode({
+    required String email,
+    required String currentPassword,
+    String? captchaToken,
+  }) async {
+    final json = await _postJson('/api/v1/me/send-bind-email-code', {
+      'email': email,
+      'current_password': currentPassword,
+      if (captchaToken != null) 'captcha_token': captchaToken,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmOperationResult> bindEmail({
+    required String email,
+    required String currentPassword,
+    required String emailCode,
+  }) async {
+    final json = await _postJson('/api/v1/me/bind-email', {
+      'email': email,
+      'current_password': currentPassword,
+      'email_code': emailCode,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmOperationResult> sendBindPhoneCode({
+    required String phoneNumber,
+    required String currentPassword,
+    String? captchaToken,
+  }) async {
+    final json = await _postJson('/api/v1/me/send-bind-phone-code', {
+      'phone_number': phoneNumber,
+      'current_password': currentPassword,
+      if (captchaToken != null) 'captcha_token': captchaToken,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmOperationResult> bindPhone({
+    required String phoneNumber,
+    required String currentPassword,
+    required String verifyCode,
+  }) async {
+    final json = await _postJson('/api/v1/me/bind-phone', {
+      'phone_number': phoneNumber,
+      'current_password': currentPassword,
+      'verify_code': verifyCode,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmOperationResult> sendOwnPasswordResetCode({
+    String? captchaToken,
+  }) async {
+    final json = await _postJson('/api/v1/me/send-password-reset-code', {
+      if (captchaToken != null) 'captcha_token': captchaToken,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmOperationResult> resetOwnPassword({
+    required String newPassword,
+    required String emailCode,
+  }) async {
+    final json = await _postJson('/api/v1/me/reset-password', {
+      'new_password': newPassword,
+      'email_code': emailCode,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmAuthenticatorSetup> beginAuthenticatorSetup({
+    required String currentPassword,
+  }) async {
+    final json = await _postJson('/api/v1/me/authenticator/setup', {
+      'current_password': currentPassword,
+    });
+    return RosmAuthenticatorSetup.fromJson(json);
+  }
+
+  Future<RosmOperationResult> verifyAuthenticatorSetup({
+    required String currentPassword,
+    required String secret,
+    required String code,
+  }) async {
+    final json = await _postJson('/api/v1/me/authenticator/verify', {
+      'current_password': currentPassword,
+      'secret': secret,
+      'code': code,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
   Future<void> signOut() async {
     final tokens = await _tokenStore.read();
     if (tokens != null) {
@@ -412,7 +526,7 @@ class RosmPassportClient {
   }) async {
     final response = await _http.get(
       issuer.resolve(path),
-      headers: {..._cookieHeader(), ...headers},
+      headers: {...await _authHeaders(), ...headers},
     );
     _storeCookies(response);
     return _decodeJsonResponse(response);
@@ -428,7 +542,7 @@ class RosmPassportClient {
       issuer.resolve(path),
       headers: {
         'content-type': 'application/json',
-        ..._cookieHeader(),
+        ...await _authHeaders(),
         ...headers,
       },
       body: jsonEncode(body),
@@ -437,6 +551,24 @@ class RosmPassportClient {
     if (ignoreApiError && response.statusCode >= 400) {
       return const {};
     }
+    return _decodeJsonResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _patchJson(
+    String path,
+    Map<String, Object?> body, {
+    Map<String, String> headers = const {},
+  }) async {
+    final response = await _http.patch(
+      issuer.resolve(path),
+      headers: {
+        'content-type': 'application/json',
+        ...await _authHeaders(),
+        ...headers,
+      },
+      body: jsonEncode(body),
+    );
+    _storeCookies(response);
     return _decodeJsonResponse(response);
   }
 
@@ -456,7 +588,7 @@ class RosmPassportClient {
   Future<Map<String, dynamic>> _deleteJson(String path) async {
     final response = await _http.delete(
       issuer.resolve(path),
-      headers: _cookieHeader(),
+      headers: await _authHeaders(),
     );
     _storeCookies(response);
     return _decodeJsonResponse(response);
@@ -493,6 +625,15 @@ class RosmPassportClient {
       'cookie': _cookies.entries
           .map((entry) => '${entry.key}=${entry.value}')
           .join('; '),
+    };
+  }
+
+  Future<Map<String, String>> _authHeaders() async {
+    final cookies = _cookieHeader();
+    final token = (await _tokenStore.read())?.accessToken;
+    return {
+      ...cookies,
+      if (token != null && token.isNotEmpty) 'authorization': 'Bearer $token',
     };
   }
 

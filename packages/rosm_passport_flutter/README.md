@@ -180,6 +180,26 @@ final auth = await passport.registerWithEmail(
 
 After registration succeeds, the built-in UI continues to the same consent and server handoff flow as a normal login.
 
+## Account management
+
+After the user signs in, apps can open the built-in account management page. It follows the same account-security flows as the web user center: update nickname, bind or change email, bind phone, reset password with email code, manage passkeys, and set or update an Authenticator TOTP factor.
+
+```dart
+await showRosmPassportAccountManagement(
+  context,
+  client: passport,
+  config: RosmPassportAccountConfig(
+    requestCaptchaToken: () => yourCaptchaProvider(),
+    registerPasskey: (options) async {
+      final response = await yourPasskeyPlugin.register(options.options);
+      return RosmWebAuthnCredential(response);
+    },
+  ),
+);
+```
+
+The SDK uses the current ROSM first-party session cookie when available. In direct public mode it also sends the stored access token as a Bearer token for `/api/v1/me` operations.
+
 ## Password recovery
 
 ```dart

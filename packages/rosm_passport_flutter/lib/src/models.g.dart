@@ -122,6 +122,14 @@ RosmAuthResult _$RosmAuthResultFromJson(Map<String, dynamic> json) =>
           json['post_register_passkey_bootstrap'] as bool,
     );
 
+RosmAccountState _$RosmAccountStateFromJson(Map<String, dynamic> json) =>
+    RosmAccountState(
+      user: RosmUser.fromJson(json['user'] as Map<String, dynamic>),
+      security: RosmSecurityState.fromJson(
+        json['security'] as Map<String, dynamic>,
+      ),
+    );
+
 RosmUserInfo _$RosmUserInfoFromJson(Map<String, dynamic> json) => RosmUserInfo(
   sub: json['sub'] as String,
   email: json['email'] as String?,
@@ -152,6 +160,13 @@ RosmOperationResult _$RosmOperationResultFromJson(Map<String, dynamic> json) =>
       message: json['message'] as String?,
       retryAfter: (json['retry_after'] as num?)?.toInt(),
     );
+
+RosmAuthenticatorSetup _$RosmAuthenticatorSetupFromJson(
+  Map<String, dynamic> json,
+) => RosmAuthenticatorSetup(
+  secret: json['secret'] as String,
+  otpauthUri: json['otpauth_uri'] as String,
+);
 
 RosmWebAuthnCredentialInfo _$RosmWebAuthnCredentialInfoFromJson(
   Map<String, dynamic> json,

@@ -262,6 +262,17 @@ class RosmAuthResult {
   final bool postRegisterPasskeyBootstrap;
 }
 
+@JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
+class RosmAccountState {
+  const RosmAccountState({required this.user, required this.security});
+
+  factory RosmAccountState.fromJson(Map<String, dynamic> json) =>
+      _$RosmAccountStateFromJson(json);
+
+  final RosmUser user;
+  final RosmSecurityState security;
+}
+
 @JsonSerializable(
   fieldRename: FieldRename.snake,
   includeIfNull: false,
@@ -352,6 +363,20 @@ class RosmWebAuthnCredential {
   const RosmWebAuthnCredential(this.response);
 
   final Map<String, dynamic> response;
+}
+
+@JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
+class RosmAuthenticatorSetup {
+  const RosmAuthenticatorSetup({
+    required this.secret,
+    required this.otpauthUri,
+  });
+
+  factory RosmAuthenticatorSetup.fromJson(Map<String, dynamic> json) =>
+      _$RosmAuthenticatorSetupFromJson(json);
+
+  final String secret;
+  final String otpauthUri;
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
