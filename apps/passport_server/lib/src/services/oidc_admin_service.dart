@@ -22,9 +22,13 @@ class OidcAdminService {
     required bool isActive,
     String? clientSecret,
   }) async {
-    if (redirectUris.any((uri) => !_isAllowedRedirectUri(uri))) {
+    if (redirectUris.any(
+      (uri) => !_isAllowedRedirectUri(uri, isConfidential: isConfidential),
+    )) {
       throw ArgumentError(
-        'redirect_uris must use https or loopback http origins.',
+        isConfidential
+            ? 'confidential redirect_uris must use https or loopback http origins.'
+            : 'public redirect_uris must use https, loopback http, or a mobile custom scheme such as com.example.app:/oidc/callback.',
       );
     }
     final existing = await _repository.findClient(clientId);
@@ -62,15 +66,43 @@ class OidcAdminService {
     return true;
   }
 
-  bool _isAllowedRedirectUri(String value) {
+  bool _isAllowedRedirectUri(String value, {required bool isConfidential}) {
     final uri = Uri.tryParse(value.trim());
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    if (uri == null ||
+        !uri.hasScheme ||
+        uri.fragment.isNotEmpty ||
+        uri.userInfo.isNotEmpty) {
       return false;
     }
     if (uri.scheme == 'https') {
-      return true;
+      return uri.host.isNotEmpty;
     }
     final isLoopbackHost = uri.host == 'localhost' || uri.host == '127.0.0.1';
-    return uri.scheme == 'http' && isLoopbackHost;
+    if (uri.scheme == 'http') {
+      return isLoopbackHost;
+    }
+    if (isConfidential) {
+      return false;
+    }
+    return _isMobileCustomScheme(uri);
+  }
+
+  bool _isMobileCustomScheme(Uri uri) {
+    const blockedSchemes = {
+      'about',
+      'data',
+      'file',
+      'ftp',
+      'http',
+      'https',
+      'javascript',
+      'mailto',
+      'tel',
+    };
+    final scheme = uri.scheme.toLowerCase();
+    if (blockedSchemes.contains(scheme)) {
+      return false;
+    }
+    return uri.path.isNotEmpty || uri.host.isNotEmpty;
   }
 }

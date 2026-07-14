@@ -7,9 +7,9 @@ This package is intentionally UI-free. Apps provide their own screens for code i
 ```dart
 final passport = RosmPassportClient(
   issuer: Uri.parse('https://auth.example.com'),
-  clientId: 'my_flutter_app',
-  redirectUri: Uri.parse('com.example.app:/oidc/callback'),
-  scopes: const {'openid', 'profile', 'email', 'phone'},
+  clientId: 'com.cruos.zion.mobile',
+  redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
+  scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('https://auth.example.com'),
 );
 
@@ -32,7 +32,7 @@ final user = await passport.userInfo();
 print('Signed in as ${session.user.nickname}; subject=${user.sub}');
 ```
 
-Native mobile clients must be configured as public OIDC clients and use PKCE S256.
+Native mobile clients must be configured as public OIDC clients and use PKCE S256. If an app already has a web or server-side confidential client, create a separate mobile client instead of reusing the same `client_id`.
 
 ## Password recovery
 
@@ -112,9 +112,10 @@ await passport.deletePasskey(passkeys.credentials.first.credentialId);
 
 ## Required configuration
 
-- Create the mobile app as a public OIDC client. Do not ship `client_secret` in Flutter.
+- Create the mobile app as a public OIDC client, for example `com.cruos.zion.mobile`. Do not ship `client_secret` in Flutter.
+- Keep web/server callbacks on a separate confidential client when they need `client_secret`.
 - Enable Authorization Code and Refresh Token grants, and require PKCE S256.
-- Register the app redirect URI exactly, for example `com.example.app:/oidc/callback`.
+- Register the app redirect URI exactly, for example `com.cruos.zion:/oidc/callback`.
 - Configure Associated Domains on iOS and Digital Asset Links on Android for the WebAuthn relying party domain.
 - Set `webAuthnOrigin` to the HTTPS origin that matches the server WebAuthn RP ID, usually the issuer origin such as `https://auth.example.com`.
 - Keep `openid` requests paired with a nonce. `RosmPassportClient.createAuthorizationRequest()` does this automatically.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, CircleHelp, Globe, Key, Mail, Pencil, Search, Settings2, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { BookOpen, CircleHelp, Globe, Key, Mail, Pencil, Search, Settings2, Smartphone, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
@@ -819,6 +819,27 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
     setOidcForm((current) => ({ ...current, scopes: nextScopes.join('\n') }));
   }
 
+  function applyMobilePublicTemplate() {
+    setOidcForm((current) => {
+      const rawClientId = current.client_id.trim() || 'com.example.app';
+      const scheme = rawClientId
+        .toLowerCase()
+        .replace(/\.mobile$/, '')
+        .replace(/[^a-z0-9+.-]/g, '.')
+        .replace(/^[^a-z]+/, 'app.');
+      return {
+        ...current,
+        client_id: rawClientId,
+        redirect_uris: `${scheme}:/oidc/callback`,
+        scopes: 'openid\nprofile\nemail\nphone\naccountRule',
+        grant_types: 'authorization_code\nrefresh_token',
+        client_secret: '',
+        is_confidential: false,
+        is_active: true,
+      };
+    });
+  }
+
   return (
     <SettingsShell
       icon={Key}
@@ -945,8 +966,16 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             </ConfigField>
             <ConfigField label="Client Secret">
               <input type="password" className="input-field" placeholder={editingClientId ? '留空表示保持原密钥' : ''} value={oidcForm.client_secret} onChange={(event) => setOidcForm((current) => ({ ...current, client_secret: event.target.value }))} />
+              <p className="mt-2 text-xs leading-5 text-sage-500">移动端 Public Client 必须留空，不要把 client_secret 写入 Flutter 包。</p>
             </ConfigField>
             <ConfigField label="Redirect URIs">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs leading-5 text-sage-500">Web 端使用 HTTPS；移动端 Public Client 可使用自定义 scheme，例如 com.example.app:/oidc/callback。</p>
+                <button type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
+                  <Smartphone size={14} />
+                  移动端 Public 模板
+                </button>
+              </div>
               <textarea rows="5" className="input-field" value={oidcForm.redirect_uris} onChange={(event) => setOidcForm((current) => ({ ...current, redirect_uris: event.target.value }))} />
             </ConfigField>
             <ConfigField label="Scopes">
@@ -984,6 +1013,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={oidcForm.is_active} onChange={(event) => setOidcForm((current) => ({ ...current, is_active: event.target.checked }))} />
               启用应用
             </label>
+          </div>
+          <div className="rounded-2xl border border-sage-100 bg-sage-50/80 p-4 text-xs leading-6 text-sage-600">
+            <p>移动端原生 SDK 必须使用 Public Client：关闭“机密客户端”、不填写 Client Secret，并登记与 Flutter 初始化完全一致的自定义 scheme Redirect URI。</p>
+            <p>Web 后台或服务端回调如果仍依赖 client_secret，请保留为单独的 Confidential Client，不要和移动端共用同一个 client_id。</p>
           </div>
         </Modal>
       )}
@@ -1303,7 +1336,7 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
             <p>把 <InlineCode>state</InlineCode> 当成必填项，防止回调串改。</p>
             <p>生产环境固定使用 HTTPS，并确认 <InlineCode>issuer</InlineCode>、JWKS 与回调域名都对外可访问。</p>
             <p>应用侧最好在服务端完成授权码换令牌，不要让浏览器直接持久化长生命周期 refresh token。</p>
-            <p>如果使用 Flutter SDK，请将客户端配置为 Public，并确保 redirect URI 与应用侧自定义 scheme 完全一致。</p>
+            <p>如果使用 Flutter SDK，请单独创建移动端 Public Client，关闭 <InlineCode>client_secret</InlineCode>，并确保 redirect URI 与应用侧自定义 scheme 完全一致。</p>
           </div>
         </div>
 
@@ -1353,16 +1386,29 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">1. 在管理端创建移动端客户端</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">移动端应用属于 Public Client。不要给 Flutter 包内置 <InlineCode>client_secret</InlineCode>，所有授权请求都使用 Authorization Code + PKCE S256。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">移动端应用属于 Public Client。不要给 Flutter 包内置 <InlineCode>client_secret</InlineCode>，所有授权请求都使用 Authorization Code + PKCE S256。Web 后台或服务端回调如果仍需要机密客户端，请保留为单独 client，不要和移动端共用。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="Client ID" value="my-flutter-app" />
+          <InfoRow label="Client ID" value="com.cruos.zion.mobile" />
           <InfoRow label="Display Name" value="展示给用户看的应用名" />
-          <InfoRow label="Redirect URI" value="com.example.app:/oidc/callback" />
-          <InfoRow label="Scopes" value="openid profile email phone" />
+          <InfoRow label="Redirect URI" value="com.cruos.zion:/oidc/callback" />
+          <InfoRow label="Scopes" value="openid profile email phone accountRule" />
           <InfoRow label="Grant Types" value="authorization_code, refresh_token" />
           <InfoRow label="Confidential" value="关闭，移动端必须作为 Public Client" />
         </div>
+        <CodeBlock>{`Client ID: com.cruos.zion.mobile
+Redirect URI: com.cruos.zion:/oidc/callback
+Confidential: false
+Client Secret: 留空
+Grant Types:
+  authorization_code
+  refresh_token
+Scopes:
+  openid
+  profile
+  email
+  phone
+  accountRule`}</CodeBlock>
       </div>
 
       <div className="glass-card space-y-6 rounded-3xl p-8">
@@ -1384,9 +1430,9 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
         </div>
         <CodeBlock>{`final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer}'),
-  clientId: 'my-flutter-app',
-  redirectUri: Uri.parse('com.example.app:/oidc/callback'),
-  scopes: const {'openid', 'profile', 'email', 'phone'},
+  clientId: 'com.cruos.zion.mobile',
+  redirectUri: Uri.parse('com.cruos.zion:/oidc/callback'),
+  scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
   webAuthnOrigin: Uri.parse('${webAuthnOrigin}'),
 );
 
@@ -1519,6 +1565,7 @@ await passport.signOut();`}</CodeBlock>
         <h3 className="text-lg font-bold text-sage-900">9. 检查清单</h3>
         <div className="space-y-2 text-sm leading-7 text-sage-600">
           <p>客户端必须关闭 <InlineCode>Confidential</InlineCode>，移动端不保存 <InlineCode>client_secret</InlineCode>。</p>
+          <p>移动端建议使用独立 client_id，例如 <InlineCode>com.cruos.zion.mobile</InlineCode>；不要复用旧 Web 登录的机密客户端。</p>
           <p><InlineCode>Redirect URI</InlineCode> 必须和 Flutter 初始化的自定义 scheme 完全一致。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
           <p>使用通行密钥时，iOS Associated Domains、Android Digital Asset Links 与 <InlineCode>webAuthnOrigin</InlineCode> 必须指向同一个 HTTPS 登录域名边界。</p>
