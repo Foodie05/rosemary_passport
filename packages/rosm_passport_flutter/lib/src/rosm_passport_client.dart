@@ -218,13 +218,13 @@ class RosmPassportClient {
     return RosmAuthResult.fromJson(json);
   }
 
-  Future<void> sendPasswordMfaCode({
+  Future<RosmOperationResult> sendPasswordMfaCode({
     required String email,
     required String password,
     required String factorType,
     String? captchaToken,
   }) async {
-    await _postJson(
+    final json = await _postJson(
       '/api/v1/auth/send-login-code',
       RosmPasswordLoginRequest(
         email: email,
@@ -233,16 +233,18 @@ class RosmPassportClient {
         captchaToken: captchaToken,
       ).toJson(),
     );
+    return RosmOperationResult.fromJson(json);
   }
 
-  Future<void> sendEmailLoginCode({
+  Future<RosmOperationResult> sendEmailLoginCode({
     required String email,
     String? captchaToken,
   }) async {
-    await _postJson('/api/v1/auth/send-email-login-code', {
+    final json = await _postJson('/api/v1/auth/send-email-login-code', {
       'email': email,
       if (captchaToken != null) 'captcha_token': captchaToken,
     });
+    return RosmOperationResult.fromJson(json);
   }
 
   Future<RosmAuthResult> loginWithEmailCode({
@@ -256,14 +258,15 @@ class RosmPassportClient {
     return RosmAuthResult.fromJson(json);
   }
 
-  Future<void> sendPhoneLoginCode({
+  Future<RosmOperationResult> sendPhoneLoginCode({
     required String phoneNumber,
     String? captchaToken,
   }) async {
-    await _postJson('/api/v1/auth/send-phone-login-code', {
+    final json = await _postJson('/api/v1/auth/send-phone-login-code', {
       'phone_number': phoneNumber,
       if (captchaToken != null) 'captcha_token': captchaToken,
     });
+    return RosmOperationResult.fromJson(json);
   }
 
   Future<RosmAuthResult> loginWithPhoneCode({
@@ -277,17 +280,18 @@ class RosmPassportClient {
     return RosmAuthResult.fromJson(json);
   }
 
-  Future<void> sendRegisterCode({
+  Future<RosmOperationResult> sendRegisterCode({
     required String email,
     required String captchaToken,
   }) async {
-    await _postJson(
+    final json = await _postJson(
       '/api/v1/auth/send-code',
       RosmRegisterCodeRequest(
         email: email,
         captchaToken: captchaToken,
       ).toJson(),
     );
+    return RosmOperationResult.fromJson(json);
   }
 
   Future<RosmAuthResult> registerWithEmail({

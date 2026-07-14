@@ -361,6 +361,7 @@ class RosmOperationResult {
     this.updated = false,
     this.deleted = false,
     this.message,
+    this.retryAfter,
   });
 
   factory RosmOperationResult.fromJson(Map<String, dynamic> json) =>
@@ -370,6 +371,7 @@ class RosmOperationResult {
   final bool updated;
   final bool deleted;
   final String? message;
+  final int? retryAfter;
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)

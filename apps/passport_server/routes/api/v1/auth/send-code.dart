@@ -18,8 +18,7 @@ Future<Response> onRequest(RequestContext context) async {
   if (payload == null ||
       payload.email.trim().isEmpty ||
       payload.captchaToken.trim().isEmpty) {
-    return errorResponse(
-        'invalid_request', '请输入邮箱并完成人机验证。');
+    return errorResponse('invalid_request', '请输入邮箱并完成人机验证。');
   }
 
   final authService = context.read<AuthService>();
@@ -32,8 +31,7 @@ Future<Response> onRequest(RequestContext context) async {
     ip: requestIp,
   );
   if (!captchaOk) {
-    return errorResponse('captcha_failed', '人机验证未通过，请重试。',
-        statusCode: 400);
+    return errorResponse('captcha_failed', '人机验证未通过，请重试。', statusCode: 400);
   }
 
   try {
@@ -59,21 +57,13 @@ Future<Response> onRequest(RequestContext context) async {
       return response;
     }
   } on EmailDeliveryException {
-    return errorResponse(
-      'temporary_issue',
-      '出现临时问题',
-      statusCode: 503,
-    );
+    return errorResponse('temporary_issue', '出现临时问题', statusCode: 503);
   } catch (_) {
-    return errorResponse(
-      'temporary_issue',
-      '出现临时问题',
-      statusCode: 503,
-    );
+    return errorResponse('temporary_issue', '出现临时问题', statusCode: 503);
   }
   return jsonResponse({
     'sent': true,
-    'retry_after': await authService.loginCodeCooldownRetryAfter(
+    'retry_after': await authService.registerCodeCooldownRetryAfter(
       email: payload.email,
     ),
   });

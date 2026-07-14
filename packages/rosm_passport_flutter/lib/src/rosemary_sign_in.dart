@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'models.dart';
@@ -112,6 +114,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   var _passwordMfaCodeSent = false;
   List<String> _passwordMfaFactors = const [];
   String? _selectedPasswordMfaFactor;
+  final _cooldowns = <_CooldownKind, int>{};
+  Timer? _cooldownTimer;
 
   @override
   void initState() {
@@ -139,6 +143,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     _registerNickname.dispose();
     _registerPassword.dispose();
     _registerCode.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -163,15 +168,17 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     await _run(() async {
       final captchaToken = await widget.config.requestCaptchaToken?.call();
       if (_mode == _SignInMode.email) {
-        await widget.client.sendEmailLoginCode(
+        final result = await widget.client.sendEmailLoginCode(
           email: _email.text.trim(),
           captchaToken: captchaToken,
         );
+        _startCooldown(_CooldownKind.login, result.retryAfter ?? 30);
       } else {
-        await widget.client.sendPhoneLoginCode(
+        final result = await widget.client.sendPhoneLoginCode(
           phoneNumber: _phone.text.trim(),
           captchaToken: captchaToken,
         );
+        _startCooldown(_CooldownKind.login, result.retryAfter ?? 60);
       }
       setState(() => _sent = true);
     });
@@ -236,12 +243,13 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     }
     final factorType = factor!;
     await _run(() async {
-      await widget.client.sendPasswordMfaCode(
+      final result = await widget.client.sendPasswordMfaCode(
         email: _passwordEmail.text.trim(),
         password: _password.text,
         factorType: factorType,
         captchaToken: await widget.config.requestCaptchaToken?.call(),
       );
+      _startCooldown(_CooldownKind.passwordMfa, result.retryAfter ?? 45);
       setState(() => _passwordMfaCodeSent = true);
     });
   }
@@ -314,13 +322,14 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       if (captchaToken == null || captchaToken.isEmpty) {
         throw const RosmApiException('captcha_required', '请先完成人机验证。');
       }
-      await widget.client.sendPasswordRecoveryCode(
+      final result = await widget.client.sendPasswordRecoveryCode(
         account: account,
         method: account.contains('@')
             ? RosmPasswordRecoveryMethod.email
             : RosmPasswordRecoveryMethod.phone,
         captchaToken: captchaToken,
       );
+      _startCooldown(_CooldownKind.recovery, result.retryAfter ?? 45);
       setState(() => _sent = true);
     });
   }
@@ -351,10 +360,11 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       if (captchaToken == null || captchaToken.isEmpty) {
         throw const RosmApiException('captcha_required', '请先完成人机验证。');
       }
-      await widget.client.sendRegisterCode(
+      final result = await widget.client.sendRegisterCode(
         email: _registerEmail.text.trim(),
         captchaToken: captchaToken,
       );
+      _startCooldown(_CooldownKind.register, result.retryAfter ?? 45);
       setState(() => _registerCodeSent = true);
     });
   }
@@ -452,6 +462,47 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  int _cooldownFor(_CooldownKind kind) => _cooldowns[kind] ?? 0;
+
+  bool _coolingDown(_CooldownKind kind) => _cooldownFor(kind) > 0;
+
+  String _codeButtonLabel(_CooldownKind kind, String readyLabel) {
+    final remaining = _cooldownFor(kind);
+    return remaining > 0 ? '${remaining}秒' : readyLabel;
+  }
+
+  void _startCooldown(_CooldownKind kind, int seconds) {
+    if (seconds <= 0) {
+      return;
+    }
+    setState(() => _cooldowns[kind] = seconds);
+    _cooldownTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) {
+        _cooldownTimer?.cancel();
+        _cooldownTimer = null;
+        return;
+      }
+      setState(() {
+        final finished = <_CooldownKind>[];
+        for (final entry in _cooldowns.entries) {
+          final next = entry.value - 1;
+          if (next <= 0) {
+            finished.add(entry.key);
+          } else {
+            _cooldowns[entry.key] = next;
+          }
+        }
+        for (final kind in finished) {
+          _cooldowns.remove(kind);
+        }
+        if (_cooldowns.isEmpty) {
+          _cooldownTimer?.cancel();
+          _cooldownTimer = null;
+        }
+      });
+    });
   }
 
   @override
@@ -759,8 +810,13 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               SizedBox(
                 width: 96,
                 child: OutlinedButton(
-                  onPressed: _busy ? null : _sendCode,
-                  child: const Text('重发'),
+                  onPressed: _busy || _coolingDown(_CooldownKind.login)
+                      ? null
+                      : _sendCode,
+                  child: _ButtonContent(
+                    busy: _busy,
+                    label: _codeButtonLabel(_CooldownKind.login, '重发'),
+                  ),
                 ),
               ),
             ],
@@ -840,10 +896,15 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 SizedBox(
                   width: 106,
                   child: OutlinedButton(
-                    onPressed: _busy ? null : _sendPasswordMfaCode,
+                    onPressed: _busy || _coolingDown(_CooldownKind.passwordMfa)
+                        ? null
+                        : _sendPasswordMfaCode,
                     child: _ButtonContent(
                       busy: _busy,
-                      label: _passwordMfaCodeSent ? '重发' : '发送',
+                      label: _codeButtonLabel(
+                        _CooldownKind.passwordMfa,
+                        _passwordMfaCodeSent ? '重发' : '发送',
+                      ),
                     ),
                   ),
                 ),
@@ -956,10 +1017,15 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               SizedBox(
                 width: 106,
                 child: OutlinedButton(
-                  onPressed: _busy ? null : _sendRegisterCode,
+                  onPressed: _busy || _coolingDown(_CooldownKind.register)
+                      ? null
+                      : _sendRegisterCode,
                   child: _ButtonContent(
                     busy: _busy,
-                    label: _registerCodeSent ? '重发' : '发送',
+                    label: _codeButtonLabel(
+                      _CooldownKind.register,
+                      _registerCodeSent ? '重发' : '发送',
+                    ),
                   ),
                 ),
               ),
@@ -1028,8 +1094,16 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             ),
             const SizedBox(width: 12),
             OutlinedButton(
-              onPressed: _busy ? null : _sendRecoveryCode,
-              child: _ButtonContent(busy: _busy, label: _sent ? '重发' : '发送'),
+              onPressed: _busy || _coolingDown(_CooldownKind.recovery)
+                  ? null
+                  : _sendRecoveryCode,
+              child: _ButtonContent(
+                busy: _busy,
+                label: _codeButtonLabel(
+                  _CooldownKind.recovery,
+                  _sent ? '重发' : '发送',
+                ),
+              ),
             ),
           ],
         ),
@@ -1380,6 +1454,8 @@ class _RegisterPrompt extends StatelessWidget {
 }
 
 enum _SignInMode { phone, email, passkey, password }
+
+enum _CooldownKind { login, passwordMfa, register, recovery }
 
 String _labelFor(_SignInMode mode) {
   return switch (mode) {

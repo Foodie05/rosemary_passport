@@ -150,6 +150,7 @@ RosmOperationResult _$RosmOperationResultFromJson(Map<String, dynamic> json) =>
       updated: json['updated'] as bool? ?? false,
       deleted: json['deleted'] as bool? ?? false,
       message: json['message'] as String?,
+      retryAfter: (json['retry_after'] as num?)?.toInt(),
     );
 
 RosmWebAuthnCredentialInfo _$RosmWebAuthnCredentialInfoFromJson(

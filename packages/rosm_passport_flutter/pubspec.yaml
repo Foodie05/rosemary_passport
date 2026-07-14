@@ -1,6 +1,6 @@
 name: rosm_passport_flutter
 description: Flutter SDK for native ROSM Passport sign-in with OIDC and PKCE.
-version: 0.3.3
+version: 0.3.4
 publish_to: none
 
 environment:

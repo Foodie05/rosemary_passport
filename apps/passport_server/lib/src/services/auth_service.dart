@@ -447,6 +447,13 @@ class AuthService {
     );
   }
 
+  Future<int?> registerCodeCooldownRetryAfter({required String email}) {
+    return verificationCodeCooldownRetryAfter(
+      email: email,
+      cooldownScope: _verificationCodeRegisterCooldownScope,
+    );
+  }
+
   Future<int?> loginCodeSendRetryAfter({
     required String email,
     String? requestIp,
