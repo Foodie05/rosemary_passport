@@ -44,6 +44,13 @@ async function main() {
 }
 
 main().catch((error) => {
-  process.stderr.write(`${error?.stack || error}`);
-  process.exit(1);
+  process.stdout.write(
+    JSON.stringify({
+      success: false,
+      code: error?.code ?? error?.name ?? '',
+      message: error?.message ?? `${error}`,
+      statusCode: error?.statusCode ?? error?.status ?? '',
+      requestId: error?.requestId ?? error?.data?.RequestId ?? '',
+    }),
+  );
 });

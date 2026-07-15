@@ -292,19 +292,39 @@ class PhoneVerificationService {
       );
     }
 
-    final helperResponse = await _runHelper('sms-check-verify-code.mjs', {
-      'accessKeyId': provider['accessKeyId'],
-      'accessKeySecret': provider['accessKeySecret'],
-      'countryCode': provider['countryCode'] ?? countryCode,
-      'phoneNumber': normalizedPhone,
-      'verifyCode': trimmedCode,
-      if (_config.aliyunSmsSchemeName.isNotEmpty)
-        'schemeName': _config.aliyunSmsSchemeName,
-    });
+    late final Map<String, dynamic> helperResponse;
+    try {
+      helperResponse = await _runHelper('sms-check-verify-code.mjs', {
+        'accessKeyId': provider['accessKeyId'],
+        'accessKeySecret': provider['accessKeySecret'],
+        'countryCode': provider['countryCode'] ?? countryCode,
+        'phoneNumber': normalizedPhone,
+        'verifyCode': trimmedCode,
+        if (_config.aliyunSmsSchemeName.isNotEmpty)
+          'schemeName': _config.aliyunSmsSchemeName,
+      });
+    } on StateError catch (error) {
+      if (_isInvalidVerifyCodeProviderError(error.message)) {
+        return const PhoneVerifyCheckAttempt.failure(
+          code: 'invalid_verify_code',
+          message: '验证码错误或已失效。',
+          statusCode: 400,
+        );
+      }
+      rethrow;
+    }
     final success = helperResponse['success'] == true;
     final responseCode = '${helperResponse['code'] ?? ''}';
+    final responseMessage = '${helperResponse['message'] ?? ''}';
     final verifyResult = '${helperResponse['verifyResult'] ?? ''}'
         .toUpperCase();
+    if (_isInvalidVerifyCodeProviderError('$responseCode $responseMessage')) {
+      return const PhoneVerifyCheckAttempt.failure(
+        code: 'invalid_verify_code',
+        message: '验证码错误或已失效。',
+        statusCode: 400,
+      );
+    }
     if (!success || responseCode != 'OK') {
       return const PhoneVerifyCheckAttempt.failure(
         code: 'temporary_issue',
@@ -323,6 +343,14 @@ class PhoneVerificationService {
     await _security?.clear(scope: _verifyPhoneScope, subject: normalizedPhone);
     await _security?.clear(scope: _verifyIpScope, subject: requestIp);
     return const PhoneVerifyCheckAttempt.success();
+  }
+
+  bool _isInvalidVerifyCodeProviderError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('validatefail') ||
+        normalized.contains('验证失败') ||
+        normalized.contains('invalid verify') ||
+        normalized.contains('invalid code');
   }
 
   String? normalizePhone(String raw, {String countryCode = '86'}) {
