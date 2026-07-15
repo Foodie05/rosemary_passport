@@ -721,15 +721,37 @@ class RosmPassportClient {
         ? Map<String, dynamic>.from(decoded)
         : <String, dynamic>{};
     if (response.statusCode >= 400) {
+      final error = json['error']?.toString();
+      final message = json['message']?.toString();
       throw RosmApiException(
-        json['error']?.toString() ?? 'request_failed',
-        json['message']?.toString() ??
-            response.reasonPhrase ??
-            'Request failed.',
+        error ?? 'request_failed',
+        message == null || message.isEmpty
+            ? _fallbackMessageFor(error, response)
+            : message,
         statusCode: response.statusCode,
       );
     }
     return json;
+  }
+
+  String _fallbackMessageFor(String? error, http.Response response) {
+    final normalized = error?.trim();
+    if (normalized != null && normalized.isNotEmpty) {
+      return switch (normalized) {
+        'invalid state' || 'invalid_state' => '授权会话已失效，请重新登录后再试。',
+        'state expired' || 'state_expired' => '授权会话已过期，请重新登录后再试。',
+        'state already consumed' ||
+        'state_already_consumed' => '这次授权已经处理过，请重新发起登录。',
+        'authorization challenge mismatch' ||
+        'authorization_challenge_mismatch' => '授权请求与服务器记录不一致，请重新登录后再试。',
+        'missing required handoff fields' ||
+        'missing_required_handoff_fields' => '应用服务器接入参数不完整，请检查 SDK 接入配置。',
+        'oidc client not configured' ||
+        'oidc_client_not_configured' => '应用服务器尚未正确配置 ROSM OIDC 客户端。',
+        _ => normalized,
+      };
+    }
+    return response.reasonPhrase ?? 'Request failed.';
   }
 
   Map<String, String> _cookieHeader() {

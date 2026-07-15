@@ -216,6 +216,51 @@ void main() {
     },
   );
 
+  test('uses server error code as fallback message', () async {
+    final client = RosmPassportClient(
+      issuer: Uri.parse('https://auth.example.com'),
+      clientId: 'com.example.app',
+      redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
+      tokenStore: _MemoryTokenStore(),
+      httpClient: MockClient((request) async {
+        return http.Response(
+          jsonEncode({'error': 'invalid state'}),
+          400,
+          headers: {'content-type': 'application/json'},
+          reasonPhrase: 'Bad Request',
+        );
+      }),
+    );
+    final authRequest = client.createAuthorizationRequest(
+      state: 'state-1',
+      nonce: 'nonce-1',
+      serverHandoff: true,
+    );
+    final approval = RosmAuthorizationApproval(
+      code: 'code-1',
+      state: 'state-1',
+      redirectUri: authRequest.redirectUri,
+      callbackUrl: authRequest.redirectUri.replace(
+        queryParameters: {'code': 'code-1', 'state': 'state-1'},
+      ),
+    );
+
+    await expectLater(
+      client.completeServerHandoff(
+        endpoint: Uri.parse('https://api.example.com/auth/rosm/sdk/complete'),
+        request: authRequest,
+        approval: approval,
+      ),
+      throwsA(
+        isA<RosmApiException>().having(
+          (error) => error.message,
+          'message',
+          '授权会话已失效，请重新登录后再试。',
+        ),
+      ),
+    );
+  });
+
   test('lists and deletes passkeys', () async {
     final requests = <http.Request>[];
     final client = RosmPassportClient(
