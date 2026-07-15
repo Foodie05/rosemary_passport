@@ -39,7 +39,11 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final result = attempt.result!;
-  final responseBody = await buildFirstPartyAuthPayload(context, user: result.user);
+  final responseBody = await buildFirstPartyAuthPayload(
+    context,
+    user: result.user,
+    tokens: result.tokens,
+  );
   return authJsonResponse(
     context,
     responseBody,

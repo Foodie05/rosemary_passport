@@ -144,29 +144,11 @@ class RosmPassportClient {
         'No refresh token is available.',
       );
     }
-    final json = await _postJson('/oidc/token', {
-      'grant_type': 'refresh_token',
-      'refresh_token': refreshToken,
-      'client_id': clientId,
-    });
-    final tokens = RosmTokenSet.fromJson(json);
-    await _tokenStore.save(tokens);
-    return tokens;
+    return _refreshWithToken(refreshToken);
   }
 
   Future<RosmUserInfo> userInfo() async {
-    final tokens = await _tokenStore.read();
-    final accessToken = tokens?.accessToken;
-    if (accessToken == null || accessToken.isEmpty) {
-      throw const RosmApiException(
-        'missing_access_token',
-        'No access token is available.',
-      );
-    }
-    final json = await _getJson(
-      '/oidc/userinfo',
-      headers: {'authorization': 'Bearer $accessToken'},
-    );
+    final json = await _getJson('/oidc/userinfo');
     return RosmUserInfo.fromJson(json);
   }
 
@@ -333,7 +315,7 @@ class RosmPassportClient {
         captchaToken: captchaToken,
       ).toJson(),
     );
-    return RosmAuthResult.fromJson(json);
+    return _authResultFromJson(json);
   }
 
   Future<RosmOperationResult> sendPasswordMfaCode({
@@ -373,7 +355,7 @@ class RosmPassportClient {
       'email': email,
       'email_code': emailCode,
     });
-    return RosmAuthResult.fromJson(json);
+    return _authResultFromJson(json);
   }
 
   Future<RosmOperationResult> sendPhoneLoginCode({
@@ -395,7 +377,7 @@ class RosmPassportClient {
       'phone_number': phoneNumber,
       'verify_code': verifyCode,
     });
-    return RosmAuthResult.fromJson(json);
+    return _authResultFromJson(json);
   }
 
   Future<RosmOperationResult> sendRegisterCode({
@@ -427,7 +409,7 @@ class RosmPassportClient {
         emailCode: emailCode,
       ).toJson(),
     );
-    return RosmAuthResult.fromJson(json);
+    return _authResultFromJson(json);
   }
 
   Future<RosmWebAuthnOptions> beginWebAuthnLogin({
@@ -450,7 +432,7 @@ class RosmPassportClient {
       if (email != null) 'email': email,
       'response': credential.response,
     });
-    return RosmAuthResult.fromJson(json);
+    return _authResultFromJson(json);
   }
 
   Future<RosmOperationResult> sendPasswordRecoveryCode({
@@ -467,6 +449,15 @@ class RosmPassportClient {
       ).toJson(),
     );
     return RosmOperationResult.fromJson(json);
+  }
+
+  Future<RosmAuthResult> _authResultFromJson(Map<String, dynamic> json) async {
+    final result = RosmAuthResult.fromJson(json);
+    final tokens = result.tokens;
+    if (tokens != null) {
+      await _tokenStore.save(tokens);
+    }
+    return result;
   }
 
   Future<RosmOperationResult> resetPasswordByCode({
@@ -527,15 +518,25 @@ class RosmPassportClient {
   Future<Map<String, dynamic>> _getJson(
     String path, {
     Map<String, String> headers = const {},
+    bool retryOnUnauthorized = true,
   }) async {
     final uri = issuer.resolve(path);
     final stopwatch = _startHttpLog('GET', uri);
     try {
-      final response = await _http.get(
+      var response = await _http.get(
         uri,
         headers: {...await _authHeaders(), ...headers},
       );
       _storeCookies(response);
+      if (retryOnUnauthorized &&
+          response.statusCode == 401 &&
+          await _refreshAfterUnauthorized()) {
+        response = await _http.get(
+          uri,
+          headers: {...await _authHeaders(), ...headers},
+        );
+        _storeCookies(response);
+      }
       final json = _decodeJsonResponse(response);
       _finishHttpLog('GET', uri, response.statusCode, stopwatch);
       return json;
@@ -550,11 +551,12 @@ class RosmPassportClient {
     Map<String, Object?> body, {
     Map<String, String> headers = const {},
     bool ignoreApiError = false,
+    bool retryOnUnauthorized = true,
   }) async {
     final uri = issuer.resolve(path);
     final stopwatch = _startHttpLog('POST', uri);
     try {
-      final response = await _http.post(
+      var response = await _http.post(
         uri,
         headers: {
           'content-type': 'application/json',
@@ -564,6 +566,20 @@ class RosmPassportClient {
         body: jsonEncode(body),
       );
       _storeCookies(response);
+      if (retryOnUnauthorized &&
+          response.statusCode == 401 &&
+          await _refreshAfterUnauthorized()) {
+        response = await _http.post(
+          uri,
+          headers: {
+            'content-type': 'application/json',
+            ...await _authHeaders(),
+            ...headers,
+          },
+          body: jsonEncode(body),
+        );
+        _storeCookies(response);
+      }
       if (ignoreApiError && response.statusCode >= 400) {
         _finishHttpLog('POST', uri, response.statusCode, stopwatch);
         return const {};
@@ -581,11 +597,12 @@ class RosmPassportClient {
     String path,
     Map<String, Object?> body, {
     Map<String, String> headers = const {},
+    bool retryOnUnauthorized = true,
   }) async {
     final uri = issuer.resolve(path);
     final stopwatch = _startHttpLog('PATCH', uri);
     try {
-      final response = await _http.patch(
+      var response = await _http.patch(
         uri,
         headers: {
           'content-type': 'application/json',
@@ -595,6 +612,20 @@ class RosmPassportClient {
         body: jsonEncode(body),
       );
       _storeCookies(response);
+      if (retryOnUnauthorized &&
+          response.statusCode == 401 &&
+          await _refreshAfterUnauthorized()) {
+        response = await _http.patch(
+          uri,
+          headers: {
+            'content-type': 'application/json',
+            ...await _authHeaders(),
+            ...headers,
+          },
+          body: jsonEncode(body),
+        );
+        _storeCookies(response);
+      }
       final json = _decodeJsonResponse(response);
       _finishHttpLog('PATCH', uri, response.statusCode, stopwatch);
       return json;
@@ -625,12 +656,21 @@ class RosmPassportClient {
     }
   }
 
-  Future<Map<String, dynamic>> _deleteJson(String path) async {
+  Future<Map<String, dynamic>> _deleteJson(
+    String path, {
+    bool retryOnUnauthorized = true,
+  }) async {
     final uri = issuer.resolve(path);
     final stopwatch = _startHttpLog('DELETE', uri);
     try {
-      final response = await _http.delete(uri, headers: await _authHeaders());
+      var response = await _http.delete(uri, headers: await _authHeaders());
       _storeCookies(response);
+      if (retryOnUnauthorized &&
+          response.statusCode == 401 &&
+          await _refreshAfterUnauthorized()) {
+        response = await _http.delete(uri, headers: await _authHeaders());
+        _storeCookies(response);
+      }
       final json = _decodeJsonResponse(response);
       _finishHttpLog('DELETE', uri, response.statusCode, stopwatch);
       return json;
@@ -713,6 +753,56 @@ class RosmPassportClient {
     );
   }
 
+  Future<bool> _refreshAfterUnauthorized() async {
+    final refreshToken = (await _tokenStore.read())?.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return false;
+    }
+    try {
+      await _refreshWithToken(refreshToken);
+      logger.info(
+        'Access token refreshed after unauthorized response.',
+        source: 'rosm_passport.client',
+        event: 'auth.refresh.success',
+      );
+      return true;
+    } on Object catch (error, stackTrace) {
+      await _tokenStore.clear();
+      logger.warning(
+        'Token refresh failed after unauthorized response.',
+        source: 'rosm_passport.client',
+        event: 'auth.refresh.failure',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  }
+
+  Future<RosmTokenSet> _refreshWithToken(String refreshToken) async {
+    final uri = issuer.resolve('/oidc/token');
+    final stopwatch = _startHttpLog('POST', uri);
+    try {
+      final response = await _http.post(
+        uri,
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({
+          'grant_type': 'refresh_token',
+          'refresh_token': refreshToken,
+          'client_id': clientId,
+        }),
+      );
+      final json = _decodeJsonResponse(response);
+      _finishHttpLog('POST', uri, response.statusCode, stopwatch);
+      final tokens = RosmTokenSet.fromJson(json);
+      await _tokenStore.save(tokens);
+      return tokens;
+    } on Object catch (error, stackTrace) {
+      _failHttpLog('POST', uri, stopwatch, error, stackTrace);
+      rethrow;
+    }
+  }
+
   Map<String, dynamic> _decodeJsonResponse(http.Response response) {
     final decoded = response.body.isEmpty
         ? const <String, dynamic>{}
@@ -748,6 +838,11 @@ class RosmPassportClient {
         'missing_required_handoff_fields' => '应用服务器接入参数不完整，请检查 SDK 接入配置。',
         'oidc client not configured' ||
         'oidc_client_not_configured' => '应用服务器尚未正确配置 ROSM OIDC 客户端。',
+        'unauthorized' ||
+        'missing_access_token' ||
+        'invalid_access_token' => '登录状态已过期，请重新登录。',
+        'invalid_grant' => '登录凭据已失效，请重新登录。',
+        'webauthn_unavailable' => '当前服务器未启用通行密钥，请稍后再试。',
         _ => normalized,
       };
     }

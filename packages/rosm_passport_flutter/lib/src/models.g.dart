@@ -120,6 +120,9 @@ RosmAuthResult _$RosmAuthResultFromJson(Map<String, dynamic> json) =>
       ),
       postRegisterPasskeyBootstrap:
           json['post_register_passkey_bootstrap'] as bool,
+      tokens: json['tokens'] == null
+          ? null
+          : RosmTokenSet.fromJson(json['tokens'] as Map<String, dynamic>),
     );
 
 RosmAccountState _$RosmAccountStateFromJson(Map<String, dynamic> json) =>

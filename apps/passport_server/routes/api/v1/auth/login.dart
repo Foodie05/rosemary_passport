@@ -39,11 +39,7 @@ Future<Response> onRequest(RequestContext context) async {
       ip: requestIp,
     );
     if (!captchaOk) {
-      return errorResponse(
-        'captcha_failed',
-        '人机验证未通过，请重试。',
-        statusCode: 400,
-      );
+      return errorResponse('captcha_failed', '人机验证未通过，请重试。', statusCode: 400);
     }
   }
   final attempt = await authService.login(
@@ -76,6 +72,7 @@ Future<Response> onRequest(RequestContext context) async {
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: result.user,
+    tokens: result.tokens,
   );
   return authJsonResponse(
     context,

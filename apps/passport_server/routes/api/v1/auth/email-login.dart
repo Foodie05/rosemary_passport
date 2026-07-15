@@ -18,10 +18,7 @@ Future<Response> onRequest(RequestContext context) async {
   if (payload == null ||
       payload.email.trim().isEmpty ||
       payload.emailCode.trim().isEmpty) {
-    return errorResponse(
-      'invalid_request',
-      '请输入邮箱和邮箱验证码。',
-    );
+    return errorResponse('invalid_request', '请输入邮箱和邮箱验证码。');
   }
 
   final requestIp = clientIpFromRequest(
@@ -55,6 +52,7 @@ Future<Response> onRequest(RequestContext context) async {
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: result.user,
+    tokens: result.tokens,
   );
   return authJsonResponse(
     context,

@@ -187,6 +187,10 @@ class _CredentialLimitException implements Exception {
   const _CredentialLimitException();
 }
 
+class WebAuthnUnavailableException implements Exception {
+  const WebAuthnUnavailableException();
+}
+
 class AuthService {
   static const _postRegistrationPasskeyBootstrapSeconds = 600;
 
@@ -2123,8 +2127,11 @@ class AuthService {
     bool allowPostRegistrationBootstrap = false,
   }) async {
     final user = await _users.findById(userId);
-    if (user == null || _webAuthn == null) {
+    if (user == null) {
       return null;
+    }
+    if (_webAuthn == null) {
+      throw const WebAuthnUnavailableException();
     }
     // Adding a passkey is normally a step-up action, so the standard path
     // still requires the current password. We only skip that check during the
@@ -2618,6 +2625,14 @@ class AuthService {
       clientId: 'first_party_web',
       expiresAt: DateTime.now().toUtc().add(
         Duration(seconds: _tokenService.accessTokenTtlSeconds),
+      ),
+    );
+    await _oidcRepository.storeRefreshToken(
+      tokenId: tokens.refreshTokenId,
+      userId: user.id,
+      clientId: 'first_party_web',
+      expiresAt: DateTime.now().toUtc().add(
+        Duration(seconds: _tokenService.refreshTokenTtlSeconds),
       ),
     );
     return AuthResult(

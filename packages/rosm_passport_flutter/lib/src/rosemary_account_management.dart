@@ -10,11 +10,13 @@ class RosmPassportAccountConfig {
   const RosmPassportAccountConfig({
     this.requestCaptchaToken,
     this.registerPasskey,
+    this.reauthenticate,
   });
 
   final Future<String?> Function()? requestCaptchaToken;
   final Future<RosmWebAuthnCredential> Function(RosmWebAuthnOptions options)?
   registerPasskey;
+  final Future<bool> Function()? reauthenticate;
 }
 
 Future<void> showRosmPassportAccountManagement(
@@ -121,6 +123,9 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         context: {'passkeys_count': passkeys?.credentials.length},
       );
     } on Object catch (error, stackTrace) {
+      if (await _recoverExpiredSession(error)) {
+        return;
+      }
       widget.client.logger.error(
         'Account management state loading failed.',
         source: 'rosm_passport.ui.account',
@@ -146,6 +151,9 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     try {
       await action();
     } on Object catch (error, stackTrace) {
+      if (await _recoverExpiredSession(error)) {
+        return;
+      }
       widget.client.logger.warning(
         'Account management action failed.',
         source: 'rosm_passport.ui.account',
@@ -176,6 +184,9 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     try {
       await action();
     } on Object catch (error, stackTrace) {
+      if (await _recoverExpiredSession(error)) {
+        return;
+      }
       widget.client.logger.warning(
         'Account management sheet action failed.',
         source: 'rosm_passport.ui.account',
@@ -192,6 +203,36 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         _refreshSheet(setSheetState);
       }
     }
+  }
+
+  Future<bool> _recoverExpiredSession(Object error) async {
+    if (!_isSessionExpired(error)) {
+      return false;
+    }
+    widget.client.logger.warning(
+      'Account management session expired; reauthentication required.',
+      source: 'rosm_passport.ui.account',
+      event: 'account.session.expired',
+      context: _errorContext(error),
+      error: error,
+    );
+    final reauthenticate = widget.config.reauthenticate;
+    if (reauthenticate == null) {
+      if (!mounted) return true;
+      setState(() {
+        _error = '登录状态已过期，请重新登录。';
+        _loading = false;
+      });
+      return true;
+    }
+    final restored = await reauthenticate();
+    if (!mounted) return true;
+    if (restored) {
+      await _load();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+    return true;
   }
 
   void _refreshSheet(StateSetter setSheetState) {
@@ -1385,6 +1426,18 @@ String _messageFor(Object error) {
     return error.message;
   }
   return error.toString();
+}
+
+bool _isSessionExpired(Object error) {
+  if (error is! RosmApiException) {
+    return false;
+  }
+  return error.statusCode == 401 ||
+      error.code == 'unauthorized' ||
+      error.code == 'missing_access_token' ||
+      error.code == 'invalid_access_token' ||
+      error.code == 'missing_refresh_token' ||
+      error.code == 'invalid_grant';
 }
 
 class _AccountColors {

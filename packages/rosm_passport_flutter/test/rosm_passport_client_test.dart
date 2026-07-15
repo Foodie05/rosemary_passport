@@ -261,6 +261,76 @@ void main() {
     );
   });
 
+  test(
+    'refreshes access token once after unauthorized account request',
+    () async {
+      final requests = <http.Request>[];
+      final store = _MemoryTokenStore()
+        .._tokens = const RosmTokenSet(
+          accessToken: 'old-access',
+          refreshToken: 'refresh-1',
+          tokenType: 'Bearer',
+          expiresIn: 3600,
+        );
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://api.example.com'),
+        clientId: 'app',
+        redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+        tokenStore: store,
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          if (request.url.path == '/api/v1/me' && requests.length == 1) {
+            return http.Response(
+              jsonEncode({'error': 'unauthorized'}),
+              401,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.url.path == '/oidc/token') {
+            return http.Response(
+              jsonEncode({
+                'access_token': 'new-access',
+                'refresh_token': 'refresh-2',
+                'token_type': 'Bearer',
+                'expires_in': 3600,
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'user': {
+                'id': 'user-1',
+                'email': 'user@example.com',
+                'nickname': 'User',
+                'roles': ['user'],
+              },
+              'security': {
+                'has_password': true,
+                'has_authenticator': false,
+                'has_phone': false,
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final account = await client.account();
+
+      expect(account.user.id, 'user-1');
+      expect(requests.map((request) => request.url.path), [
+        '/api/v1/me',
+        '/oidc/token',
+        '/api/v1/me',
+      ]);
+      expect(requests.last.headers['authorization'], 'Bearer new-access');
+      expect((await store.read())?.refreshToken, 'refresh-2');
+    },
+  );
+
   test('lists and deletes passkeys', () async {
     final requests = <http.Request>[];
     final client = RosmPassportClient(

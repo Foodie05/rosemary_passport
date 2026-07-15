@@ -10,6 +10,7 @@ import 'http.dart';
 Future<Map<String, dynamic>> buildFirstPartyAuthPayload(
   RequestContext context, {
   required AuthenticatedUser user,
+  TokenPair? tokens,
   bool postRegistrationPasskeyBootstrap = false,
 }) async {
   final mustBindEmail =
@@ -26,6 +27,7 @@ Future<Map<String, dynamic>> buildFirstPartyAuthPayload(
       'admin_mfa_required': user.roles.contains('admin') && !mustBindEmail,
       ...securityState,
     },
+    if (tokens != null) 'tokens': tokens.toJson(),
     'post_register_passkey_bootstrap': postRegistrationPasskeyBootstrap,
   };
 }

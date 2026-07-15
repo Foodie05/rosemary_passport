@@ -17,11 +17,20 @@ Future<Response> onRequest(RequestContext context) async {
   final verifyCode = (body['verify_code'] ?? '').toString().trim();
   final nickname = (body['nickname'] ?? '').toString().trim();
   final password = (body['password'] ?? '').toString();
-  if (phoneNumber.isEmpty || verifyCode.isEmpty || nickname.isEmpty || password.isEmpty) {
-    return errorResponse('invalid_request', 'phone_number, verify_code, nickname and password are required.');
+  if (phoneNumber.isEmpty ||
+      verifyCode.isEmpty ||
+      nickname.isEmpty ||
+      password.isEmpty) {
+    return errorResponse(
+      'invalid_request',
+      'phone_number, verify_code, nickname and password are required.',
+    );
   }
 
-  final requestIp = clientIpFromRequest(context.request, config: context.read<AppConfig>());
+  final requestIp = clientIpFromRequest(
+    context.request,
+    config: context.read<AppConfig>(),
+  );
   final attempt = await context.read<AuthService>().registerWithPhoneCode(
     phoneNumber: phoneNumber,
     nickname: nickname,
@@ -30,13 +39,18 @@ Future<Response> onRequest(RequestContext context) async {
     requestIp: requestIp,
   );
   if (!attempt.ok) {
-    return errorResponse(attempt.code ?? 'register_failed', attempt.message ?? '注册失败。', statusCode: attempt.statusCode);
+    return errorResponse(
+      attempt.code ?? 'register_failed',
+      attempt.message ?? '注册失败。',
+      statusCode: attempt.statusCode,
+    );
   }
 
   final result = attempt.result!;
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: result.user,
+    tokens: result.tokens,
     postRegistrationPasskeyBootstrap: result.postRegistrationPasskeyBootstrap,
   );
   return authJsonResponse(

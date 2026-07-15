@@ -11,11 +11,13 @@ Future<Response> onRequest(RequestContext context) async {
 
   final body = await tryParseJsonObject(context.request);
   if (body == null) {
-    return errorResponse('invalid_request', 'Request body must be a JSON object.');
+    return errorResponse(
+      'invalid_request',
+      'Request body must be a JSON object.',
+    );
   }
   final currentPassword = body['current_password']?.toString() ?? '';
-  final usePostRegistrationBootstrap =
-      body['post_register_bootstrap'] == true;
+  final usePostRegistrationBootstrap = body['post_register_bootstrap'] == true;
   if (!usePostRegistrationBootstrap && currentPassword.trim().isEmpty) {
     return errorResponse('invalid_request', 'current_password is required.');
   }
@@ -34,11 +36,11 @@ Future<Response> onRequest(RequestContext context) async {
   final origin = context.request.headers['origin'] ?? '';
   try {
     final options = await context.read<AuthService>().beginWebAuthnRegistration(
-          userId: user.id,
-          currentPassword: currentPassword,
-          origin: origin,
-          allowPostRegistrationBootstrap: usePostRegistrationBootstrap,
-        );
+      userId: user.id,
+      currentPassword: currentPassword,
+      origin: origin,
+      allowPostRegistrationBootstrap: usePostRegistrationBootstrap,
+    );
     if (options == null) {
       if (usePostRegistrationBootstrap) {
         return errorResponse(
@@ -56,6 +58,13 @@ Future<Response> onRequest(RequestContext context) async {
         'credential_limit_reached',
         '最多只能创建 5 个系统通行密钥。',
         statusCode: 409,
+      );
+    }
+    if (error is WebAuthnUnavailableException) {
+      return errorResponse(
+        'webauthn_unavailable',
+        '当前服务器未启用通行密钥，请稍后再试。',
+        statusCode: 503,
       );
     }
     rethrow;

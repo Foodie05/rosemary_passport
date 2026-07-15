@@ -20,10 +20,7 @@ Future<Response> onRequest(RequestContext context) async {
       payload.nickname.trim().isEmpty ||
       payload.password.isEmpty ||
       payload.emailCode.trim().isEmpty) {
-    return errorResponse(
-      'invalid_request',
-      '请输入邮箱、昵称、密码和邮箱验证码。',
-    );
+    return errorResponse('invalid_request', '请输入邮箱、昵称、密码和邮箱验证码。');
   }
 
   final result = await context.read<AuthService>().register(
@@ -49,6 +46,7 @@ Future<Response> onRequest(RequestContext context) async {
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: authResult.user,
+    tokens: authResult.tokens,
     postRegistrationPasskeyBootstrap:
         authResult.postRegistrationPasskeyBootstrap,
   );

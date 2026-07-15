@@ -252,6 +252,7 @@ class RosmAuthResult {
     required this.user,
     required this.security,
     required this.postRegisterPasskeyBootstrap,
+    this.tokens,
   });
 
   factory RosmAuthResult.fromJson(Map<String, dynamic> json) =>
@@ -260,6 +261,7 @@ class RosmAuthResult {
   final RosmUser user;
   final RosmSecurityState security;
   final bool postRegisterPasskeyBootstrap;
+  final RosmTokenSet? tokens;
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
