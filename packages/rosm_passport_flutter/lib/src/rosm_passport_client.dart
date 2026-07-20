@@ -427,11 +427,12 @@ class RosmPassportClient {
   Future<RosmAuthResult> completeWebAuthnLogin({
     String? email,
     required RosmWebAuthnCredential credential,
+    Uri? origin,
   }) async {
     final json = await _postJson('/api/v1/auth/webauthn/verify', {
       if (email != null) 'email': email,
       'response': credential.response,
-    });
+    }, headers: _webAuthnHeaders(origin));
     return _authResultFromJson(json);
   }
 
@@ -496,10 +497,11 @@ class RosmPassportClient {
 
   Future<RosmOperationResult> completePasskeyRegistration({
     required RosmWebAuthnCredential credential,
+    Uri? origin,
   }) async {
     final json = await _postJson('/api/v1/me/webauthn/register/verify', {
       'response': credential.response,
-    });
+    }, headers: _webAuthnHeaders(origin));
     return RosmOperationResult.fromJson(json);
   }
 

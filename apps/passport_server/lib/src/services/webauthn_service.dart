@@ -111,6 +111,13 @@ class WebAuthnService {
 
     final verified = payload['verified'] == true;
     if (!verified) {
+      _logVerificationFailure(
+        flow: 'registration',
+        payload: payload,
+        expectedOrigins: _expectedOrigins(challenge.origin),
+        expectedRpId: challenge.rpId,
+        response: response,
+      );
       return false;
     }
 
@@ -213,6 +220,13 @@ class WebAuthnService {
 
     final verified = payload['verified'] == true;
     if (!verified) {
+      _logVerificationFailure(
+        flow: 'authentication',
+        payload: payload,
+        expectedOrigins: _expectedOrigins(challenge.origin),
+        expectedRpId: challenge.rpId,
+        response: response,
+      );
       return false;
     }
 
@@ -267,5 +281,30 @@ class WebAuthnService {
       origin,
       ..._config.webAuthnAndroidOrigins,
     }.toList(growable: false);
+  }
+
+  void _logVerificationFailure({
+    required String flow,
+    required Map<String, dynamic> payload,
+    required List<String> expectedOrigins,
+    required String expectedRpId,
+    required Map<String, dynamic> response,
+  }) {
+    final credentialId = ((response['id'] ?? response['rawId']) ?? '')
+        .toString();
+    print(
+      jsonEncode({
+        'level': 'warning',
+        'source': 'passport_server.webauthn',
+        'event': 'webauthn.verify.failure',
+        'flow': flow,
+        'error_code': payload['errorCode']?.toString(),
+        'error_message': payload['errorMessage']?.toString(),
+        'expected_rp_id': expectedRpId,
+        'expected_origins': expectedOrigins,
+        'credential_id_length': credentialId.length,
+        'has_response': response['response'] is Map,
+      }),
+    );
   }
 }

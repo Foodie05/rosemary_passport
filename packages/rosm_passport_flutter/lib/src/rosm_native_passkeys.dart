@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:passkeys/authenticator.dart';
 import 'package:passkeys/types.dart';
 
@@ -66,6 +68,7 @@ class RosmNativePasskeys {
           'client_data_json_length': response.clientDataJSON.length,
           'authenticator_data_length': response.authenticatorData.length,
           'signature_length': response.signature.length,
+          ..._clientDataSummary(response.clientDataJSON),
         },
       );
       _logger.info(
@@ -131,6 +134,7 @@ class RosmNativePasskeys {
           'attestation_object_length': response.attestationObject.length,
           'transports_count': response.transports.whereType<String>().length,
           'transports': response.transports.whereType<String>().toList(),
+          ..._clientDataSummary(response.clientDataJSON),
         },
       );
       _logger.info(
@@ -165,6 +169,34 @@ class RosmNativePasskeys {
       'original_error_type': original.runtimeType.toString(),
       'original_error': original.toString(),
     };
+  }
+
+  static Map<String, Object?> _clientDataSummary(String clientDataJson) {
+    try {
+      final clientData = _decodeClientDataJson(clientDataJson);
+      if (clientData is! Map) {
+        return const {'client_data_parse_error': 'not_object'};
+      }
+      return {
+        'client_data_type': clientData['type']?.toString(),
+        'client_data_origin': clientData['origin']?.toString(),
+        'client_data_challenge_length':
+            clientData['challenge']?.toString().length ?? 0,
+        if (clientData.containsKey('crossOrigin'))
+          'client_data_cross_origin': clientData['crossOrigin'] == true,
+      };
+    } on Object catch (error) {
+      return {'client_data_parse_error': error.runtimeType.toString()};
+    }
+  }
+
+  static Object? _decodeClientDataJson(String value) {
+    try {
+      final decoded = utf8.decode(base64Url.decode(base64Url.normalize(value)));
+      return jsonDecode(decoded);
+    } on Object {
+      return jsonDecode(value);
+    }
   }
 
   static Map<String, dynamic> _optionsMap(RosmWebAuthnOptions options) {
