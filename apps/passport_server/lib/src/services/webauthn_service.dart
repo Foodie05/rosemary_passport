@@ -105,7 +105,7 @@ class WebAuthnService {
     final payload = await _runHelper('webauthn-verify-registration.mjs', {
       'response': response,
       'expectedChallenge': challenge.challenge,
-      'expectedOrigin': challenge.origin,
+      'expectedOrigin': _expectedOrigins(challenge.origin),
       'expectedRPID': challenge.rpId,
     });
 
@@ -201,7 +201,7 @@ class WebAuthnService {
     final payload = await _runHelper('webauthn-verify-authentication.mjs', {
       'response': response,
       'expectedChallenge': challenge.challenge,
-      'expectedOrigin': challenge.origin,
+      'expectedOrigin': _expectedOrigins(challenge.origin),
       'expectedRPID': challenge.rpId,
       'credential': {
         'id': credential.credentialId,
@@ -260,5 +260,12 @@ class WebAuthnService {
       final fallback = Uri.parse(_config.serverBaseUrl);
       return fallback.host;
     }
+  }
+
+  List<String> _expectedOrigins(String origin) {
+    return <String>{
+      origin,
+      ..._config.webAuthnAndroidOrigins,
+    }.toList(growable: false);
   }
 }

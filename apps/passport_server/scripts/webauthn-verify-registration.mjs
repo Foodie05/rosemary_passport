@@ -15,26 +15,36 @@ const toBase64Url = (buffer) =>
 
 const input = await readStdin();
 
-const verification = await verifyRegistrationResponse({
-  response: input.response,
-  expectedChallenge: input.expectedChallenge,
-  expectedOrigin: input.expectedOrigin,
-  expectedRPID: input.expectedRPID,
-});
+try {
+  const verification = await verifyRegistrationResponse({
+    response: input.response,
+    expectedChallenge: input.expectedChallenge,
+    expectedOrigin: input.expectedOrigin,
+    expectedRPID: input.expectedRPID,
+  });
 
-const info = verification.registrationInfo;
-process.stdout.write(
-  JSON.stringify({
-    verified: verification.verified,
-    registrationInfo: info
-      ? {
-          credentialID: info.credential.id,
-          credentialPublicKey: toBase64Url(info.credential.publicKey),
-          counter: info.credential.counter,
-          transports: info.credential.transports || [],
-          deviceType: info.credentialDeviceType,
-          backedUp: info.credentialBackedUp,
-        }
-      : null,
-  }),
-);
+  const info = verification.registrationInfo;
+  process.stdout.write(
+    JSON.stringify({
+      verified: verification.verified,
+      registrationInfo: info
+        ? {
+            credentialID: info.credential.id,
+            credentialPublicKey: toBase64Url(info.credential.publicKey),
+            counter: info.credential.counter,
+            transports: info.credential.transports || [],
+            deviceType: info.credentialDeviceType,
+            backedUp: info.credentialBackedUp,
+          }
+        : null,
+    }),
+  );
+} catch (error) {
+  process.stdout.write(
+    JSON.stringify({
+      verified: false,
+      errorCode: error?.name || 'WebAuthnVerificationError',
+      errorMessage: error?.message || 'WebAuthn verification failed',
+    }),
+  );
+}

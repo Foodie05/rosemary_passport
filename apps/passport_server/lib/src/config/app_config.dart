@@ -118,6 +118,8 @@ class AppConfig {
 
   bool get oidcRequirePkce =>
       (_env['OIDC_REQUIRE_PKCE'] ?? 'true').toLowerCase() == 'true';
+  List<String> get webAuthnAndroidOrigins =>
+      _csvList(_env['WEBAUTHN_ANDROID_ORIGINS'] ?? '');
   bool get trustProxyHeaders =>
       (_env['TRUST_PROXY_HEADERS'] ?? 'false').toLowerCase() == 'true';
   List<String> get trustedProxyIps => (_env['TRUSTED_PROXY_IPS'] ?? '')
@@ -156,6 +158,14 @@ class AppConfig {
     }
     defaults.addAll(const ['http://localhost:5173', 'http://127.0.0.1:5173']);
     return defaults.toList();
+  }
+
+  List<String> _csvList(String value) {
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
   }
 
   String _pemFromEnv(String b64Key, String legacyKey) {
