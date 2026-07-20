@@ -225,13 +225,14 @@ await showRosmPassportAccountManagement(
   client: passport,
   config: RosmPassportAccountConfig(
     requestCaptchaToken: () => yourCaptchaProvider(),
+    signInConfig: signInConfig,
   ),
 );
 ```
 
 Passkey registration is handled by the SDK with the system passkey sheet. Apps only need to make sure their platform association files and entitlements are configured for the ROSM WebAuthn relying party domain.
 
-The SDK uses the current ROSM first-party session cookie when available. In direct public mode it also sends the stored access token as a Bearer token for `/api/v1/me` operations.
+The SDK uses the current ROSM first-party session cookie when available. In direct public mode it also sends the stored access token as a Bearer token for `/api/v1/me` operations. If the account session expires, pass the same `signInConfig` to `RosmPassportAccountConfig`; the account center can then open the built-in login flow instead of leaving the user on an expired-token screen.
 
 ## Password recovery
 
@@ -276,7 +277,28 @@ await passport.completePasskeyRegistration(
 );
 ```
 
-Most apps do not need to call these functions directly. They are exported for custom UI. If an app must use a different passkey implementation, pass `authenticatePasskey` in `RosmPassportSignInConfig` or `registerPasskey` in `RosmPassportAccountConfig`; otherwise leave them unset and let the SDK use the built-in native adapter.
+Most apps do not need to call these functions directly. They are exported for custom UI. If an app must use a different passkey implementation, pass `authenticatePasskey` in `RosmPassportSignInConfig` or `registerPasskey` in `RosmPassportAccountConfig`; otherwise leave them unset and let the SDK use the built-in native adapter. During integration, use `RosmNativePasskeys(debugMode: true)` in custom callbacks to enable the underlying passkeys doctor diagnostics.
+
+`RosmPasskeyPlatformConfig` can generate the native association snippets that your server and app targets must agree on:
+
+```dart
+const passkeyConfig = RosmPasskeyPlatformConfig(
+  rpDomain: 'auth.cruty.cn',
+  appleTeamId: 'Y6AYA4F7T3',
+  appleBundleId: 'com.cruos.zion',
+  androidPackageName: 'com.cruos.zion',
+  androidSha256CertFingerprints: [
+    'AA:BB:CC:...',
+  ],
+);
+
+final iosEntitlement = passkeyConfig.appleAssociatedDomain;
+final aasa = passkeyConfig.appleAppSiteAssociation(
+  includeUniversalLinks: true,
+);
+final assetLinks = passkeyConfig.androidAssetLinks();
+final androidAssetStatement = passkeyConfig.androidAssetStatementsInclude();
+```
 
 ## Required configuration
 
@@ -285,9 +307,9 @@ Most apps do not need to call these functions directly. They are exported for cu
 - If using direct public mode, register the custom-scheme redirect URI and keep the client public.
 - Enable Authorization Code and Refresh Token grants, and require PKCE S256.
 - Configure passkey platform association for the WebAuthn relying party domain:
-  - iOS/macOS: add the Associated Domains entitlement with `webcredentials:<rp-domain>` and serve the Apple App Site Association file from that domain.
-  - Android: serve Digital Asset Links for the app package name and signing certificate fingerprint.
-  - Web: use HTTPS and make sure the page origin matches the relying party domain.
+  - iOS/macOS: add the Associated Domains entitlement with `webcredentials:<rp-domain>` to every app target that uses passkeys. Serve `https://<rp-domain>/.well-known/apple-app-site-association` with no redirect and include the exact App ID (`<Apple Team ID>.<Bundle ID>`) in `webcredentials.apps`. For Zion on `auth.cruty.cn`, the App ID must be `Y6AYA4F7T3.com.cruos.zion`; the platform error `Application with identifier Y6AYA4F7T3.com.cruos.zion is not associated with domain auth.cruty.cn` means this association is missing, stale, or not yet visible to Apple's Associated Domains service.
+  - Android: serve `https://<rp-domain>/.well-known/assetlinks.json` with HTTP 200, no redirect, and `Content-Type: application/json`. Include `delegate_permission/common.get_login_creds`, the app package name, and all SHA-256 signing certificate fingerprints used by debug, release, and Play signing builds. Add the `asset_statements` manifest metadata when using Android Credential Manager/password sharing verification.
+  - Web: use HTTPS and make sure the page hostname matches the relying party ID.
   - Windows: no mobile entitlement is required, but the relying party domain and origin still need to match the server options.
 - Set `webAuthnOrigin` to the HTTPS origin that matches the server WebAuthn RP ID, usually the issuer origin such as `https://auth.example.com`.
 - Keep `openid` requests paired with a nonce. `RosmPassportClient.createAuthorizationRequest()` does this automatically.

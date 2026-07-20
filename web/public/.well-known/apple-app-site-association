@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "Y6AYA4F7T3.com.cruos.zion",
+        "paths": ["*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["Y6AYA4F7T3.com.cruos.zion"]
+  }
+}

@@ -1630,31 +1630,27 @@ await passport.resetPasswordByCode(
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">6. 通行密钥登录与添加</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 负责获取和验证 WebAuthn options，系统通行密钥弹窗由应用通过平台 passkey 插件触发。插件返回的 credential response 直接包装为 RosmWebAuthnCredential 传回 SDK。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 默认内置原生通行密钥适配，会获取 WebAuthn options、调起系统通行密钥弹窗，并把 credential response 交回 ROSM 验证。接入方通常不需要手写 WebAuthn JSON 或额外接 passkey 插件。</p>
         </div>
         <CodeBlock>{`final loginOptions = await passport.beginWebAuthnLogin(
   email: 'user@example.com',
 );
 
-final loginCredential = await passkeyPlugin.authenticate(
-  loginOptions.options,
-);
+final loginCredential = await authenticateRosmPasskey(loginOptions);
 
 final session = await passport.completeWebAuthnLogin(
   email: 'user@example.com',
-  credential: RosmWebAuthnCredential(loginCredential),
+  credential: loginCredential,
 );
 
 final registerOptions = await passport.beginPasskeyRegistration(
   currentPassword: currentPassword,
 );
 
-final registerCredential = await passkeyPlugin.register(
-  registerOptions.options,
-);
+final registerCredential = await registerRosmPasskey(registerOptions);
 
 await passport.completePasskeyRegistration(
-  credential: RosmWebAuthnCredential(registerCredential),
+  credential: registerCredential,
 );`}</CodeBlock>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="登录" value="beginWebAuthnLogin + completeWebAuthnLogin" />
@@ -1667,11 +1663,25 @@ await passport.completePasskeyRegistration(
       <div className="glass-card space-y-6 rounded-3xl p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">7. 通行密钥平台配置</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">Passkey 必须绑定 HTTPS relying party 域名。移动端需要完成系统级域名关联，并让 SDK 请求 options 时携带同一个 Origin。</p>
+          <p className="mt-2 text-sm leading-relaxed text-sage-600">Passkey 必须绑定 HTTPS relying party 域名。移动端需要完成系统级域名关联，并让 SDK 请求 options 时携带同一个 Origin。iOS 报 “Application with identifier ... is not associated with domain ...” 时，优先检查 App ID、entitlement 与 AASA 是否完全一致并已部署生效。</p>
         </div>
+        <CodeBlock>{`const passkeyConfig = RosmPasskeyPlatformConfig(
+  rpDomain: 'auth.cruty.cn',
+  appleTeamId: 'Y6AYA4F7T3',
+  appleBundleId: 'com.cruos.zion',
+  androidPackageName: 'com.cruos.zion',
+  androidSha256CertFingerprints: ['AA:BB:CC:...'],
+);
+
+final iosEntitlement = passkeyConfig.appleAssociatedDomain;
+final aasa = passkeyConfig.appleAppSiteAssociation(
+  includeUniversalLinks: true,
+);
+final assetLinks = passkeyConfig.androidAssetLinks();
+final assetStatement = passkeyConfig.androidAssetStatementsInclude();`}</CodeBlock>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="iOS" value="配置 Associated Domains，例如 webcredentials:auth.example.com" />
-          <InfoRow label="Android" value="配置 Digital Asset Links，并声明应用包名和签名证书指纹" />
+          <InfoRow label="iOS/macOS" value="配置 Associated Domains，例如 webcredentials:auth.cruty.cn；AASA 的 webcredentials.apps 必须包含 TeamID.BundleID" />
+          <InfoRow label="Android" value="assetlinks.json 必须 200、无跳转、application/json，并声明包名与所有 SHA-256 签名证书指纹" />
           <InfoRow label="SDK Origin" value={`webAuthnOrigin 使用服务端 WebAuthn RP 对应的 HTTPS origin，例如 ${webAuthnOrigin}`} />
           <InfoRow label="服务端域名" value="issuer、RP ID、平台关联文件必须指向同一登录域名边界" />
         </div>

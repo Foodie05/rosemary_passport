@@ -301,11 +301,29 @@ await passport.completePasskeyRegistration(
 
 内置适配支持 Android、iOS、macOS、Web 和 Windows。Linux 取决于底层 Flutter passkey 插件，目前不可用。接入方如果必须使用自定义平台实现，可以通过 `RosmPassportSignInConfig.authenticatePasskey` 和 `RosmPassportAccountConfig.registerPasskey` 覆盖默认实现。
 
+调试阶段可以在自定义回调里使用 `RosmNativePasskeys(debugMode: true)` 打开底层 passkeys doctor。SDK 也导出了 `RosmPasskeyPlatformConfig`，用于生成/核对平台关联文件需要的结构：
+
+```dart
+const passkeyConfig = RosmPasskeyPlatformConfig(
+  rpDomain: 'auth.cruty.cn',
+  appleTeamId: 'Y6AYA4F7T3',
+  appleBundleId: 'com.cruos.zion',
+  androidPackageName: 'com.cruos.zion',
+  androidSha256CertFingerprints: ['AA:BB:CC:...'],
+);
+
+final iosEntitlement = passkeyConfig.appleAssociatedDomain;
+final aasa = passkeyConfig.appleAppSiteAssociation(
+  includeUniversalLinks: true,
+);
+final assetLinks = passkeyConfig.androidAssetLinks();
+```
+
 平台配置要求：
 
-- iOS/macOS：为 App 增加 Associated Domains entitlement，配置 `webcredentials:<rp-domain>`，并在该域名提供 Apple App Site Association 文件。
-- Android：在 WebAuthn RP 域名提供 Digital Asset Links，绑定 App package name 与签名证书 fingerprint。
-- Web：必须使用 HTTPS origin，且 origin/RP ID 与 ROSM Passport 签发的 WebAuthn options 保持一致。
+- iOS/macOS：为每个使用通行密钥的 target 增加 Associated Domains entitlement，配置 `webcredentials:<rp-domain>`，并在该域名提供 `https://<rp-domain>/.well-known/apple-app-site-association`。文件不能跳转，App ID 必须是 `<Apple Team ID>.<Bundle ID>`。例如 Zion 使用 `auth.cruty.cn` 时，AASA 的 `webcredentials.apps` 必须包含 `Y6AYA4F7T3.com.cruos.zion`；如果系统报 `Application with identifier Y6AYA4F7T3.com.cruos.zion is not associated with domain auth.cruty.cn`，就是域名关联还没有生效。
+- Android：在 WebAuthn RP 域名提供 `https://<rp-domain>/.well-known/assetlinks.json`，HTTP 200、无 301/302、`Content-Type: application/json`，并包含 `delegate_permission/common.get_login_creds`、App package name，以及 debug/release/Play signing 证书的 SHA-256 fingerprint。使用 Credential Manager 共享凭据校验时，在 manifest 加 `asset_statements` 指向这个文件。
+- Web：必须使用 HTTPS origin，且 hostname/RP ID 与 ROSM Passport 签发的 WebAuthn options 保持一致。
 - Windows：不需要移动端 entitlement，但仍需保证 RP ID 与 origin 由服务端按同一域名生成。
 
 核心类：

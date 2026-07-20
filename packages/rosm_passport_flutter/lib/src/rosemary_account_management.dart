@@ -5,18 +5,21 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'rosm_native_passkeys.dart';
 import 'rosm_passport_client.dart';
+import 'rosemary_sign_in.dart';
 
 class RosmPassportAccountConfig {
   const RosmPassportAccountConfig({
     this.requestCaptchaToken,
     this.registerPasskey,
     this.reauthenticate,
+    this.signInConfig,
   });
 
   final Future<String?> Function()? requestCaptchaToken;
   final Future<RosmWebAuthnCredential> Function(RosmWebAuthnOptions options)?
   registerPasskey;
   final Future<bool> Function()? reauthenticate;
+  final RosmPassportSignInConfig? signInConfig;
 }
 
 Future<void> showRosmPassportAccountManagement(
@@ -52,6 +55,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   RosmPasskeyList? _passkeys;
   var _loading = true;
   var _busy = false;
+  var _sessionExpired = false;
   String? _error;
 
   final _nickname = TextEditingController();
@@ -89,6 +93,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _sessionExpired = false;
       _error = null;
     });
     try {
@@ -184,7 +189,20 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     try {
       await action();
     } on Object catch (error, stackTrace) {
-      if (await _recoverExpiredSession(error)) {
+      if (_isSessionExpired(error)) {
+        widget.client.logger.warning(
+          'Account management sheet session expired.',
+          source: 'rosm_passport.ui.account',
+          event: 'ui.sheet_session.expired',
+          context: _errorContext(error),
+          error: error,
+        );
+        if (!mounted) return;
+        setState(() {
+          _sessionExpired = true;
+          _error = '登录状态已过期，请重新登录。';
+        });
+        _refreshSheet(setSheetState);
         return;
       }
       widget.client.logger.warning(
@@ -216,16 +234,16 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
       context: _errorContext(error),
       error: error,
     );
-    final reauthenticate = widget.config.reauthenticate;
-    if (reauthenticate == null) {
-      if (!mounted) return true;
-      setState(() {
-        _error = '登录状态已过期，请重新登录。';
-        _loading = false;
-      });
+    if (!mounted) return true;
+    setState(() {
+      _sessionExpired = true;
+      _error = '登录状态已过期，请重新登录。';
+      _loading = false;
+    });
+    if (!_hasReauthenticationFlow) {
       return true;
     }
-    final restored = await reauthenticate();
+    final restored = await _reauthenticate();
     if (!mounted) return true;
     if (restored) {
       await _load();
@@ -233,6 +251,50 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
       Navigator.of(context).maybePop();
     }
     return true;
+  }
+
+  bool get _hasReauthenticationFlow =>
+      widget.config.reauthenticate != null ||
+      widget.config.signInConfig != null;
+
+  Future<bool> _reauthenticate() async {
+    final reauthenticate = widget.config.reauthenticate;
+    if (reauthenticate != null) {
+      return reauthenticate();
+    }
+    final signInConfig = widget.config.signInConfig;
+    if (signInConfig == null) {
+      return false;
+    }
+    final result = await showRosmPassportSignIn(
+      context,
+      client: widget.client,
+      config: signInConfig,
+    );
+    return result != null;
+  }
+
+  Future<void> _retryAfterError() async {
+    if (!_sessionExpired) {
+      await _load();
+      return;
+    }
+    if (!_hasReauthenticationFlow) {
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final restored = await _reauthenticate();
+    if (!mounted) return;
+    if (restored) {
+      await _load();
+    } else {
+      Navigator.of(context).maybePop();
+    }
   }
 
   void _refreshSheet(StateSetter setSheetState) {
@@ -414,28 +476,31 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
       title: _account?.security.hasAuthenticator == true ? '更新验证器' : '设置验证器',
       child: StatefulBuilder(
         builder: (context, setSheetState) {
-          return _AuthenticatorSheet(
-            currentPassword: _currentPassword,
-            code: _authenticatorCode,
-            setup: _authenticatorSetup,
-            busy: _busy,
-            onBegin: () => _run(() async {
-              final setup = await widget.client.beginAuthenticatorSetup(
-                currentPassword: _currentPassword.text,
-              );
-              setSheetState(() => _authenticatorSetup = setup);
-            }),
-            onSubmit: () => _run(() async {
-              final setup = _authenticatorSetup;
-              if (setup == null) return;
-              await widget.client.verifyAuthenticatorSetup(
-                currentPassword: _currentPassword.text,
-                secret: setup.secret,
-                code: _authenticatorCode.text.trim(),
-              );
-              if (mounted) Navigator.of(context).pop();
-              await _load();
-            }),
+          return _SheetBody(
+            error: _error,
+            child: _AuthenticatorSheet(
+              currentPassword: _currentPassword,
+              code: _authenticatorCode,
+              setup: _authenticatorSetup,
+              busy: _busy,
+              onBegin: () => _runInSheet(setSheetState, () async {
+                final setup = await widget.client.beginAuthenticatorSetup(
+                  currentPassword: _currentPassword.text,
+                );
+                setSheetState(() => _authenticatorSetup = setup);
+              }),
+              onSubmit: () => _runInSheet(setSheetState, () async {
+                final setup = _authenticatorSetup;
+                if (setup == null) return;
+                await widget.client.verifyAuthenticatorSetup(
+                  currentPassword: _currentPassword.text,
+                  secret: setup.secret,
+                  code: _authenticatorCode.text.trim(),
+                );
+                if (mounted) Navigator.of(context).pop();
+                await _load();
+              }),
+            ),
           );
         },
       ),
@@ -446,60 +511,67 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     _currentPassword.clear();
     await _showSheet(
       title: '系统通行密钥',
-      child: _PasskeySheet(
-        passkeys: _passkeys,
-        currentPassword: _currentPassword,
-        busy: _busy,
-        canRegister: true,
-        onRefresh: () => _run(() async {
-          final passkeys = await widget.client.listPasskeys();
-          setState(() => _passkeys = passkeys);
-        }),
-        onRegister: () => _run(() async {
-          final registrar =
-              widget.config.registerPasskey ??
-              (options) => RosmNativePasskeys(
-                logger: widget.client.logger,
-              ).register(options);
-          widget.client.logger.info(
-            'Passkey registration options request started.',
-            source: 'rosm_passport.ui.account',
-            event: 'passkey.register.options.start',
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          return _SheetBody(
+            error: _error,
+            child: _PasskeySheet(
+              passkeys: _passkeys,
+              currentPassword: _currentPassword,
+              busy: _busy,
+              canRegister: true,
+              onRefresh: () => _runInSheet(setSheetState, () async {
+                final passkeys = await widget.client.listPasskeys();
+                setState(() => _passkeys = passkeys);
+              }),
+              onRegister: () => _runInSheet(setSheetState, () async {
+                final registrar =
+                    widget.config.registerPasskey ??
+                    (options) => RosmNativePasskeys(
+                      logger: widget.client.logger,
+                    ).register(options);
+                widget.client.logger.info(
+                  'Passkey registration options request started.',
+                  source: 'rosm_passport.ui.account',
+                  event: 'passkey.register.options.start',
+                );
+                final options = await widget.client.beginPasskeyRegistration(
+                  currentPassword: _currentPassword.text,
+                );
+                widget.client.logger.info(
+                  'Passkey registration options received.',
+                  source: 'rosm_passport.ui.account',
+                  event: 'passkey.register.options.success',
+                );
+                final credential = await registrar(options);
+                widget.client.logger.info(
+                  'Passkey registration credential received; verifying with server.',
+                  source: 'rosm_passport.ui.account',
+                  event: 'passkey.register.verify.start',
+                  context: _credentialSummary(credential),
+                );
+                await widget.client.completePasskeyRegistration(
+                  credential: credential,
+                );
+                widget.client.logger.info(
+                  'Passkey registration verification completed.',
+                  source: 'rosm_passport.ui.account',
+                  event: 'passkey.register.verify.success',
+                );
+                final passkeys = await widget.client.listPasskeys();
+                setState(() => _passkeys = passkeys);
+                _currentPassword.clear();
+                await _load();
+              }),
+              onDelete: (credentialId) => _runInSheet(setSheetState, () async {
+                await widget.client.deletePasskey(credentialId);
+                final passkeys = await widget.client.listPasskeys();
+                setState(() => _passkeys = passkeys);
+                await _load();
+              }),
+            ),
           );
-          final options = await widget.client.beginPasskeyRegistration(
-            currentPassword: _currentPassword.text,
-          );
-          widget.client.logger.info(
-            'Passkey registration options received.',
-            source: 'rosm_passport.ui.account',
-            event: 'passkey.register.options.success',
-          );
-          final credential = await registrar(options);
-          widget.client.logger.info(
-            'Passkey registration credential received; verifying with server.',
-            source: 'rosm_passport.ui.account',
-            event: 'passkey.register.verify.start',
-            context: _credentialSummary(credential),
-          );
-          await widget.client.completePasskeyRegistration(
-            credential: credential,
-          );
-          widget.client.logger.info(
-            'Passkey registration verification completed.',
-            source: 'rosm_passport.ui.account',
-            event: 'passkey.register.verify.success',
-          );
-          final passkeys = await widget.client.listPasskeys();
-          setState(() => _passkeys = passkeys);
-          _currentPassword.clear();
-          await _load();
-        }),
-        onDelete: (credentialId) => _run(() async {
-          await widget.client.deletePasskey(credentialId);
-          final passkeys = await widget.client.listPasskeys();
-          setState(() => _passkeys = passkeys);
-          await _load();
-        }),
+        },
       ),
     );
   }
@@ -661,7 +733,15 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : account == null
-            ? _AccountError(message: _error ?? '无法读取账号信息。', onRetry: _load)
+            ? _AccountError(
+                message: _error ?? '无法读取账号信息。',
+                actionLabel: _sessionExpired && !_hasReauthenticationFlow
+                    ? '返回登录'
+                    : _sessionExpired
+                    ? '重新登录'
+                    : '重试',
+                onRetry: _retryAfterError,
+              )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                 children: [
@@ -1396,9 +1476,14 @@ class _AccountMessage extends StatelessWidget {
 }
 
 class _AccountError extends StatelessWidget {
-  const _AccountError({required this.message, required this.onRetry});
+  const _AccountError({
+    required this.message,
+    required this.actionLabel,
+    required this.onRetry,
+  });
 
   final String message;
+  final String actionLabel;
   final VoidCallback onRetry;
 
   @override
@@ -1411,7 +1496,7 @@ class _AccountError extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
+            FilledButton(onPressed: onRetry, child: Text(actionLabel)),
           ],
         ),
       ),
@@ -1432,8 +1517,7 @@ bool _isSessionExpired(Object error) {
   if (error is! RosmApiException) {
     return false;
   }
-  return error.statusCode == 401 ||
-      error.code == 'unauthorized' ||
+  return error.code == 'unauthorized' ||
       error.code == 'missing_access_token' ||
       error.code == 'invalid_access_token' ||
       error.code == 'missing_refresh_token' ||

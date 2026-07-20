@@ -154,6 +154,36 @@ void main() {
     expect(jsonDecode(captured.body), {'email': 'user@example.com'});
   });
 
+  test('generates passkey platform association snippets', () {
+    const config = RosmPasskeyPlatformConfig(
+      rpDomain: 'auth.cruty.cn',
+      appleTeamId: 'Y6AYA4F7T3',
+      appleBundleId: 'com.cruos.zion',
+      androidPackageName: 'com.cruos.zion',
+      androidSha256CertFingerprints: ['AA:BB:CC'],
+    );
+
+    expect(config.appleAssociatedDomain, 'webcredentials:auth.cruty.cn');
+    expect(config.appleAppSiteAssociation(), {
+      'webcredentials': {
+        'apps': ['Y6AYA4F7T3.com.cruos.zion'],
+      },
+    });
+    expect(config.androidAssetLinks(), [
+      {
+        'relation': ['delegate_permission/common.get_login_creds'],
+        'target': {
+          'namespace': 'android_app',
+          'package_name': 'com.cruos.zion',
+          'sha256_cert_fingerprints': ['AA:BB:CC'],
+        },
+      },
+    ]);
+    expect(config.androidAssetStatementsInclude(), {
+      'include': 'https://auth.cruty.cn/.well-known/assetlinks.json',
+    });
+  });
+
   test(
     'completes server handoff with authorization code and verifier',
     () async {
