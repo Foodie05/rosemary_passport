@@ -8,8 +8,8 @@ class WebAuthnService {
   WebAuthnService({
     required AppConfig config,
     required WebAuthnRepository repository,
-  })  : _config = config,
-        _repository = repository;
+  }) : _config = config,
+       _repository = repository;
 
   final AppConfig _config;
   final WebAuthnRepository _repository;
@@ -60,19 +60,22 @@ class WebAuthnService {
   }) async {
     final rpId = _rpIdFromOrigin(origin);
     final credentials = await _repository.listCredentialsForUser(userId);
-    final payload = await _runHelper(
-      'webauthn-register-options.mjs',
-      {
-        'rpName': 'ROSM Pass',
-        'rpID': rpId,
-        'userID': userId,
-        'userName': email,
-        'userDisplayName': nickname,
-        'excludeCredentialIDs': credentials
-            .map((credential) => credential.credentialId)
-            .toList(),
-      },
-    );
+    final payload = await _runHelper('webauthn-register-options.mjs', {
+      'rpName': 'ROSM Pass',
+      'rpID': rpId,
+      'userID': userId,
+      'userName': email,
+      'userDisplayName': nickname,
+      'excludeCredentials': credentials
+          .map(
+            (credential) => {
+              'id': credential.credentialId,
+              'type': 'public-key',
+              'transports': credential.transports,
+            },
+          )
+          .toList(),
+    });
 
     final challenge = payload['challenge']?.toString() ?? '';
     await _repository.storeChallenge(
@@ -94,19 +97,17 @@ class WebAuthnService {
       userId: userId,
       purpose: 'register',
     );
-    if (challenge == null || challenge.expiresAt.isBefore(DateTime.now().toUtc())) {
+    if (challenge == null ||
+        challenge.expiresAt.isBefore(DateTime.now().toUtc())) {
       return false;
     }
 
-    final payload = await _runHelper(
-      'webauthn-verify-registration.mjs',
-      {
-        'response': response,
-        'expectedChallenge': challenge.challenge,
-        'expectedOrigin': challenge.origin,
-        'expectedRPID': challenge.rpId,
-      },
-    );
+    final payload = await _runHelper('webauthn-verify-registration.mjs', {
+      'response': response,
+      'expectedChallenge': challenge.challenge,
+      'expectedOrigin': challenge.origin,
+      'expectedRPID': challenge.rpId,
+    });
 
     final verified = payload['verified'] == true;
     if (!verified) {
@@ -143,16 +144,19 @@ class WebAuthnService {
       return null;
     }
     final rpId = _rpIdFromOrigin(origin);
-    final payload = await _runHelper(
-      'webauthn-auth-options.mjs',
-      {
-        'rpID': rpId,
-        if (credentials.isNotEmpty)
-          'allowCredentialIDs': credentials
-              .map((credential) => credential.credentialId)
-              .toList(),
-      },
-    );
+    final payload = await _runHelper('webauthn-auth-options.mjs', {
+      'rpID': rpId,
+      if (credentials.isNotEmpty)
+        'allowCredentials': credentials
+            .map(
+              (credential) => {
+                'id': credential.credentialId,
+                'type': 'public-key',
+                'transports': credential.transports,
+              },
+            )
+            .toList(),
+    });
 
     final challenge = payload['challenge']?.toString() ?? '';
     await _repository.storeChallenge(
@@ -172,7 +176,8 @@ class WebAuthnService {
     String? email,
     required Map<String, dynamic> response,
   }) async {
-    final credentialId = ((response['id'] ?? response['rawId']) ?? '').toString();
+    final credentialId = ((response['id'] ?? response['rawId']) ?? '')
+        .toString();
     if (credentialId.isEmpty) {
       return false;
     }
@@ -188,25 +193,23 @@ class WebAuthnService {
       email: email,
       purpose: userId == null ? 'authenticate_discoverable' : 'authenticate',
     );
-    if (challenge == null || challenge.expiresAt.isBefore(DateTime.now().toUtc())) {
+    if (challenge == null ||
+        challenge.expiresAt.isBefore(DateTime.now().toUtc())) {
       return false;
     }
 
-    final payload = await _runHelper(
-      'webauthn-verify-authentication.mjs',
-      {
-        'response': response,
-        'expectedChallenge': challenge.challenge,
-        'expectedOrigin': challenge.origin,
-        'expectedRPID': challenge.rpId,
-        'credential': {
-          'id': credential.credentialId,
-          'publicKey': credential.publicKey,
-          'counter': credential.counter,
-          'transports': credential.transports,
-        },
+    final payload = await _runHelper('webauthn-verify-authentication.mjs', {
+      'response': response,
+      'expectedChallenge': challenge.challenge,
+      'expectedOrigin': challenge.origin,
+      'expectedRPID': challenge.rpId,
+      'credential': {
+        'id': credential.credentialId,
+        'publicKey': credential.publicKey,
+        'counter': credential.counter,
+        'transports': credential.transports,
       },
-    );
+    });
 
     final verified = payload['verified'] == true;
     if (!verified) {
@@ -218,7 +221,8 @@ class WebAuthnService {
     );
     await _repository.updateCredentialCounter(
       credentialId: credential.credentialId,
-      counter: int.tryParse('${authenticationInfo['newCounter']}') ??
+      counter:
+          int.tryParse('${authenticationInfo['newCounter']}') ??
           credential.counter,
     );
     await _repository.deleteChallenge(challenge.id);
@@ -229,11 +233,9 @@ class WebAuthnService {
     String scriptName,
     Map<String, dynamic> payload,
   ) async {
-    final process = await Process.start(
-      'node',
-      ['scripts/$scriptName'],
-      workingDirectory: _helperWorkingDirectory,
-    );
+    final process = await Process.start('node', [
+      'scripts/$scriptName',
+    ], workingDirectory: _helperWorkingDirectory);
     process.stdin.writeln(jsonEncode(payload));
     await process.stdin.close();
 

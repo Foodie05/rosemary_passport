@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.cruos.zion",
+      "sha256_cert_fingerprints": [
+        "30:78:13:63:11:72:40:E5:1A:FB:1F:75:8E:D7:9F:A8:2D:9D:35:1E:BB:A3:B9:78:C7:C6:80:F4:4D:6E:5E:BF",
+        "13:D7:22:45:0A:7C:30:6F:54:CB:93:A6:E5:F4:C3:6E:AA:73:3B:DC:9E:34:6A:27:55:C2:61:C6:DC:C2:51:0C"
+      ]
+    }
+  }
+]

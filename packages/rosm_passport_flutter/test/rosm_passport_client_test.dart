@@ -184,6 +184,37 @@ void main() {
     });
   });
 
+  test('normalizes passkey credential descriptors for native plugins', () {
+    final options = RosmWebAuthnOptions({
+      'challenge': 'challenge',
+      'rp': {'id': 'auth.cruty.cn', 'name': 'ROSM'},
+      'user': {'id': 'user-id', 'name': 'user@example.com'},
+      'excludeCredentials': [
+        {'id': 'credential-id'},
+      ],
+      'allowCredentials': [
+        {
+          'id': 'allowed-id',
+          'type': '',
+          'transports': ['internal'],
+        },
+      ],
+    });
+
+    final normalized = RosmNativePasskeys.normalizeOptionsForPlatform(options);
+
+    expect(normalized['excludeCredentials'], [
+      {'id': 'credential-id', 'type': 'public-key', 'transports': <String>[]},
+    ]);
+    expect(normalized['allowCredentials'], [
+      {
+        'id': 'allowed-id',
+        'type': 'public-key',
+        'transports': ['internal'],
+      },
+    ]);
+  });
+
   test(
     'completes server handoff with authorization code and verifier',
     () async {

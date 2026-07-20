@@ -12,6 +12,12 @@ class RosmNativePasskeys {
   final PasskeyAuthenticator _authenticator;
   final RosmPassportLogger _logger;
 
+  static Map<String, dynamic> normalizeOptionsForPlatform(
+    RosmWebAuthnOptions options,
+  ) {
+    return _optionsMap(options);
+  }
+
   Future<RosmWebAuthnCredential> authenticate(
     RosmWebAuthnOptions options, {
     MediationType mediation = MediationType.Required,
@@ -74,7 +80,7 @@ class RosmNativePasskeys {
         'Passkey authentication failed.',
         source: 'rosm_passport.passkeys',
         event: 'passkey.authenticate.failure',
-        context: {'error_code': _errorCode(exception)},
+        context: _failureContext(exception, error),
         error: exception,
         stackTrace: stackTrace,
       );
@@ -139,7 +145,7 @@ class RosmNativePasskeys {
         'Passkey registration failed.',
         source: 'rosm_passport.passkeys',
         event: 'passkey.register.failure',
-        context: {'error_code': _errorCode(exception)},
+        context: _failureContext(exception, error),
         error: exception,
         stackTrace: stackTrace,
       );
@@ -153,14 +159,47 @@ class RosmNativePasskeys {
         : error.runtimeType.toString();
   }
 
-  Map<String, dynamic> _optionsMap(RosmWebAuthnOptions options) {
+  Map<String, Object?> _failureContext(Object exception, Object original) {
+    return {
+      'error_code': _errorCode(exception),
+      'original_error_type': original.runtimeType.toString(),
+      'original_error': original.toString(),
+    };
+  }
+
+  static Map<String, dynamic> _optionsMap(RosmWebAuthnOptions options) {
     final source = options.options['publicKey'] is Map
         ? options.options['publicKey']
         : options.options;
-    return _deepStringKeyedMap(source);
+    final normalized = _deepStringKeyedMap(source);
+    _normalizeCredentialDescriptors(normalized, 'allowCredentials');
+    _normalizeCredentialDescriptors(normalized, 'excludeCredentials');
+    return normalized;
   }
 
-  Map<String, dynamic> _deepStringKeyedMap(Object? value) {
+  static void _normalizeCredentialDescriptors(
+    Map<String, dynamic> options,
+    String key,
+  ) {
+    final descriptors = options[key];
+    if (descriptors is! List) return;
+    options[key] = descriptors
+        .whereType<Map>()
+        .map((descriptor) {
+          final normalized = _deepStringKeyedMap(descriptor);
+          normalized['type'] = normalized['type']?.toString().isNotEmpty == true
+              ? normalized['type']
+              : 'public-key';
+          final transports = normalized['transports'];
+          normalized['transports'] = transports is List
+              ? transports.map((transport) => transport.toString()).toList()
+              : <String>[];
+          return normalized;
+        })
+        .toList(growable: false);
+  }
+
+  static Map<String, dynamic> _deepStringKeyedMap(Object? value) {
     if (value is! Map) {
       throw const RosmApiException(
         'invalid_passkey_options',
@@ -172,7 +211,7 @@ class RosmNativePasskeys {
     );
   }
 
-  Object? _deepJsonValue(Object? value) {
+  static Object? _deepJsonValue(Object? value) {
     if (value is Map) {
       return _deepStringKeyedMap(value);
     }
@@ -220,7 +259,9 @@ class RosmNativePasskeys {
     if (error is TimeoutException) {
       return const RosmApiException('passkey_timeout', '通行密钥操作已超时，请重试。');
     }
-    if (error is MalformedBase64Url || error is FormatException) {
+    if (error is MalformedBase64Url ||
+        error is FormatException ||
+        error is TypeError) {
       return const RosmApiException(
         'invalid_passkey_options',
         'ROSM Passport 返回的通行密钥参数格式不正确。',

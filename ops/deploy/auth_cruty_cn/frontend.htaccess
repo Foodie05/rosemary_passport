@@ -5,6 +5,11 @@ RewriteEngine On
   Header set Content-Type "application/json"
 </Files>
 
+<Files "assetlinks.json">
+  ForceType application/json
+  Header set Content-Type "application/json"
+</Files>
+
 # Let existing files and directories pass through directly.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
