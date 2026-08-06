@@ -14,12 +14,22 @@ Future<Response> onRequest(RequestContext context) async {
   if (context.request.method == HttpMethod.put) {
     final body = await tryParseJsonObject(context.request);
     if (body == null) {
-      return errorResponse('invalid_request', 'Request body must be a JSON object.');
+      return errorResponse(
+        'invalid_request',
+        'Request body must be a JSON object.',
+      );
     }
-    await service.updateSystemSettings(body);
+    try {
+      await service.updateSystemSettings(body);
+    } on FormatException catch (error) {
+      return errorResponse('invalid_request', error.message);
+    }
     return jsonResponse({'updated': true});
   }
 
-  return errorResponse('method_not_allowed', 'Use GET or PUT.',
-      statusCode: 405);
+  return errorResponse(
+    'method_not_allowed',
+    'Use GET or PUT.',
+    statusCode: 405,
+  );
 }

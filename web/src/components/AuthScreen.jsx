@@ -9,7 +9,7 @@ export function AuthScreen({
   loading,
   loginForm,
   registerForm,
-  hcaptchaRef,
+  captchaRef,
   setAuthMode,
   setLoginStep,
   setLoginForm,
@@ -30,7 +30,7 @@ export function AuthScreen({
         <div className="auth-points">
           <InfoPill label="邮件验证码" value="内建" />
           <InfoPill label="后台角色" value={session.user?.roles?.join(', ') || '待登录'} />
-          <InfoPill label="hCaptcha" value={publicConfig?.captcha?.site_key ? '已启用' : '可选'} />
+          <InfoPill label="阿里云验证码" value={publicConfig?.captcha?.scene_id ? '已启用' : '可选'} />
         </div>
       </div>
 
@@ -117,7 +117,7 @@ export function AuthScreen({
               />
             </Field>
             <div className="captcha">
-              <div ref={hcaptchaRef} />
+              <div ref={captchaRef} />
             </div>
             <button className="ghost" type="button" onClick={submitRegisterCode}>
               发送验证码

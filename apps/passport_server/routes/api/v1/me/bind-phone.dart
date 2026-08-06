@@ -27,6 +27,9 @@ Future<Response> onRequest(RequestContext context) async {
         phoneNumber: phoneNumber,
         currentPassword: currentPassword,
         verifyCode: verifyCode,
+        preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
+            ? user.accessTokenId
+            : null,
       );
 
   if (!result.ok) {

@@ -8,8 +8,17 @@ Future<Response> onRequest(RequestContext context) async {
     return errorResponse('method_not_allowed', '请使用 POST 请求。', statusCode: 405);
   }
 
+  final body = await context.request.json();
+  final payload = body is Map
+      ? Map<String, dynamic>.from(body)
+      : <String, dynamic>{};
+  final token = (payload['captcha_token'] ?? '').toString().trim();
+  if (token.isEmpty) {
+    return errorResponse('invalid_request', '请先完成阿里云验证码验证。');
+  }
+
   final result = await context
       .read<AdminSettingsService>()
-      .testHcaptchaConnection();
+      .testAliyunCaptchaConnection(token);
   return jsonResponse(result, statusCode: result['ok'] == true ? 200 : 400);
 }

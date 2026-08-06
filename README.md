@@ -65,22 +65,18 @@ PORT=8080 dart run build/bin/server.dart
 
 5. 前端在 `web/` 目录，默认调用 `http://localhost:8080`，可用任意静态文件服务打开 `index.html`。
 
-### hCaptcha 配置
+### 阿里云验证码 2.0 配置
 
-前端 `sitekey` 配置在 [web/config.js](/Users/tianyue/Documents/Projects/rosemary_passport/web/config.js)：
-
-```js
-window.ROSM_CONFIG = {
-  apiBase: 'http://localhost:8080',
-  hcaptchaSiteKey: '你的_hcaptcha_sitekey',
-};
-```
-
-后端 `secret` 配置在 `apps/passport_server/.env`：
+推荐在 Rosemary 管理页面的“服务配置”中填写 Prefix、场景 ID 与 AccessKey，并使用“验证阿里云验证码”完成一次真实连通测试。也可以通过环境变量提供默认配置：
 
 ```env
-HCAPTCHA_SECRET=你的_hcaptcha_secret
+ALIYUN_CAPTCHA_PREFIX=你的身份标
+ALIYUN_CAPTCHA_SCENE_ID=你的场景ID
+ALIYUN_CAPTCHA_ACCESS_KEY_ID=你的AccessKeyID
+ALIYUN_CAPTCHA_ACCESS_KEY_SECRET=你的AccessKeySecret
 ```
+
+验证码专用 AccessKey 未配置时会复用短信服务或通用阿里云 AccessKey。前端构建可使用 `VITE_ALIYUN_CAPTCHA_PREFIX` 和 `VITE_ALIYUN_CAPTCHA_SCENE_ID` 作为公开配置兜底。
 
 ## 必做的生产安全项
 

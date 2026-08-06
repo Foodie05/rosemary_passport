@@ -32,6 +32,9 @@ Future<Response> onRequest(RequestContext context) async {
         newEmail: email,
         currentPassword: currentPassword,
         emailCode: emailCode,
+        preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
+            ? user.accessTokenId
+            : null,
       );
 
   if (!result.ok) {

@@ -410,6 +410,26 @@ class OidcRepository {
     );
   }
 
+  Future<void> revokeAccessTokensForUserExcept(
+    String userId,
+    String preservedTokenId,
+  ) async {
+    await _ensureSchema();
+    await _db.execute(
+      '''
+      update oidc_access_tokens
+      set revoked_at = now()
+      where user_id = @user_id
+        and token_id <> @preserved_token_id
+        and revoked_at is null
+      ''',
+      params: {
+        'user_id': userId,
+        'preserved_token_id': preservedTokenId,
+      },
+    );
+  }
+
   Future<void> upsertClient({
     required String clientId,
     required String? displayName,

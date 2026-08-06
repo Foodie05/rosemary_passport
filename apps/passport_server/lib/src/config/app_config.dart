@@ -71,15 +71,21 @@ class AppConfig {
   int get argon2Iterations => int.parse(_env['ARGON2_ITERATIONS'] ?? '4');
   int get argon2Parallelism => int.parse(_env['ARGON2_PARALLELISM'] ?? '1');
 
-  String get hcaptchaSecret => _env['HCAPTCHA_SECRET'] ?? '';
-  String get hcaptchaSiteKey => _env['HCAPTCHA_SITEKEY'] ?? '';
-  String get captchaSecret {
-    if (hcaptchaSecret.isNotEmpty) {
-      return hcaptchaSecret;
-    }
-    // Backward compatibility for legacy env key.
-    return _env['TURNSTILE_SECRET'] ?? '';
+  String get aliyunCaptchaPrefix =>
+      (_env['ALIYUN_CAPTCHA_PREFIX'] ?? '').trim();
+  String get aliyunCaptchaSceneId =>
+      (_env['ALIYUN_CAPTCHA_SCENE_ID'] ?? '').trim();
+  String get aliyunCaptchaAccessKeyId {
+    final dedicated = (_env['ALIYUN_CAPTCHA_ACCESS_KEY_ID'] ?? '').trim();
+    return dedicated.isNotEmpty ? dedicated : aliyunAccessKeyId;
   }
+
+  String get aliyunCaptchaAccessKeySecret {
+    final dedicated = (_env['ALIYUN_CAPTCHA_ACCESS_KEY_SECRET'] ?? '').trim();
+    return dedicated.isNotEmpty ? dedicated : aliyunAccessKeySecret;
+  }
+
+  String get aliyunCaptchaRegion => 'cn';
 
   String get smtpHost => _env['SMTP_HOST'] ?? '';
   int get smtpPort => int.parse(_env['SMTP_PORT'] ?? '587');
