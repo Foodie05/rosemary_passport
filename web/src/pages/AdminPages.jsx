@@ -118,9 +118,9 @@ function SettingsShell({ icon: Icon, title, description, children, onSubmit, act
           <p className="mt-1 text-sage-500">{description}</p>
         </div>
       </div>
-      <form onSubmit={onSubmit} className="glass-card space-y-8 rounded-3xl p-8">
+      <form onSubmit={onSubmit} className="glass-card space-y-8 rounded-3xl p-5 sm:p-8">
         {children}
-        {actions ? <div className="flex justify-end gap-3 border-t border-sage-100 pt-6">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap justify-end gap-3 border-t border-sage-100 pt-6">{actions}</div> : null}
       </form>
     </div>
   );
@@ -129,8 +129,8 @@ function SettingsShell({ icon: Icon, title, description, children, onSubmit, act
 function ConfigField({ label, hint, defaultValue, children }) {
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-1.5 text-sm font-bold text-sage-700">
-        <span>{label}</span>
+      <label className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-sage-700">
+        <span className="min-w-0 break-words">{label}</span>
         {defaultValue !== undefined ? (
           <span className="rounded-full bg-sage-100 px-2 py-0.5 text-[11px] font-semibold text-sage-500">
             默认 {String(defaultValue)}
@@ -217,11 +217,11 @@ function ProviderListSection({
       <div className="flex flex-wrap gap-2">
         {providers.length ? (
           providers.map((provider) => (
-            <span key={provider} className="inline-flex items-center gap-2 rounded-full border border-sage-200 bg-sage-50 px-3 py-1.5 text-sm font-medium text-sage-700">
-              {provider}
+            <span key={provider} className="inline-flex max-w-full items-center gap-2 rounded-full border border-sage-200 bg-sage-50 px-3 py-1.5 text-sm font-medium text-sage-700">
+              <span className="min-w-0 break-all">{provider}</span>
               <button
                 type="button"
-                className="rounded-full text-sage-400 transition-colors hover:text-red-500"
+                className="shrink-0 rounded-full text-sage-400 transition-colors hover:text-red-500"
                 onClick={() => onRemove(provider)}
                 aria-label={`移除 ${provider}`}
               >
@@ -240,9 +240,9 @@ function ProviderListSection({
 function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
   return (
     <label className="flex items-start justify-between gap-4 rounded-2xl border border-sage-100 bg-white p-5 text-sm text-sage-700">
-      <span className="space-y-2">
-        <span className="flex items-center gap-1.5">
-          <span className="font-bold text-sage-900">{title}</span>
+      <span className="min-w-0 space-y-2">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="min-w-0 break-words font-bold text-sage-900">{title}</span>
           <span className="rounded-full bg-sage-100 px-2 py-0.5 text-[11px] font-semibold text-sage-500">
             默认 {defaultEnabled ? '开启' : '关闭'}
           </span>
@@ -251,7 +251,7 @@ function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
       </span>
       <input
         type="checkbox"
-        className="mt-1 h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
+        className="mt-1 h-4 w-4 shrink-0 rounded text-sage-600 focus:ring-sage-400"
         checked={checked}
         onChange={onChange}
       />
@@ -261,18 +261,18 @@ function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
 
 function Modal({ title, children, onClose, actions }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-sage-900/20 p-3 backdrop-blur-sm sm:p-6">
-      <div className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)]">
-        <div className="flex items-center justify-between border-b border-sage-100 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-sage-900/20 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+      <div className="my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
+        <div className="flex items-center justify-between border-b border-sage-100 px-4 py-4 sm:px-6">
           <h3 className="text-xl font-bold text-sage-900">{title}</h3>
           <button type="button" className="rounded-xl p-2 text-sage-400 hover:bg-sage-50 hover:text-sage-700" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           <div className="space-y-5">{children}</div>
         </div>
-        <div className="flex justify-end gap-3 border-t border-sage-100 bg-white px-6 py-4">{actions}</div>
+        <div className="flex flex-col-reverse gap-3 border-t border-sage-100 bg-white px-4 py-4 [&>*]:w-full sm:flex-row sm:justify-end sm:px-6 sm:[&>*]:w-auto">{actions}</div>
       </div>
     </div>
   );
@@ -304,19 +304,19 @@ export function AdminServiceConfig({
   setSystemForm,
   saveServiceConfig,
   testSmtpConnection,
-  testHcaptchaConnection,
+  testAliyunCaptchaConnection,
   testPhoneSmsConnection,
 }) {
   return (
     <SettingsShell
       icon={Mail}
       title="服务配置"
-      description="集中管理 SMTP 邮箱服务和 hCaptcha 运行参数。"
+      description="集中管理 SMTP 邮箱、阿里云验证码和短信服务参数。"
       onSubmit={saveServiceConfig}
       actions={(
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" type="button" onClick={testSmtpConnection}>验证 SMTP 连接</button>
-          <button className="btn-secondary" type="button" onClick={testHcaptchaConnection}>验证 hCaptcha 连接</button>
+          <button className="btn-secondary" type="button" onClick={testAliyunCaptchaConnection}>验证阿里云验证码</button>
           <button className="btn-secondary" type="button" onClick={testPhoneSmsConnection}>验证短信配置</button>
           <button className="btn-primary" type="submit">保存服务配置</button>
         </div>
@@ -357,15 +357,21 @@ export function AdminServiceConfig({
         <div className="border-t border-sage-100 pt-8">
           <div className="space-y-5">
             <div>
-              <h3 className="text-lg font-bold text-sage-900">hCaptcha 配置</h3>
-              <p className="mt-1 text-sm text-sage-500">配置前端站点验证与后端校验所需参数。</p>
+              <h3 className="text-lg font-bold text-sage-900">阿里云验证码 2.0</h3>
+              <p className="mt-1 text-sm text-sage-500">Prefix 与场景 ID 来自验证码 2.0 控制台；AccessKey 来自 RAM 用户，需授予 AliyunYundunAFSFullAccess。</p>
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <ConfigField label="Site Key">
-                <input className="input-field" value={systemForm.hcaptcha_site_key || ''} onChange={(event) => setSystemForm((current) => ({ ...current, hcaptcha_site_key: event.target.value }))} />
+              <ConfigField label="Prefix">
+                <input className="input-field" value={systemForm.aliyun_captcha_prefix || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_prefix: event.target.value }))} />
               </ConfigField>
-              <ConfigField label="Secret Key">
-                <input type="password" className="input-field" value={systemForm.hcaptcha_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, hcaptcha_secret: event.target.value }))} />
+              <ConfigField label="场景 ID" hint="只填写场景管理中显示的 ID，不要包含场景名称或空格。">
+                <input className="input-field" autoComplete="off" value={systemForm.aliyun_captcha_scene_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_scene_id: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="AccessKey ID" hint="填写 RAM 用户的 AccessKey ID。">
+                <input className="input-field" autoComplete="off" value={systemForm.aliyun_captcha_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_id: event.target.value }))} />
+              </ConfigField>
+              <ConfigField label="AccessKey Secret" hint="AccessKey 创建时仅展示一次；只保存在服务端，不会下发到客户端。">
+                <input type="password" className="input-field" autoComplete="new-password" placeholder={systemForm.aliyun_captcha_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.aliyun_captcha_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_secret: event.target.value }))} />
               </ConfigField>
             </div>
             <label className="flex items-center gap-3 text-sm text-sage-600">
@@ -586,7 +592,7 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
 
       <div className="glass-card overflow-hidden rounded-2xl">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
+          <table className="min-w-[760px] w-full border-collapse text-left">
             <thead>
               <tr className="border-b border-sage-100 bg-sage-50/50">
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">用户</th>
@@ -660,7 +666,7 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between border-t border-sage-100 p-4 text-sm text-sage-500">
+        <div className="flex flex-col gap-3 border-t border-sage-100 p-4 text-sm text-sage-500 sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 位用户</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => loadUsers({ page: pagination.page - 1, search }), '用户数据加载失败')}>
@@ -1279,7 +1285,7 @@ Authorization: Bearer ACCESS_TOKEN`,
   }
 
   return (
-    <div className="min-h-screen bg-sage-50 p-6 lg:p-10">
+    <div className="min-h-dvh bg-sage-50 p-4 sm:p-6 lg:p-10">
       <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="OIDC 接入文档"
@@ -1296,7 +1302,7 @@ Authorization: Bearer ACCESS_TOKEN`,
         )}
       />
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">当前生效参数</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">以下内容来自当前后台已鉴权读取到的运行配置，可直接提供给接入方使用。</p>
@@ -1317,7 +1323,7 @@ Authorization: Bearer ACCESS_TOKEN`,
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">1. 什么是 OIDC</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">OIDC 是建立在 OAuth 2.0 之上的身份层协议。OAuth 2.0 解决“授权访问资源”，OIDC 进一步解决“确认用户是谁”。典型流程是应用把用户带到身份提供方登录，身份提供方确认身份后返回授权码，应用再用授权码换取令牌并读取用户资料。</p>
@@ -1434,7 +1440,7 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
   const nativeApproveEndpoint = `${issuer}/api/v1/oidc/native/approve`;
 
   return (
-    <div className="min-h-screen bg-sage-50 p-6 lg:p-10">
+    <div className="min-h-dvh bg-sage-50 p-4 sm:p-6 lg:p-10">
       <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="Flutter SDK 接入"
@@ -1451,7 +1457,7 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
         )}
       />
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">1. 选择客户端模式</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">推荐生产应用使用“服务端交接”模式：Flutter SDK 在 App 内完成 Rosemary 风格登录 UI 和授权确认，但 <InlineCode>client_secret</InlineCode> 仍只放在接入方自己的服务器。SDK 获取一次性授权码后，把授权码和 PKCE verifier 交给接入方服务器，由服务器作为机密客户端换取 token 并创建业务会话。</p>
@@ -1488,7 +1494,7 @@ Scopes:
   accountRule`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">2. 添加 SDK 依赖</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 放在当前 GitHub 仓库中，应用可以直接通过 git 依赖接入。</p>
@@ -1500,7 +1506,7 @@ Scopes:
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">3. 使用 SDK 内置 UI</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、手机、密码、密码二次验证、注册、忘记密码、通行密钥登录、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
@@ -1539,7 +1545,7 @@ final appSession = result?.serverPayload;`}</CodeBlock>
         </p>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">4. 接入方服务器完成换票</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">服务端交接接口由接入方实现。SDK 会把授权码、PKCE verifier、state、nonce 和 redirect URI 发给该接口；接入方服务器再带自己的 <InlineCode>client_secret</InlineCode> 调用 ROSM token 端点，校验 ID Token 后创建自己的 App 会话。</p>
@@ -1604,7 +1610,7 @@ POST ${tokenEndpoint}
 }`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">5. 忘记密码</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">应用侧先完成人机验证，再调用 SDK 发送找回验证码。邮箱找回和手机找回都使用同一组 Dart 方法，通过 RosmPasswordRecoveryMethod 区分。</p>
@@ -1627,7 +1633,7 @@ await passport.resetPasswordByCode(
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">6. 通行密钥登录与添加</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 默认内置原生通行密钥适配，会获取 WebAuthn options、调起系统通行密钥弹窗，并把 credential response 交回 ROSM 验证。接入方通常不需要手写 WebAuthn JSON 或额外接 passkey 插件。</p>
@@ -1660,7 +1666,7 @@ await passport.completePasskeyRegistration(
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">7. 通行密钥平台配置</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">Passkey 必须绑定 HTTPS relying party 域名。移动端需要完成系统级域名关联，并让 SDK 请求 options 时携带同一个 Origin。iOS 报 “Application with identifier ... is not associated with domain ...” 时，优先检查 App ID、entitlement 与 AASA 是否完全一致并已部署生效。</p>
@@ -1687,7 +1693,7 @@ final assetStatement = passkeyConfig.androidAssetStatementsInclude();`}</CodeBlo
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-8">
+      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
         <div>
           <h3 className="text-lg font-bold text-sage-900">8. Public 直连模式与端点</h3>
           <p className="mt-2 text-sm leading-relaxed text-sage-600">如果应用明确不经过自己的服务器，可以把 OIDC client 配成 Public，并使用自定义 scheme redirect URI。此时 SDK 会在设备上换取和保存 ROSM token；生产业务 App 更推荐上面的服务端交接模式。</p>
@@ -1714,7 +1720,7 @@ final userInfo = await passport.userInfo();
 await passport.signOut();`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-4 rounded-3xl p-8">
+      <div className="glass-card space-y-4 rounded-3xl p-5 sm:p-8">
         <h3 className="text-lg font-bold text-sage-900">9. 检查清单</h3>
         <div className="space-y-2 text-sm leading-7 text-sage-600">
           <p>生产推荐使用服务端交接：Flutter SDK 设置 <InlineCode>serverHandoff</InlineCode>，接入方服务器保存 <InlineCode>client_secret</InlineCode> 并完成 token exchange。</p>

@@ -66,8 +66,10 @@ class EmailService {
 
     try {
       await send(message, smtpServer);
-    } catch (_) {
-      throw EmailDeliveryException('SMTP delivery failed.');
+    } catch (e, st) {
+      print('[EMAIL] SMTP delivery failed: ${e.runtimeType}: $e');
+      print('[EMAIL] StackTrace: $st');
+      throw EmailDeliveryException('SMTP delivery failed: ${e.runtimeType}: $e');
     }
   }
 

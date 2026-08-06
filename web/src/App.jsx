@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AdminLayout, UserLayout } from './components/Layouts';
-import { HCAPTCHA_SITE_KEY, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
+import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
 import { AdminFlutterSdkDocsPage, AdminOIDCConfig, AdminOidcDocsPage, AdminSecurityPolicy, AdminServiceConfig, AdminUsers } from './pages/AdminPages';
-import { ForgotPasswordPage, LoginPage, PostRegisterPasskeyPrompt, RegisterPage } from './pages/AuthPages';
+import { ForgotPasswordPage, LoginPage, PostRegisterBindingPrompt, PostRegisterPasskeyPrompt, RegisterPage } from './pages/AuthPages';
 import { UserAccountPage } from './pages/UserPages';
 import { useTheme } from './theme';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
@@ -47,8 +47,9 @@ function AppRoutes({
   registerCodeCooldownRemaining,
   submitRegister,
   submitRegisterCode,
-  publicHcaptchaRef,
+  publicCaptchaRef,
   publicConfig,
+  captchaConfigured,
   mountPublicCaptcha,
   sendRecoveryCode,
   resetPasswordByCode,
@@ -72,7 +73,7 @@ function AppRoutes({
   setSystemForm,
   saveServiceConfig,
   testSmtpConnection,
-  testHcaptchaConnection,
+  testAliyunCaptchaConnection,
   testPhoneSmsConnection,
   users,
   usersPagination,
@@ -163,8 +164,9 @@ function AppRoutes({
                 registerCodeCooldownRemaining={registerCodeCooldownRemaining}
                 submitRegister={submitRegister}
                 submitRegisterCode={submitRegisterCode}
-                hcaptchaRef={publicHcaptchaRef}
+                captchaRef={publicCaptchaRef}
                 publicConfig={publicConfig}
+                captchaConfigured={captchaConfigured}
                 mountCaptcha={mountPublicCaptcha}
                 authNext={registerNext}
               />
@@ -203,7 +205,7 @@ function AppRoutes({
               />
             }
           />
-          <Route path="service" element={<AdminServiceConfig systemForm={systemForm} setSystemForm={setSystemForm} saveServiceConfig={saveServiceConfig} testSmtpConnection={testSmtpConnection} testHcaptchaConnection={testHcaptchaConnection} testPhoneSmsConnection={testPhoneSmsConnection} />} />
+          <Route path="service" element={<AdminServiceConfig systemForm={systemForm} setSystemForm={setSystemForm} saveServiceConfig={saveServiceConfig} testSmtpConnection={testSmtpConnection} testAliyunCaptchaConnection={testAliyunCaptchaConnection} testPhoneSmsConnection={testPhoneSmsConnection} />} />
           <Route
             path="users"
             element={
@@ -332,6 +334,9 @@ function App() {
   const [postRegisterPasskeyError, setPostRegisterPasskeyError] = useState('');
   const [postRegisterMethod, setPostRegisterMethod] = useState('email');
   const [pendingAuthRedirect, setPendingAuthRedirect] = useState('');
+  const [postRegisterBindingPromptOpen, setPostRegisterBindingPromptOpen] = useState(false);
+  const [postRegisterBindingPassword, setPostRegisterBindingPassword] = useState('');
+  const [postRegisterPasskeyPending, setPostRegisterPasskeyPending] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
     email: '',
@@ -367,13 +372,14 @@ function App() {
     is_active: true,
   });
 
-  const publicHcaptchaRef = useRef(null);
-  const publicHcaptchaWidgetRef = useRef(null);
-  const publicHcaptchaMountRef = useRef(null);
-  const publicHcaptchaThemeRef = useRef(null);
-  const backgroundHcaptchaContainerRef = useRef(null);
-  const backgroundHcaptchaWidgetRef = useRef(null);
-  const backgroundHcaptchaPromiseRef = useRef(null);
+  const publicCaptchaRef = useRef(null);
+  const publicCaptchaInstanceRef = useRef(null);
+  const publicCaptchaTokenRef = useRef('');
+  const publicCaptchaConfigRef = useRef('');
+  const backgroundCaptchaContainerRef = useRef(null);
+  const backgroundCaptchaButtonRef = useRef(null);
+  const backgroundCaptchaInstanceRef = useRef(null);
+  const backgroundCaptchaPromiseRef = useRef(null);
 
   const isLoggedIn = Boolean(session.user);
   const isAdmin = session.user?.roles?.includes('admin');
@@ -429,12 +435,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    void ensureBackgroundCaptchaWidget();
-  }, [publicConfig]);
-
-  useEffect(() => {
     void ensurePublicCaptchaWidget();
-  }, [publicConfig, resolvedTheme]);
+  }, [publicConfig]);
 
   useEffect(() => {
     if (registerCodeCooldownRemaining <= 0) {
@@ -474,7 +476,31 @@ function App() {
   }
 
   function hasConfiguredCaptcha() {
-    return Boolean(`${publicConfig?.captcha?.site_key || HCAPTCHA_SITE_KEY}`.trim());
+    const config = getCaptchaConfig();
+    return Boolean(config.prefix && config.sceneId);
+  }
+
+  function isBootstrapLoginEmail(email) {
+    return `${email || ''}`.trim().toLowerCase().endsWith('@rosm.local');
+  }
+
+  function getCaptchaConfig(override = {}) {
+    return {
+      prefix: `${override.prefix || publicConfig?.captcha?.prefix || ALIYUN_CAPTCHA_PREFIX}`.trim(),
+      sceneId: `${override.sceneId || publicConfig?.captcha?.scene_id || ALIYUN_CAPTCHA_SCENE_ID}`.trim(),
+      region: `${override.region || publicConfig?.captcha?.region || 'cn'}`.trim(),
+    };
+  }
+
+  function validatedAliyunCaptchaSceneId(value, { required = false } = {}) {
+    const sceneId = `${value || ''}`.trim();
+    if (!sceneId && !required) {
+      return '';
+    }
+    if (!sceneId || !/^[a-z0-9]+$/.test(sceneId)) {
+      throw new Error('场景 ID 只能填写验证码 2.0 控制台显示的小写字母和数字，不要包含场景名称。');
+    }
+    return sceneId;
   }
 
   async function api(path, options = {}) {
@@ -567,6 +593,7 @@ function App() {
   }
 
   function getPasskeySetupErrorMessage(error) {
+    const normalizedMessage = String(error?.message || '').toLowerCase();
     if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') {
       return '你已取消本次通行密钥操作，或操作已超时。';
     }
@@ -581,6 +608,9 @@ function App() {
     }
     if (error?.name === 'SecurityError') {
       return '当前环境不允许使用通行密钥，请检查域名与安全上下文。';
+    }
+    if (error?.name === 'UnknownError' || normalizedMessage.includes('credential manager')) {
+      return '系统凭据管理器暂时无法创建通行密钥。你可以改用最新版 Chrome 重试，或先选择“稍后再说”，这不会影响刚刚注册的账户和登录状态。';
     }
     return error?.message || '通行密钥添加失败，请稍后再试。';
   }
@@ -638,7 +668,10 @@ function App() {
       registration_email_provider_whitelist: normalizeProviderList(security.registration_email_provider_whitelist),
       registration_email_provider_blacklist_input: '',
       registration_email_provider_whitelist_input: '',
-      hcaptcha_site_key: security.hcaptcha_site_key || '',
+      aliyun_captcha_prefix: security.aliyun_captcha_prefix || '',
+      aliyun_captcha_scene_id: security.aliyun_captcha_scene_id || '',
+      aliyun_captcha_access_key_id: security.aliyun_captcha_access_key_id || '',
+      aliyun_captcha_access_key_secret: '',
       smtp_host: smtp.host || '',
       smtp_port: smtp.port || 587,
       smtp_from: smtp.from || '',
@@ -687,60 +720,90 @@ function App() {
     });
   }, [loadDiscovery]);
 
-  function ensureHcaptchaScript() {
+  function ensureAliyunCaptchaScript(config = getCaptchaConfig()) {
     return new Promise((resolve, reject) => {
-      if (window.hcaptcha) {
+      if (window.initAliyunCaptcha && window.__rosmAliyunCaptchaPrefix === config.prefix) {
         resolve();
         return;
       }
-      const existing = document.querySelector('script[data-hcaptcha]');
+      const existing = document.querySelector('script[data-aliyun-captcha]');
       if (existing) {
-        existing.addEventListener('load', resolve, { once: true });
-        existing.addEventListener('error', reject, { once: true });
-        return;
+        if (existing.dataset.prefix !== config.prefix) {
+          existing.remove();
+          delete window.initAliyunCaptcha;
+        } else {
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', reject, { once: true });
+          return;
+        }
       }
+      window.AliyunCaptchaConfig = {
+        region: config.region,
+        prefix: config.prefix,
+      };
+      window.__rosmAliyunCaptchaPrefix = config.prefix;
       const script = document.createElement('script');
-      script.src = 'https://js.hcaptcha.com/1/api.js?render=explicit';
+      script.src = 'https://o.alicdn.com/captcha-frontend/aliyunCaptcha/AliyunCaptcha.js';
       script.async = true;
-      script.defer = true;
-      script.dataset.hcaptcha = 'true';
-      script.addEventListener('load', resolve, { once: true });
+      script.dataset.aliyunCaptcha = 'true';
+      script.dataset.prefix = config.prefix;
+      script.addEventListener('load', () => {
+        window.__rosmAliyunCaptchaLoadedAt = Date.now();
+        resolve();
+      }, { once: true });
       script.addEventListener('error', reject, { once: true });
       document.body.appendChild(script);
     });
   }
 
+  async function waitForAliyunCaptchaReady(config) {
+    await ensureAliyunCaptchaScript(config);
+    const elapsed = Date.now() - Number(window.__rosmAliyunCaptchaLoadedAt || 0);
+    if (elapsed < 2000) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2000 - elapsed));
+    }
+  }
+
+  function destroyCaptchaInstance(instanceRef) {
+    try {
+      instanceRef.current?.destroy?.();
+    } catch (_) {
+      // Ignore provider cleanup errors and rebuild the widget.
+    }
+    instanceRef.current = null;
+  }
+
   async function ensurePublicCaptchaWidget() {
-    const siteKey = `${publicConfig?.captcha?.site_key || HCAPTCHA_SITE_KEY}`.trim();
-    if (!siteKey || !publicHcaptchaRef.current) {
+    const config = getCaptchaConfig();
+    if (!config.prefix || !config.sceneId || !publicCaptchaRef.current) {
       return null;
     }
-
-    await ensureHcaptchaScript();
-    if (
-      publicHcaptchaWidgetRef.current !== null &&
-      publicHcaptchaMountRef.current === publicHcaptchaRef.current &&
-      publicHcaptchaThemeRef.current === resolvedTheme
-    ) {
-      return publicHcaptchaWidgetRef.current;
+    const configKey = `${config.region}:${config.prefix}:${config.sceneId}`;
+    if (publicCaptchaInstanceRef.current && publicCaptchaConfigRef.current === configKey) {
+      return publicCaptchaInstanceRef.current;
     }
 
-    if (publicHcaptchaWidgetRef.current !== null) {
-      try {
-        window.hcaptcha.remove(publicHcaptchaWidgetRef.current);
-      } catch (_) {
-        // ignore
-      }
-      publicHcaptchaWidgetRef.current = null;
-    }
-
-    publicHcaptchaWidgetRef.current = window.hcaptcha.render(publicHcaptchaRef.current, {
-      sitekey: siteKey,
-      theme: resolvedTheme === 'dark' ? 'dark' : 'light',
+    await waitForAliyunCaptchaReady(config);
+    destroyCaptchaInstance(publicCaptchaInstanceRef);
+    publicCaptchaTokenRef.current = '';
+    publicCaptchaRef.current.innerHTML = '';
+    window.initAliyunCaptcha({
+      SceneId: config.sceneId,
+      mode: 'embed',
+      element: '#aliyun-register-captcha',
+      slideStyle: { width: 360, height: 40 },
+      success: (captchaVerifyParam) => {
+        publicCaptchaTokenRef.current = captchaVerifyParam;
+      },
+      fail: () => {
+        publicCaptchaTokenRef.current = '';
+      },
+      getInstance: (instance) => {
+        publicCaptchaInstanceRef.current = instance;
+      },
     });
-    publicHcaptchaMountRef.current = publicHcaptchaRef.current;
-    publicHcaptchaThemeRef.current = resolvedTheme;
-    return publicHcaptchaWidgetRef.current;
+    publicCaptchaConfigRef.current = configKey;
+    return publicCaptchaInstanceRef.current;
   }
 
   const mountPublicCaptcha = useCallback(() => {
@@ -748,10 +811,7 @@ function App() {
   }, [publicConfig]);
 
   function getPublicCaptchaToken() {
-    if (!window.hcaptcha || publicHcaptchaWidgetRef.current === null) {
-      throw new Error('请先完成人机验证');
-    }
-    const token = window.hcaptcha.getResponse(publicHcaptchaWidgetRef.current);
+    const token = publicCaptchaTokenRef.current;
     if (!token) {
       throw new Error('请先完成人机验证');
     }
@@ -759,75 +819,76 @@ function App() {
   }
 
   function resetPublicCaptcha() {
-    if (window.hcaptcha && publicHcaptchaWidgetRef.current !== null) {
-      window.hcaptcha.reset(publicHcaptchaWidgetRef.current);
+    destroyCaptchaInstance(publicCaptchaInstanceRef);
+    publicCaptchaTokenRef.current = '';
+    publicCaptchaConfigRef.current = '';
+    if (publicCaptchaRef.current) {
+      publicCaptchaRef.current.innerHTML = '';
     }
+    window.setTimeout(() => void ensurePublicCaptchaWidget(), 0);
   }
 
-  async function ensureBackgroundCaptchaWidget() {
-    const siteKey = `${publicConfig?.captcha?.site_key || HCAPTCHA_SITE_KEY}`.trim();
-    if (!siteKey || !backgroundHcaptchaContainerRef.current) {
-      return null;
+  async function executeBackgroundCaptcha(configOverride = {}) {
+    const config = getCaptchaConfig(configOverride);
+    if (!config.prefix || !config.sceneId || !backgroundCaptchaContainerRef.current) {
+      throw new Error('当前未配置阿里云验证码');
     }
-
-    await ensureHcaptchaScript();
-    if (backgroundHcaptchaWidgetRef.current !== null) {
-      return backgroundHcaptchaWidgetRef.current;
-    }
-
-    backgroundHcaptchaWidgetRef.current = window.hcaptcha.render(backgroundHcaptchaContainerRef.current, {
-      sitekey: siteKey,
-      size: 'invisible',
-      callback: (token) => {
-        const pending = backgroundHcaptchaPromiseRef.current;
-        if (!pending) {
-          return;
-        }
-        backgroundHcaptchaPromiseRef.current = null;
-        pending.resolve(token);
-      },
-      'error-callback': () => {
-        const pending = backgroundHcaptchaPromiseRef.current;
-        if (!pending) {
-          return;
-        }
-        backgroundHcaptchaPromiseRef.current = null;
-        pending.reject(new Error('人机验证失败，请重试。'));
-      },
-      'expired-callback': () => {
-        const pending = backgroundHcaptchaPromiseRef.current;
-        if (!pending) {
-          return;
-        }
-        backgroundHcaptchaPromiseRef.current = null;
-        pending.reject(new Error('人机验证已过期，请重试。'));
-      },
-    });
-    return backgroundHcaptchaWidgetRef.current;
-  }
-
-  async function executeBackgroundCaptcha() {
-    const widgetId = await ensureBackgroundCaptchaWidget();
-    if (widgetId === null || !window.hcaptcha) {
-      throw new Error('当前未配置 hCaptcha');
-    }
-    if (backgroundHcaptchaPromiseRef.current) {
+    if (backgroundCaptchaPromiseRef.current) {
       throw new Error('人机验证正在处理中，请稍后再试。');
     }
+    await waitForAliyunCaptchaReady(config);
+
+    destroyCaptchaInstance(backgroundCaptchaInstanceRef);
+    backgroundCaptchaContainerRef.current.innerHTML = '';
     return new Promise((resolve, reject) => {
-      backgroundHcaptchaPromiseRef.current = { resolve, reject };
+      const timer = window.setTimeout(() => {
+        backgroundCaptchaPromiseRef.current = null;
+        reject(new Error('人机验证已超时，请重试。'));
+      }, 120000);
+      const finish = (callback, value) => {
+        const pending = backgroundCaptchaPromiseRef.current;
+        if (!pending) {
+          return;
+        }
+        window.clearTimeout(pending.timer);
+        if (pending.triggerTimer) {
+          window.clearTimeout(pending.triggerTimer);
+        }
+        backgroundCaptchaPromiseRef.current = null;
+        callback(value);
+      };
+      backgroundCaptchaPromiseRef.current = { resolve, reject, timer, triggerTimer: null };
       try {
-        window.hcaptcha.execute(widgetId);
+        window.initAliyunCaptcha({
+          SceneId: config.sceneId,
+          mode: 'popup',
+          element: '#aliyun-background-captcha',
+          button: '#aliyun-background-captcha-trigger',
+          slideStyle: { width: 360, height: 40 },
+          success: (captchaVerifyParam) => finish(resolve, captchaVerifyParam),
+          fail: () => {},
+          close: () => finish(reject, new Error('人机验证已取消。')),
+          getInstance: (instance) => {
+            backgroundCaptchaInstanceRef.current = instance;
+            const pending = backgroundCaptchaPromiseRef.current;
+            if (!pending || pending.triggerTimer) {
+              return;
+            }
+            pending.triggerTimer = window.setTimeout(() => {
+              backgroundCaptchaButtonRef.current?.click();
+            }, 2100);
+          },
+        });
       } catch (error) {
-        backgroundHcaptchaPromiseRef.current = null;
-        reject(error instanceof Error ? error : new Error('请先完成人机验证'));
+        finish(reject, error instanceof Error ? error : new Error('人机验证加载失败。'));
       }
     });
   }
 
   function resetBackgroundCaptcha() {
-    if (window.hcaptcha && backgroundHcaptchaWidgetRef.current !== null) {
-      window.hcaptcha.reset(backgroundHcaptchaWidgetRef.current);
+    destroyCaptchaInstance(backgroundCaptchaInstanceRef);
+    if (backgroundCaptchaContainerRef.current) {
+      backgroundCaptchaContainerRef.current.innerHTML = '';
     }
   }
 
@@ -920,11 +981,17 @@ function App() {
     event.preventDefault();
     setLoading(true);
     try {
-      const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
+      const email = loginForm.email.trim();
+      // The backend only grants this bypass after validating both the password
+      // and the one-time bootstrap state. Reserved local admins must be able to
+      // reach that check before Captcha has been configured in the admin UI.
+      const captchaToken = hasConfiguredCaptcha() && !isBootstrapLoginEmail(email)
+        ? await executeBackgroundCaptcha()
+        : undefined;
       const data = await api('/api/v1/auth/password-factors', {
         method: 'POST',
         body: {
-          email: loginForm.email.trim(),
+          email,
           password: loginForm.password,
           ...(captchaToken ? { captcha_token: captchaToken } : {}),
         },
@@ -933,7 +1000,7 @@ function App() {
         const payload = await api('/api/v1/auth/login', {
           method: 'POST',
           body: {
-            email: loginForm.email.trim(),
+            email,
             password: loginForm.password,
           },
         });
@@ -1095,7 +1162,7 @@ function App() {
     }
   }, [loginForm.email, loginMethod, selectedPasswordFactor]);
 
-  function onLoginSuccess(payload) {
+  function onLoginSuccess(payload, { deferRedirect = false } = {}) {
     setSession({ user: payload.user, security: payload.security || {} });
     setStatus(`已登录：${payload.user?.email || ''}`);
     setLoginMethod('phone_code');
@@ -1113,7 +1180,7 @@ function App() {
     if (!(payload.security?.must_bind_email)) {
       void Promise.allSettled([loadSystemConfig(), loadOidcClients()]);
     }
-    if (pendingAuthRedirect && payload.post_register_passkey_bootstrap !== true) {
+    if (!deferRedirect && pendingAuthRedirect && payload.post_register_passkey_bootstrap !== true) {
       window.location.replace(pendingAuthRedirect);
       return;
     }
@@ -1143,7 +1210,8 @@ function App() {
               password: registerForm.password,
             },
           });
-      onLoginSuccess(payload);
+      const registrationPassword = registerForm.password;
+      onLoginSuccess(payload, { deferRedirect: true });
       setRegisterForm({
         email: '',
         email_code: '',
@@ -1154,9 +1222,10 @@ function App() {
       });
       setPostRegisterPasskeyError('');
       setPostRegisterMethod(registerMethod);
-      setPostRegisterPasskeyPromptOpen(
-        payload.post_register_passkey_bootstrap === true,
-      );
+      setPostRegisterBindingPassword(registrationPassword);
+      setPostRegisterPasskeyPending(payload.post_register_passkey_bootstrap === true);
+      setPostRegisterPasskeyPromptOpen(false);
+      setPostRegisterBindingPromptOpen(true);
     } catch (error) {
       showToast(getAuthErrorMessage(error, 'register'), 'error');
     } finally {
@@ -1255,6 +1324,26 @@ function App() {
       body: payload,
     });
     redirectToLoginWithToast('手机号绑定成功，请重新登录。');
+    return result;
+  }
+
+  async function bindEmailPostRegister(payload) {
+    const result = await api('/api/v1/me/bind-email', {
+      method: 'POST',
+      auth: true,
+      body: payload,
+    });
+    await tryLoadMe();
+    return result;
+  }
+
+  async function bindPhonePostRegister(payload) {
+    const result = await api('/api/v1/me/bind-phone', {
+      method: 'POST',
+      auth: true,
+      body: payload,
+    });
+    await tryLoadMe();
     return result;
   }
 
@@ -1413,13 +1502,18 @@ function App() {
       return;
     }
     try {
+      const captchaSceneId = validatedAliyunCaptchaSceneId(
+        systemForm.aliyun_captcha_scene_id,
+      );
       await api('/api/v1/admin/settings', {
         method: 'PUT',
         auth: true,
         body: {
           security: {
-            hcaptcha_site_key: systemForm.hcaptcha_site_key || '',
-            hcaptcha_secret: systemForm.hcaptcha_secret || '',
+            aliyun_captcha_prefix: systemForm.aliyun_captcha_prefix || '',
+            aliyun_captcha_scene_id: captchaSceneId,
+            aliyun_captcha_access_key_id: systemForm.aliyun_captcha_access_key_id || '',
+            aliyun_captcha_access_key_secret: systemForm.aliyun_captcha_access_key_secret || '',
             phone_verification_enabled: Boolean(systemForm.phone_verification_enabled ?? true),
             phone_sms_access_key_id: systemForm.phone_sms_access_key_id || '',
             phone_sms_access_key_secret: systemForm.phone_sms_access_key_secret || '',
@@ -1450,13 +1544,18 @@ function App() {
 
   async function testSmtpConnection() {
     try {
+      const captchaSceneId = validatedAliyunCaptchaSceneId(
+        systemForm.aliyun_captcha_scene_id,
+      );
       await api('/api/v1/admin/settings', {
         method: 'PUT',
         auth: true,
         body: {
           security: {
-            hcaptcha_site_key: systemForm.hcaptcha_site_key || '',
-            hcaptcha_secret: systemForm.hcaptcha_secret || '',
+            aliyun_captcha_prefix: systemForm.aliyun_captcha_prefix || '',
+            aliyun_captcha_scene_id: captchaSceneId,
+            aliyun_captcha_access_key_id: systemForm.aliyun_captcha_access_key_id || '',
+            aliyun_captcha_access_key_secret: systemForm.aliyun_captcha_access_key_secret || '',
             phone_verification_enabled: Boolean(systemForm.phone_verification_enabled ?? true),
             phone_sms_access_key_id: systemForm.phone_sms_access_key_id || '',
             phone_sms_access_key_secret: systemForm.phone_sms_access_key_secret || '',
@@ -1489,30 +1588,43 @@ function App() {
     }
   }
 
-  async function testHcaptchaConnection() {
+  async function testAliyunCaptchaConnection() {
     try {
+      const sceneId = validatedAliyunCaptchaSceneId(
+        systemForm.aliyun_captcha_scene_id,
+        { required: true },
+      );
       await api('/api/v1/admin/settings', {
         method: 'PUT',
         auth: true,
         body: {
           security: {
-            hcaptcha_site_key: systemForm.hcaptcha_site_key || '',
-            hcaptcha_secret: systemForm.hcaptcha_secret || '',
+            aliyun_captcha_prefix: systemForm.aliyun_captcha_prefix || '',
+            aliyun_captcha_scene_id: sceneId,
+            aliyun_captcha_access_key_id: systemForm.aliyun_captcha_access_key_id || '',
+            aliyun_captcha_access_key_secret: systemForm.aliyun_captcha_access_key_secret || '',
           },
           registration: {
             require_email_verification: Boolean(systemForm.registration_email_verify),
           },
         },
       });
-      const result = await api('/api/v1/admin/settings/hcaptcha-test', {
+      const captchaToken = await executeBackgroundCaptcha({
+        prefix: systemForm.aliyun_captcha_prefix,
+        sceneId,
+      });
+      const result = await api('/api/v1/admin/settings/aliyun-captcha-test', {
         method: 'POST',
         auth: true,
+        body: { captcha_token: captchaToken },
       });
-      showToast(result.message || 'hCaptcha 连接验证成功。', 'success');
+      showToast(result.message || '阿里云验证码连接验证成功。', 'success');
       await loadSystemConfig();
       await loadPublicConfig();
     } catch (error) {
-      showToast(error.message || 'hCaptcha 连接验证失败。', 'error');
+      showToast(error.message || '阿里云验证码连接验证失败。', 'error');
+    } finally {
+      resetBackgroundCaptcha();
     }
   }
 
@@ -1743,9 +1855,17 @@ function App() {
   return (
     <>
       <div
-        ref={backgroundHcaptchaContainerRef}
+        ref={backgroundCaptchaContainerRef}
+        id="aliyun-background-captcha"
         aria-hidden="true"
-        style={{ position: 'fixed', left: '-9999px', top: '0', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+      />
+      <button
+        ref={backgroundCaptchaButtonRef}
+        id="aliyun-background-captcha-trigger"
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{ position: 'fixed', left: '-9999px', top: 0, width: 1, height: 1, opacity: 0 }}
       />
       <BrowserRouter>
       {toast && (
@@ -1753,6 +1873,65 @@ function App() {
           {toast.message}
         </div>
       )}
+        <PostRegisterBindingPrompt
+          open={postRegisterBindingPromptOpen}
+          registrationMethod={postRegisterMethod}
+          onSendCode={async (account) => {
+            try {
+              const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
+              const bindingPhone = postRegisterMethod === 'email';
+              const result = await api(
+                bindingPhone ? '/api/v1/me/send-bind-phone-code' : '/api/v1/me/send-bind-email-code',
+                {
+                  method: 'POST',
+                  auth: true,
+                  body: {
+                    ...(bindingPhone ? { phone_number: account } : { email: account }),
+                    current_password: postRegisterBindingPassword,
+                    ...(captchaToken ? { captcha_token: captchaToken } : {}),
+                  },
+                },
+              );
+              showToast(bindingPhone ? '验证码已发送，请注意查收短信。' : '验证码已发送，请注意查收邮箱。', 'success');
+              return result;
+            } finally {
+              resetBackgroundCaptcha();
+            }
+          }}
+          onConfirm={async (account, code) => {
+            const bindingPhone = postRegisterMethod === 'email';
+            if (bindingPhone) {
+              await bindPhonePostRegister({
+                phone_number: account,
+                current_password: postRegisterBindingPassword,
+                verify_code: code,
+              });
+            } else {
+              await bindEmailPostRegister({
+                email: account,
+                current_password: postRegisterBindingPassword,
+                email_code: code,
+              });
+            }
+            setPostRegisterBindingPromptOpen(false);
+            setPostRegisterBindingPassword('');
+            if (postRegisterPasskeyPending) {
+              setPostRegisterPasskeyPromptOpen(true);
+            } else if (pendingAuthRedirect) {
+              window.location.replace(pendingAuthRedirect);
+            }
+            showToast(bindingPhone ? '手机号绑定成功' : '邮箱绑定成功', 'success');
+          }}
+          onSkip={() => {
+            setPostRegisterBindingPromptOpen(false);
+            setPostRegisterBindingPassword('');
+            if (postRegisterPasskeyPending) {
+              setPostRegisterPasskeyPromptOpen(true);
+            } else if (pendingAuthRedirect) {
+              window.location.replace(pendingAuthRedirect);
+            }
+          }}
+        />
         <PostRegisterPasskeyPrompt
           open={postRegisterPasskeyPromptOpen}
           registrationMethod={postRegisterMethod}
@@ -1805,8 +1984,9 @@ function App() {
         registerCodeCooldownRemaining={registerCodeCooldownRemaining}
         submitRegister={submitRegister}
         submitRegisterCode={submitRegisterCode}
-        publicHcaptchaRef={publicHcaptchaRef}
+        publicCaptchaRef={publicCaptchaRef}
         publicConfig={publicConfig}
+        captchaConfigured={hasConfiguredCaptcha()}
         mountPublicCaptcha={mountPublicCaptcha}
         sendRecoveryCode={sendRecoveryCode}
         resetPasswordByCode={resetPasswordByCode}
@@ -1830,7 +2010,7 @@ function App() {
         setSystemForm={setSystemForm}
         saveServiceConfig={saveServiceConfig}
         testSmtpConnection={testSmtpConnection}
-        testHcaptchaConnection={testHcaptchaConnection}
+        testAliyunCaptchaConnection={testAliyunCaptchaConnection}
         testPhoneSmsConnection={testPhoneSmsConnection}
         users={users}
         usersPagination={usersPagination}

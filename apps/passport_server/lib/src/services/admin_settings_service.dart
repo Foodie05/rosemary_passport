@@ -26,7 +26,8 @@ class AdminSettingsService {
     final security = await _policyService.mergedSecuritySettings();
     final registration = await _settingsRepository.getJson('registration');
     final smtpPassword = (smtp['password'] ?? '').toString();
-    final captchaSecret = (security['hcaptcha_secret'] ?? '').toString();
+    final captchaAccessKeySecret =
+        (security['aliyun_captcha_access_key_secret'] ?? '').toString();
     return {
       'smtp': {
         ...smtp,
@@ -35,23 +36,26 @@ class AdminSettingsService {
       },
       'security': {
         ...security,
-        'hcaptcha_secret': '',
-        'hcaptcha_secret_configured': captchaSecret.trim().isNotEmpty,
+        'aliyun_captcha_access_key_secret': '',
+        'aliyun_captcha_access_key_secret_configured': captchaAccessKeySecret
+            .trim()
+            .isNotEmpty,
         'phone_verification_enabled':
             (security['phone_verification_enabled'] ?? true) == true,
-        'phone_sms_access_key_id':
-            (security['phone_sms_access_key_id'] ?? '').toString(),
+        'phone_sms_access_key_id': (security['phone_sms_access_key_id'] ?? '')
+            .toString(),
         'phone_sms_access_key_secret': '',
         'phone_sms_access_key_secret_configured':
             (security['phone_sms_access_key_secret'] ?? '')
                 .toString()
                 .trim()
                 .isNotEmpty,
-        'phone_sms_sign_name': (security['phone_sms_sign_name'] ?? '').toString(),
-        'phone_sms_template_code':
-            (security['phone_sms_template_code'] ?? '').toString(),
-        'phone_sms_scheme_name':
-            (security['phone_sms_scheme_name'] ?? '').toString(),
+        'phone_sms_sign_name': (security['phone_sms_sign_name'] ?? '')
+            .toString(),
+        'phone_sms_template_code': (security['phone_sms_template_code'] ?? '')
+            .toString(),
+        'phone_sms_scheme_name': (security['phone_sms_scheme_name'] ?? '')
+            .toString(),
       },
       'registration': registration,
       'oidc': {
@@ -69,7 +73,13 @@ class AdminSettingsService {
         'pkce_required': _config.oidcRequirePkce,
         'response_types_supported': ['code'],
         'grant_types_supported': ['authorization_code', 'refresh_token'],
-        'scopes_supported': ['openid', 'profile', 'email', 'phone', 'accountRule'],
+        'scopes_supported': [
+          'openid',
+          'profile',
+          'email',
+          'phone',
+          'accountRule',
+        ],
         'token_endpoint_auth_methods_supported': ['client_secret_post', 'none'],
         'id_token_signing_alg_values_supported': ['RS256'],
       },
@@ -93,9 +103,23 @@ class AdminSettingsService {
       final nextSecurity = Map<String, dynamic>.from(
         payload['security'] as Map<String, dynamic>,
       );
-      if ((nextSecurity['hcaptcha_secret'] ?? '').toString().isEmpty &&
-          (current['hcaptcha_secret'] ?? '').toString().isNotEmpty) {
-        nextSecurity.remove('hcaptcha_secret');
+      final submittedSceneId = nextSecurity['aliyun_captcha_scene_id'];
+      if (submittedSceneId != null) {
+        final sceneId = submittedSceneId.toString().trim();
+        if (sceneId.isNotEmpty && !RegExp(r'^[a-z0-9]+$').hasMatch(sceneId)) {
+          throw const FormatException(
+            '场景 ID 只能填写验证码 2.0 控制台显示的小写字母和数字，不要包含场景名称。',
+          );
+        }
+        nextSecurity['aliyun_captcha_scene_id'] = sceneId;
+      }
+      if ((nextSecurity['aliyun_captcha_access_key_secret'] ?? '')
+              .toString()
+              .isEmpty &&
+          (current['aliyun_captcha_access_key_secret'] ?? '')
+              .toString()
+              .isNotEmpty) {
+        nextSecurity.remove('aliyun_captcha_access_key_secret');
       }
       if ((nextSecurity['phone_sms_access_key_secret'] ?? '')
               .toString()
@@ -166,13 +190,45 @@ class AdminSettingsService {
     }
   }
 
-  Future<Map<String, dynamic>> testHcaptchaConnection() async {
+  Future<Map<String, dynamic>> testAliyunCaptchaConnection(String token) async {
     final security = await _settingsRepository.getJson('security');
-    final siteKey = (security['hcaptcha_site_key'] ?? '').toString().trim();
-    if (siteKey.isEmpty) {
-      return {'ok': false, 'message': 'hCaptcha Site Key 未配置。'};
+    String configured(String key, String fallback) {
+      final value = (security[key] ?? '').toString().trim();
+      return value.isNotEmpty ? value : fallback;
     }
-    return _captchaService.verifyCaptchaConfiguration();
+
+    final prefix = configured(
+      'aliyun_captcha_prefix',
+      _config.aliyunCaptchaPrefix,
+    );
+    final sceneId = configured(
+      'aliyun_captcha_scene_id',
+      _config.aliyunCaptchaSceneId,
+    );
+    final accessKeyId = configured(
+      'aliyun_captcha_access_key_id',
+      configured('phone_sms_access_key_id', _config.aliyunCaptchaAccessKeyId),
+    );
+    final accessKeySecret = configured(
+      'aliyun_captcha_access_key_secret',
+      configured(
+        'phone_sms_access_key_secret',
+        _config.aliyunCaptchaAccessKeySecret,
+      ),
+    );
+    if (prefix.isEmpty ||
+        sceneId.isEmpty ||
+        accessKeyId.isEmpty ||
+        accessKeySecret.isEmpty) {
+      return {'ok': false, 'message': '请先完整配置阿里云验证码 Prefix、场景 ID 和 AccessKey。'};
+    }
+    if (!RegExp(r'^[a-z0-9]+$').hasMatch(sceneId)) {
+      return {
+        'ok': false,
+        'message': '场景 ID 只能填写验证码 2.0 控制台显示的小写字母和数字，不要包含场景名称。',
+      };
+    }
+    return _captchaService.verifyCaptchaConfiguration(token: token);
   }
 
   Future<Map<String, dynamic>> testPhoneSmsConfig() async {
@@ -181,13 +237,16 @@ class AdminSettingsService {
     if (!enabled) {
       return {'ok': false, 'message': '手机号验证码功能已关闭。'};
     }
-    final accessKeyId =
-        (security['phone_sms_access_key_id'] ?? '').toString().trim();
-    final accessKeySecret =
-        (security['phone_sms_access_key_secret'] ?? '').toString().trim();
+    final accessKeyId = (security['phone_sms_access_key_id'] ?? '')
+        .toString()
+        .trim();
+    final accessKeySecret = (security['phone_sms_access_key_secret'] ?? '')
+        .toString()
+        .trim();
     final signName = (security['phone_sms_sign_name'] ?? '').toString().trim();
-    final templateCode =
-        (security['phone_sms_template_code'] ?? '').toString().trim();
+    final templateCode = (security['phone_sms_template_code'] ?? '')
+        .toString()
+        .trim();
     if (accessKeyId.isEmpty ||
         accessKeySecret.isEmpty ||
         signName.isEmpty ||

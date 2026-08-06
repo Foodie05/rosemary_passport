@@ -90,13 +90,13 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
   );
 
   return (
-    <div className="flex min-h-screen bg-sage-50">
-      <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r border-sage-200 bg-white/50 p-6 backdrop-blur-xl lg:flex">
+    <div className="flex min-h-dvh bg-sage-50">
+      <aside className="sticky top-0 hidden h-dvh w-64 flex-col overflow-y-auto border-r border-sage-200 bg-white/50 p-6 backdrop-blur-xl lg:flex">
         {sidebar}
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-sage-200 bg-white/50 px-6 backdrop-blur-md">
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-sage-200 bg-white/50 px-4 py-2 backdrop-blur-md sm:px-6">
           <div className="flex items-center gap-4 lg:hidden">
             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-sage-600" type="button">
               <Menu size={24} />
@@ -129,7 +129,7 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-7xl p-6 lg:p-10">
+        <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-10">
           <Outlet />
         </div>
       </main>
@@ -149,9 +149,9 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 z-50 w-72 bg-white p-6 shadow-2xl lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,calc(100vw-2rem))] flex-col overflow-y-auto bg-white p-5 shadow-2xl lg:hidden"
             >
-              <div className="mb-10 flex items-center justify-between">
+              <div className="mb-8 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-600 text-white">
                     <Shield size={24} />
@@ -162,7 +162,7 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
                   <X size={24} />
                 </button>
               </div>
-              <div className="flex h-full flex-col">
+              <div className="flex min-h-0 flex-1 flex-col">
                 <div className="mb-4">
                   <ThemeToggle className="w-full justify-center" />
                 </div>
@@ -196,15 +196,15 @@ export function UserLayout({ session, logout }) {
   const displayName = cleanDisplayName(session.user?.nickname, session.user?.email || 'User');
 
   return (
-    <div className="flex min-h-screen flex-col bg-sage-50">
-      <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-sage-200 bg-white/70 px-6 backdrop-blur-md">
+    <div className="flex min-h-dvh flex-col bg-sage-50">
+      <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-sage-200 bg-white/70 px-4 py-2 backdrop-blur-md sm:px-6">
         <div className="flex cursor-pointer items-center gap-2" onClick={() => navigate('/account')}>
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sage-600 text-white">
             <Fingerprint size={18} />
           </div>
           <span className="font-bold tracking-tight text-sage-900">ROSM Pass</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle className="hidden md:inline-flex" />
           <span className="hidden text-sm font-medium text-sage-600 sm:block">{displayName}</span>
           <button
@@ -222,10 +222,10 @@ export function UserLayout({ session, logout }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-6 lg:p-10">
+      <main className="mx-auto w-full max-w-5xl flex-1 p-4 sm:p-6 lg:p-10">
         <Outlet />
       </main>
-      <footer className="border-t border-sage-200 bg-white/30 py-8 text-center text-sm text-sage-400">
+      <footer className="border-t border-sage-200 bg-white/30 px-4 py-6 text-center text-sm text-sage-400 sm:py-8">
         <p>© 2026 ROSM 通行证 · 单点登录系统</p>
       </footer>
     </div>

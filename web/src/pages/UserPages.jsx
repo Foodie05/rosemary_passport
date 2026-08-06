@@ -23,16 +23,18 @@ function StatusBadge({ ready, readyLabel = '已设置', pendingLabel = '待完�
 
 function Modal({ title, children, onClose, actions }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-sage-900/20 p-6 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-lg rounded-[2rem] p-8 shadow-2xl shadow-sage-900/10">
-        <div className="mb-6 flex items-center justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-sage-900/20 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+      <div className="glass-card my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-3xl shadow-2xl shadow-sage-900/10 sm:max-h-[calc(100dvh-3rem)] sm:rounded-[2rem]">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-sage-100 px-5 py-4 sm:px-8 sm:py-5">
           <h3 className="text-xl font-bold text-sage-900">{title}</h3>
           <button type="button" onClick={onClose} className="rounded-xl px-3 py-2 text-sm font-medium text-sage-500 hover:bg-sage-100 hover:text-sage-900">
             关闭
           </button>
         </div>
-        <div className="space-y-5">{children}</div>
-        <div className="mt-8 flex justify-end gap-3">{actions}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
+          <div className="space-y-5">{children}</div>
+        </div>
+        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-sage-100 px-5 py-4 [&>*]:w-full sm:flex-row sm:justify-end sm:px-8 sm:[&>*]:w-auto">{actions}</div>
       </div>
     </div>
   );
@@ -403,9 +405,9 @@ export function UserAccountPage({
   }
 
   return (
-    <div className="space-y-10 py-6">
-      <div className="flex flex-col gap-8 rounded-[2.5rem] border border-white/50 bg-white/40 p-8 shadow-sm md:flex-row md:items-center">
-        <div className="flex h-32 w-32 items-center justify-center rounded-[2.5rem] border-4 border-white bg-sage-200 text-4xl font-bold text-sage-700 shadow-xl">
+    <div className="space-y-7 py-2 sm:space-y-10 sm:py-6">
+      <div className="flex flex-col items-center gap-5 rounded-3xl border border-white/50 bg-white/40 p-5 shadow-sm sm:gap-8 sm:p-8 md:flex-row md:items-center md:rounded-[2.5rem]">
+        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border-4 border-white bg-sage-200 text-3xl font-bold text-sage-700 shadow-xl sm:h-32 sm:w-32 sm:rounded-[2.5rem] sm:text-4xl">
           {(session.user?.email || 'R').charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 space-y-4 text-center md:text-left">
@@ -413,7 +415,7 @@ export function UserAccountPage({
             {editingNickname ? (
               <input
                 ref={nicknameRef}
-                className="w-full max-w-xl border-none bg-transparent p-0 text-3xl font-bold text-sage-900 focus:outline-none"
+                className="w-full max-w-xl border-none bg-transparent p-0 text-2xl font-bold text-sage-900 focus:outline-none sm:text-3xl"
                 value={nickname}
                 onChange={(event) => setNickname(event.target.value)}
                 onBlur={() => void handleNicknameBlur()}
@@ -424,14 +426,14 @@ export function UserAccountPage({
                 }}
               />
             ) : (
-              <button type="button" onClick={() => setEditingNickname(true)} className="text-left text-3xl font-bold text-sage-900">
+              <button type="button" onClick={() => setEditingNickname(true)} className="text-center text-2xl font-bold text-sage-900 sm:text-3xl md:text-left">
                 {displayName}
               </button>
             )}
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sage-500">
-              <span>UID: {session.user?.id || '-'}</span>
-              <span>·</span>
-              <button type="button" onClick={() => setBindModalOpen(true)} className="font-medium text-sage-600 hover:text-sage-900">
+            <div className="mt-3 flex min-w-0 flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sage-500 md:justify-start">
+              <span className="max-w-full break-all">UID: {session.user?.id || '-'}</span>
+              <span aria-hidden="true">·</span>
+              <button type="button" onClick={() => setBindModalOpen(true)} className="max-w-full break-all font-medium text-sage-600 hover:text-sage-900">
                 {session.user?.email || '-'}
               </button>
             </div>
@@ -453,34 +455,34 @@ export function UserAccountPage({
               <h3 className="text-sm font-bold uppercase tracking-wider text-sage-400">基础操作</h3>
             </div>
             <div className="glass-card overflow-hidden rounded-3xl">
-              <div className="flex items-center justify-between gap-4 p-5">
-                <div>
+              <div className="flex flex-col items-stretch gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-tight text-sage-400">重置密码</p>
                   <p className="mt-0.5 text-sm font-semibold text-sage-900">通过邮箱验证码重置当前账户密码</p>
                 </div>
-                <button type="button" onClick={() => setResetModalOpen(true)} className="btn-primary px-4 py-2.5">
+                <button type="button" onClick={() => setResetModalOpen(true)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
                   重置密码
                 </button>
               </div>
             </div>
             <div className="glass-card overflow-hidden rounded-3xl">
-              <div className="flex items-center justify-between gap-4 p-5">
-                <div>
+              <div className="flex flex-col items-stretch gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-tight text-sage-400">系统通行密钥</p>
                   <p className="mt-0.5 text-sm font-semibold text-sage-900">连接浏览器和操作系统的 WebAuthn 服务，使用指纹、人脸或设备凭据完成验证</p>
                 </div>
-                <button type="button" onClick={() => setPasskeyModalOpen(true)} className="btn-primary px-4 py-2.5">
+                <button type="button" onClick={() => setPasskeyModalOpen(true)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
                   {hasPasskey ? '管理通行密钥' : '连接通行密钥'}
                 </button>
               </div>
             </div>
             <div className="glass-card overflow-hidden rounded-3xl">
-              <div className="flex items-center justify-between gap-4 p-5">
-                <div>
+              <div className="flex flex-col items-stretch gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-tight text-sage-400">Authenticator 验证器</p>
                   <p className="mt-0.5 text-sm font-semibold text-sage-900">连接 Google Authenticator、1Password 或其他 TOTP 应用作为动态口令验证方式</p>
                 </div>
-                <button type="button" onClick={() => setAuthenticatorModalOpen(true)} className="btn-primary px-4 py-2.5">
+                <button type="button" onClick={() => setAuthenticatorModalOpen(true)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
                   {hasAuthenticator ? '更新验证器' : '设置验证器'}
                 </button>
               </div>
@@ -498,7 +500,7 @@ export function UserAccountPage({
                 : '如需更换绑定邮箱，可通过邮箱验证码完成验证与绑定。'}
             </p>
             <div className="mt-6 flex justify-end">
-              <div className="flex gap-3">
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                 <button type="button" onClick={() => setBindModalOpen(true)} className="btn-primary px-4 py-2.5">
                   绑定邮箱
                 </button>
@@ -529,13 +531,13 @@ export function UserAccountPage({
                 <span className="text-sm text-sage-600">Authenticator 验证器</span>
                 <StatusBadge ready={hasAuthenticator} readyLabel="已连接" pendingLabel="未连接" />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex min-w-0 items-center justify-between gap-3">
                 <span className="text-sm text-sage-600">当前邮箱</span>
-                <span className="max-w-[180px] truncate text-sm font-semibold text-sage-900">{session.user?.email || '-'}</span>
+                <span className="min-w-0 truncate text-right text-sm font-semibold text-sage-900">{session.user?.email || '-'}</span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex min-w-0 items-center justify-between gap-3">
                 <span className="text-sm text-sage-600">当前手机号</span>
-                <span className="max-w-[180px] truncate text-sm font-semibold text-sage-900">{session.user?.phone_number || '-'}</span>
+                <span className="min-w-0 truncate text-right text-sm font-semibold text-sage-900">{session.user?.phone_number || '-'}</span>
               </div>
             </div>
           </div>
@@ -675,7 +677,7 @@ export function UserAccountPage({
                 <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4 text-sm text-sage-500">读取中...</div>
               ) : passkeyCredentials.length ? (
                 passkeyCredentials.map((credential) => (
-                  <div key={credential.credential_id} className="flex items-center justify-between gap-4 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+                  <div key={credential.credential_id} className="flex flex-col items-stretch gap-4 rounded-2xl border border-sage-100 bg-sage-50/70 p-4 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-sage-900">
                         {credential.device_type === 'platform' ? '本机设备通行密钥' : '外部设备通行密钥'}
@@ -743,7 +745,7 @@ export function UserAccountPage({
           </div>
           {authenticatorSecret ? (
             <div className="space-y-4 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
-              {authenticatorQrDataUrl ? <img src={authenticatorQrDataUrl} alt="Authenticator QR" className="h-40 w-40 rounded-xl border border-sage-100 bg-white p-2" /> : null}
+              {authenticatorQrDataUrl ? <img src={authenticatorQrDataUrl} alt="Authenticator QR" className="aspect-square h-auto w-40 max-w-full rounded-xl border border-sage-100 bg-white p-2" /> : null}
               <div className="space-y-1 text-sm text-sage-600">
                 <p className="font-semibold text-sage-900">手动输入密钥</p>
                 <p className="break-all font-mono text-xs text-sage-700">{authenticatorSecret}</p>

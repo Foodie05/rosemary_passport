@@ -17,13 +17,24 @@ Future<Response> onRequest(RequestContext context) async {
       : <String, dynamic>{};
 
   final appConfig = context.read<AppConfig>();
-  final siteKey =
-      (security['hcaptcha_site_key'] ?? '').toString().trim().isNotEmpty
-      ? security['hcaptcha_site_key'].toString().trim()
-      : appConfig.hcaptchaSiteKey;
+  String configured(String key, String fallback) {
+    final value = (security[key] ?? '').toString().trim();
+    return value.isNotEmpty ? value : fallback;
+  }
 
   return jsonResponse({
-    'captcha': {'provider': 'hcaptcha', 'site_key': siteKey},
+    'captcha': {
+      'provider': 'aliyun',
+      'prefix': configured(
+        'aliyun_captcha_prefix',
+        appConfig.aliyunCaptchaPrefix,
+      ),
+      'scene_id': configured(
+        'aliyun_captcha_scene_id',
+        appConfig.aliyunCaptchaSceneId,
+      ),
+      'region': appConfig.aliyunCaptchaRegion,
+    },
     'security': {
       'register_code_cooldown_seconds':
           security['register_code_cooldown_seconds'],
@@ -31,7 +42,8 @@ Future<Response> onRequest(RequestContext context) async {
     'registration': settings['registration'] ?? <String, dynamic>{},
     'phone_verification': {
       'enabled': (security['phone_verification_enabled'] ?? true) == true,
-      'country_code': (security['phone_sms_country_code'] ?? '')
+      'country_code':
+          (security['phone_sms_country_code'] ?? '')
               .toString()
               .trim()
               .isNotEmpty

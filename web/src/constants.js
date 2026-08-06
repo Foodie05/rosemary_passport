@@ -1,5 +1,6 @@
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
-export const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || '';
+export const ALIYUN_CAPTCHA_PREFIX = import.meta.env.VITE_ALIYUN_CAPTCHA_PREFIX || '';
+export const ALIYUN_CAPTCHA_SCENE_ID = import.meta.env.VITE_ALIYUN_CAPTCHA_SCENE_ID || '';
 
 export const SECURITY_FIELDS = [
   ['email_code_max_attempts', '验证码最大错误次数'],

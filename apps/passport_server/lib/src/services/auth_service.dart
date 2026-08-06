@@ -1698,6 +1698,7 @@ class AuthService {
     required String newEmail,
     required String currentPassword,
     required String emailCode,
+    String? preservedAccessTokenId,
   }) async {
     final user = await _users.findById(userId);
     if (user == null) {
@@ -1756,7 +1757,10 @@ class AuthService {
     }
 
     await _users.updateEmail(userId: user.id, email: targetEmail);
-    await _revokeAllRefreshTokens(user.id);
+    await _revokeAllRefreshTokens(
+      user.id,
+      preservedAccessTokenId: preservedAccessTokenId,
+    );
     if (await isBootstrapAdmin(user)) {
       await _settings.closeBootstrapLogin(boundEmail: targetEmail);
     }
@@ -1837,6 +1841,7 @@ class AuthService {
     required String currentPassword,
     required String verifyCode,
     String? requestIp,
+    String? preservedAccessTokenId,
   }) async {
     final user = await _users.findById(userId);
     if (user == null) {
@@ -1899,7 +1904,10 @@ class AuthService {
       );
     }
     await _users.updatePhoneNumber(userId: user.id, phoneNumber: normalized);
-    await _revokeAllRefreshTokens(user.id);
+    await _revokeAllRefreshTokens(
+      user.id,
+      preservedAccessTokenId: preservedAccessTokenId,
+    );
     return const EmailActionAttempt.success();
   }
 
@@ -2671,10 +2679,19 @@ class AuthService {
     return email.toLowerCase().trim().endsWith('@rosm.local');
   }
 
-  Future<void> _revokeAllRefreshTokens(String userId) {
+  Future<void> _revokeAllRefreshTokens(
+    String userId, {
+    String? preservedAccessTokenId,
+  }) {
     return Future.wait([
       _oidcRepository.revokeRefreshTokensForUser(userId),
-      _oidcRepository.revokeAccessTokensForUser(userId),
+      if (preservedAccessTokenId == null || preservedAccessTokenId.isEmpty)
+        _oidcRepository.revokeAccessTokensForUser(userId)
+      else
+        _oidcRepository.revokeAccessTokensForUserExcept(
+          userId,
+          preservedAccessTokenId,
+        ),
     ]);
   }
 }

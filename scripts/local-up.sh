@@ -7,7 +7,6 @@ LOCAL_DIR="$ROOT_DIR/.local"
 ENV_FILE="$SERVER_DIR/.env"
 BOOTSTRAP_LOG="$LOCAL_DIR/bootstrap.log"
 ADMIN_CRED_FILE="$LOCAL_DIR/admin_credentials.env"
-FIRST_ADMIN_BOOTSTRAP=0
 
 mkdir -p "$LOCAL_DIR"
 
@@ -115,8 +114,10 @@ REFRESH_TOKEN_TTL_SECONDS=2592000
 ARGON2_MEMORY_KB=8192
 ARGON2_ITERATIONS=2
 ARGON2_PARALLELISM=1
-HCAPTCHA_SECRET=
-HCAPTCHA_SITEKEY=
+ALIYUN_CAPTCHA_PREFIX=
+ALIYUN_CAPTCHA_SCENE_ID=
+ALIYUN_CAPTCHA_ACCESS_KEY_ID=
+ALIYUN_CAPTCHA_ACCESS_KEY_SECRET=
 SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_USER=
@@ -157,7 +158,6 @@ create_admin_credential_if_needed() {
     printf 'LOCAL_ADMIN_PASSWORD=%q\n' "$admin_password"
     printf 'LOCAL_ADMIN_NICKNAME=%q\n' "$admin_nickname"
   } >"$ADMIN_CRED_FILE"
-  FIRST_ADMIN_BOOTSTRAP=1
 }
 
 escape_for_osascript() {
@@ -199,9 +199,22 @@ log "安装后端依赖..."
 log "安装前端依赖..."
 (cd "$ROOT_DIR/web" && npm install >/dev/null)
 
-if [[ "$FIRST_ADMIN_BOOTSTRAP" -eq 1 ]]; then
-  # shellcheck disable=SC1090
-  source "$ADMIN_CRED_FILE"
+# shellcheck disable=SC1090
+source "$ADMIN_CRED_FILE"
+
+admin_exists="$(
+  docker compose exec -T postgres \
+    psql -U rosm_passport -d rosm_passport -tAc \
+    "select count(*) from users where lower(email) = lower('$(printf '%s' "$LOCAL_ADMIN_EMAIL" | sed "s/'/''/g")')" \
+    | tr -d '[:space:]'
+)"
+user_count="$(
+  docker compose exec -T postgres \
+    psql -U rosm_passport -d rosm_passport -tAc 'select count(*) from users' \
+    | tr -d '[:space:]'
+)"
+
+if [[ "$admin_exists" == "0" && "$user_count" == "0" ]]; then
   log "首次初始化本地管理员账号..."
   (
     cd "$SERVER_DIR"
@@ -219,9 +232,11 @@ if [[ "$FIRST_ADMIN_BOOTSTRAP" -eq 1 ]]; then
   echo "  email: $LOCAL_ADMIN_EMAIL"
   echo "  password: $LOCAL_ADMIN_PASSWORD"
   echo "  账号文件: $ADMIN_CRED_FILE"
+elif [[ "$admin_exists" != "0" ]]; then
+  log "检测到数据库中已有本地管理员，跳过自动创建。"
 else
-  log "检测到已有管理员初始化记录，跳过自动创建超级管理员。"
-  log "如需重新初始化，请手动删除 $ADMIN_CRED_FILE 并清理本地数据库。"
+  log "数据库中已有其他用户，未自动创建本地管理员。"
+  log "请通过已有管理员账号登录，或在确认数据用途后手动恢复管理员。"
 fi
 
 BACKEND_CMD="cd \"$SERVER_DIR\" && dart run dart_frog_cli:dart_frog dev --port 8080"

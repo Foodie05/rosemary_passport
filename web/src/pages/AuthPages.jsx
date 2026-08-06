@@ -21,7 +21,7 @@ import {
 
 function AuthPageFrame({ children }) {
   return (
-    <div className="relative">
+    <div className="relative min-h-dvh overflow-x-clip">
       <div className="fixed right-4 top-4 z-40 sm:right-6 sm:top-6">
         <ThemeToggle />
       </div>
@@ -70,14 +70,14 @@ function CodeInputWithAction({
   return (
     <div className="space-y-2">
       <label className="ml-1 text-sm font-bold text-sage-700">{label}</label>
-      <div className="group relative">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sage-400 transition-colors group-focus-within:text-sage-600">
+      <div className="group relative flex flex-col gap-2 min-[400px]:block">
+        <div className="absolute left-4 top-6 -translate-y-1/2 text-sage-400 transition-colors group-focus-within:text-sage-600 min-[400px]:top-1/2">
           <Icon size={18} />
         </div>
         <input
           type="text"
           placeholder={placeholder}
-          className="w-full rounded-2xl border border-sage-200 bg-sage-50/50 py-3 pl-12 pr-32 transition-all duration-300 placeholder:text-sage-300 focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-400/10"
+          className="w-full rounded-2xl border border-sage-200 bg-sage-50/50 py-3 pl-12 pr-4 transition-all duration-300 placeholder:text-sage-300 focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-400/10 min-[400px]:pr-32"
           value={value}
           onChange={onChange}
         />
@@ -85,7 +85,7 @@ function CodeInputWithAction({
           type="button"
           onClick={onAction}
           disabled={actionDisabled}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl border border-sage-200 bg-white px-3 py-2 text-xs font-bold text-sage-600 shadow-sm transition-colors hover:bg-sage-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-xl border border-sage-200 bg-white px-3 py-2.5 text-xs font-bold text-sage-600 shadow-sm transition-colors hover:bg-sage-50 disabled:cursor-not-allowed disabled:opacity-50 min-[400px]:absolute min-[400px]:right-2 min-[400px]:top-1/2 min-[400px]:w-auto min-[400px]:-translate-y-1/2"
         >
           {actionLabel}
         </button>
@@ -537,10 +537,10 @@ export function LoginPage({
 
   return (
     <AuthPageFrame>
-      <div className="grid min-h-screen grid-cols-1 bg-white lg:grid-cols-2">
+      <div className="grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-2">
         <BrandSection />
 
-        <div className="relative flex flex-col justify-center p-8 sm:p-12 lg:p-24">
+        <div className="relative flex flex-col justify-center px-5 pb-10 pt-20 sm:p-12 lg:p-24">
           <div className="mx-auto w-full max-w-md space-y-10">
             <div className="space-y-3">
               <div className="space-y-2">
@@ -557,7 +557,7 @@ export function LoginPage({
                 <button
                   type="button"
                   onClick={() => switchTab('phone_code')}
-                  className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${loginMethod === 'phone_code' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+                  className={`relative z-10 rounded-xl px-1 py-2 text-xs font-bold transition-colors min-[400px]:px-2 min-[400px]:text-sm sm:px-4 ${loginMethod === 'phone_code' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
                 >
                   {loginMethod === 'phone_code' ? (
                     <motion.span
@@ -571,7 +571,7 @@ export function LoginPage({
                 <button
                   type="button"
                   onClick={() => switchTab('email_code')}
-                  className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${loginMethod === 'email_code' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+                  className={`relative z-10 rounded-xl px-1 py-2 text-xs font-bold transition-colors min-[400px]:px-2 min-[400px]:text-sm sm:px-4 ${loginMethod === 'email_code' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
                 >
                   {loginMethod === 'email_code' ? (
                     <motion.span
@@ -585,7 +585,7 @@ export function LoginPage({
                 <button
                   type="button"
                   onClick={() => switchTab('webauthn')}
-                  className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${loginMethod === 'webauthn' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+                  className={`relative z-10 rounded-xl px-1 py-2 text-xs font-bold transition-colors min-[400px]:px-2 min-[400px]:text-sm sm:px-4 ${loginMethod === 'webauthn' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
                 >
                   {loginMethod === 'webauthn' ? (
                     <motion.span
@@ -599,7 +599,7 @@ export function LoginPage({
                 <button
                   type="button"
                   onClick={() => switchTab('password')}
-                  className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${loginMethod === 'password' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
+                  className={`relative z-10 rounded-xl px-1 py-2 text-xs font-bold transition-colors min-[400px]:px-2 min-[400px]:text-sm sm:px-4 ${loginMethod === 'password' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
                 >
                   {loginMethod === 'password' ? (
                     <motion.span
@@ -661,8 +661,9 @@ export function RegisterPage({
   registerCodeCooldownRemaining,
   submitRegister,
   submitRegisterCode,
-  hcaptchaRef,
+  captchaRef,
   publicConfig,
+  captchaConfigured,
   mountCaptcha,
   authNext = '',
 }) {
@@ -674,14 +675,14 @@ export function RegisterPage({
     registerCodeSending ||
     registerCodeCooldownRemaining > 0 ||
     !(registerMethod === 'phone' ? registerForm.phone_number.trim() : registerForm.email.trim()) ||
-    !publicConfig?.captcha?.site_key;
+    !captchaConfigured;
 
   return (
     <AuthPageFrame>
-    <div className="grid min-h-screen grid-cols-1 bg-white lg:grid-cols-2">
+    <div className="grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-2">
       <BrandSection />
 
-      <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-24">
+      <div className="flex flex-col justify-center px-5 pb-10 pt-20 sm:p-12 lg:p-24">
         <div className="mx-auto w-full max-w-md space-y-8">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-sage-900">创建新账户</h1>
@@ -730,7 +731,7 @@ export function RegisterPage({
                 onChange={(event) => setRegisterForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
               />
             )}
-            <div className="grid grid-cols-[1fr_auto] gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_auto]">
               <AuthInput
                 icon={ShieldCheck}
                 label={registerMethod === 'email' ? '邮箱验证码' : '短信验证码'}
@@ -738,7 +739,7 @@ export function RegisterPage({
                 value={registerMethod === 'email' ? registerForm.email_code : registerForm.phone_code}
                 onChange={(event) => setRegisterForm((current) => ({ ...current, [registerMethod === 'email' ? 'email_code' : 'phone_code']: event.target.value }))}
               />
-              <button type="button" onClick={() => void submitRegisterCode()} className="btn-secondary mt-[30px] whitespace-nowrap px-4" disabled={registerCodeDisabled}>
+              <button type="button" onClick={() => void submitRegisterCode()} className="btn-secondary whitespace-nowrap px-4 min-[400px]:mt-[30px]" disabled={registerCodeDisabled}>
                 <LoadingButtonText
                   loading={registerCodeSending}
                   loadingText="发送中..."
@@ -769,9 +770,9 @@ export function RegisterPage({
                 人机验证
               </div>
               <div className="rounded-2xl border border-sage-100 bg-sage-50/60 p-4">
-                {publicConfig?.captcha?.site_key ? (
+                {captchaConfigured ? (
                   <div className="space-y-3">
-                    <div ref={hcaptchaRef} />
+                    <div id="aliyun-register-captcha" ref={captchaRef} className="min-h-10" />
                     <p className="text-xs text-sage-500">发送验证码前需要先完成一次人机验证。</p>
                   </div>
                 ) : (
@@ -811,9 +812,9 @@ export function ForgotPasswordPage({
   const [error, setError] = useState('');
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-sage-50 p-6">
+    <div className="flex min-h-dvh items-center justify-center bg-sage-50 px-4 py-8 sm:p-6">
       <div className="w-full max-w-md">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card rounded-[2.5rem] p-10 shadow-2xl shadow-sage-900/5">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card rounded-3xl p-6 shadow-2xl shadow-sage-900/5 sm:rounded-[2.5rem] sm:p-10">
           <AnimatePresence mode="wait">
             {step === 'request' ? (
               <motion.div key="request" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
@@ -909,31 +910,31 @@ export function PostRegisterPasskeyPrompt({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-sage-950/45 p-6 backdrop-blur-sm">
-      <div className="w-full max-w-xl overflow-hidden rounded-[2rem] border border-white/60 bg-[#fcfaf5] shadow-2xl shadow-sage-950/20">
-        <div className="border-b border-sage-200/80 bg-gradient-to-br from-white via-[#f8f3ea] to-[#eef4ea] px-8 py-7">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-900 text-white shadow-lg shadow-sage-900/15">
+    <div className="account-security-dialog fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-sage-950/45 backdrop-blur-sm">
+      <div className="account-security-prompt account-security-dialog__card flex w-full max-w-xl flex-col overflow-hidden border shadow-2xl shadow-sage-950/20 sm:rounded-[2rem]">
+        <div className="account-security-prompt__header shrink-0 border-b px-4 py-4 sm:px-8 sm:py-7">
+          <div className="mb-2.5 flex items-center gap-3 sm:mb-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sage-900 text-white shadow-lg shadow-sage-900/15 sm:h-12 sm:w-12 sm:rounded-2xl">
               <Fingerprint size={22} />
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-sage-500">ROSM 账户安全</p>
-              <h3 className="text-2xl font-bold text-sage-950">添加系统通行密钥？</h3>
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase text-sage-500 sm:text-xs sm:tracking-[0.24em]">ROSM 账户安全</p>
+              <h3 className="text-xl font-bold text-sage-950 sm:text-2xl">添加系统通行密钥？</h3>
             </div>
           </div>
-          <p className="max-w-lg text-sm leading-7 text-sage-700">
+          <p className="max-w-lg text-sm leading-6 text-sage-700 sm:leading-7">
             你刚刚已经完成注册，我们可以直接调用系统完成一次通行密钥录入。
             以后登录通常会更快，也更不容易忘记密码。
           </p>
         </div>
 
-        <div className="space-y-5 px-8 py-7">
-          <div className="rounded-3xl border border-sage-200 bg-white/80 p-5">
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-sage-800">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-8 sm:py-7">
+          <div className="account-security-prompt__panel rounded-2xl border p-4 sm:rounded-3xl sm:p-5">
+            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-sage-800 sm:mb-3">
               <CheckCircle2 size={18} className="text-green-600" />
               这样做的好处
             </div>
-            <div className="space-y-2 text-sm leading-7 text-sage-600">
+            <div className="space-y-2 text-sm leading-6 text-sage-600 sm:leading-7">
               <p>登录时通常只需指纹、面容或设备解锁，无需反复输入密码。</p>
               <p>通行密钥基于当前设备安全能力，抗钓鱼能力通常比传统密码更强。</p>
               <p>
@@ -945,24 +946,166 @@ export function PostRegisterPasskeyPrompt({
               <p>现在也可以跳过，之后仍可在账户安全页面手动添加。</p>
             </div>
           </div>
+        </div>
 
+        <div className="account-security-dialog__actions shrink-0 space-y-3 border-t border-sage-200/70 bg-inherit px-4 pt-3 sm:px-8 sm:py-5">
           {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="account-security-prompt__error max-h-24 overflow-y-auto rounded-xl border px-3 py-2.5 text-sm leading-5 sm:rounded-2xl sm:px-4 sm:py-3">
               {error}
             </div>
           ) : null}
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button type="button" onClick={onSkip} disabled={saving} className="btn-secondary px-5 py-3">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:justify-end">
+            <button type="button" onClick={onSkip} disabled={saving} className="btn-secondary min-w-0 px-3 py-3 sm:px-5">
               稍后再说
             </button>
-            <button type="button" onClick={onConfirm} disabled={saving} className="btn-primary min-w-[180px] px-5 py-3">
+            <button type="button" onClick={onConfirm} disabled={saving} className="btn-primary min-w-0 px-3 py-3 sm:min-w-[180px] sm:px-5">
               <LoadingButtonText
                 loading={saving}
                 loadingText="等待系统验证..."
-                idleText="立即添加通行密钥"
+                idleText="立即添加"
                 icon={ArrowRight}
               />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PostRegisterBindingPrompt({
+  open,
+  registrationMethod = 'email',
+  onSendCode,
+  onConfirm,
+  onSkip,
+}) {
+  const [account, setAccount] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const bindingPhone = registrationMethod === 'email';
+
+  useEffect(() => {
+    if (!open) {
+      setAccount('');
+      setCode('');
+      setCodeSent(false);
+      setError('');
+      setCooldown(0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (cooldown <= 0) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      setCooldown((current) => (current > 1 ? current - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
+
+  if (!open) {
+    return null;
+  }
+
+  async function handleSendCode() {
+    setError('');
+    setSending(true);
+    try {
+      const result = await onSendCode(account.trim());
+      setCodeSent(true);
+      setCooldown(Math.max(1, Number(result?.retry_after || 60)));
+    } catch (sendError) {
+      setError(sendError.message || '验证码发送失败，请稍后重试。');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleConfirm() {
+    setError('');
+    setSaving(true);
+    try {
+      await onConfirm(account.trim(), code.trim());
+    } catch (bindError) {
+      setError(bindError.message || '绑定失败，请检查验证码后重试。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-start justify-center overflow-y-auto bg-sage-950/45 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+      <div className="account-security-prompt my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-3xl border shadow-2xl shadow-sage-950/20 sm:max-h-[calc(100dvh-3rem)]">
+        <div className="account-security-prompt__header border-b px-5 py-5 sm:px-7 sm:py-6">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sage-900 text-white">
+              {bindingPhone ? <Smartphone size={21} /> : <Mail size={21} />}
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase text-sage-500">完善账户信息</p>
+              <h3 className="text-xl font-bold text-sage-950">
+                {bindingPhone ? '添加手机号码' : '添加邮箱地址'}
+              </h3>
+            </div>
+          </div>
+          <p className="text-sm leading-7 text-sage-700">
+            {bindingPhone
+              ? '添加手机号可以更方便地登录并安全持有账户，下次可直接使用手机号登录。'
+              : '添加邮箱可以更方便地登录并安全持有账户，下次可直接使用邮箱登录。'}
+          </p>
+        </div>
+
+        <div className="space-y-5 px-5 py-5 sm:px-7 sm:py-6">
+          <AuthInput
+            icon={bindingPhone ? Smartphone : Mail}
+            label={bindingPhone ? '手机号码' : '邮箱地址'}
+            type={bindingPhone ? 'tel' : 'email'}
+            placeholder={bindingPhone ? '13800138000' : 'name@example.com'}
+            value={account}
+            onChange={(event) => setAccount(bindingPhone ? event.target.value.replace(/[^\d+]/g, '') : event.target.value)}
+          />
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_auto]">
+            <AuthInput
+              icon={ShieldCheck}
+              label={bindingPhone ? '短信验证码' : '邮箱验证码'}
+              placeholder="输入验证码"
+              value={code}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+            />
+            <button
+              type="button"
+              className="btn-secondary whitespace-nowrap px-4 min-[400px]:mt-[30px]"
+              onClick={() => void handleSendCode()}
+              disabled={sending || cooldown > 0 || !account.trim()}
+            >
+              <LoadingButtonText
+                loading={sending}
+                loadingText="发送中..."
+                idleText={cooldown > 0 ? `${cooldown} 秒后重发` : '发送验证码'}
+              />
+            </button>
+          </div>
+
+          {error ? <div className="account-security-prompt__error rounded-xl border px-4 py-3 text-sm">{error}</div> : null}
+
+          <div className="flex flex-col-reverse gap-3 [&>*]:w-full sm:flex-row sm:justify-end sm:[&>*]:w-auto">
+            <button type="button" onClick={onSkip} disabled={sending || saving} className="btn-secondary px-5 py-3">
+              跳过
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirm()}
+              disabled={saving || !codeSent || !code.trim() || !account.trim()}
+              className="btn-primary min-w-[150px] px-5 py-3"
+            >
+              <LoadingButtonText loading={saving} loadingText="验证并绑定中..." idleText="验证并添加" icon={ArrowRight} />
             </button>
           </div>
         </div>

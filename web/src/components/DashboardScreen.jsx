@@ -450,13 +450,13 @@ export function DashboardScreen({
                   <div className="form-section-grid">
                     <div className="form-subsection">
                       <h3>注册与验证码</h3>
-                      <Field label="hCaptcha Site Key">
+                      <Field label="阿里云验证码场景 ID">
                         <input
-                          value={systemForm.hcaptcha_site_key || ''}
+                          value={systemForm.aliyun_captcha_scene_id || ''}
                           onChange={(event) =>
                             setSystemForm((current) => ({
                               ...current,
-                              hcaptcha_site_key: event.target.value,
+                              aliyun_captcha_scene_id: event.target.value,
                             }))
                           }
                         />
