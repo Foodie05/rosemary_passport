@@ -33,7 +33,9 @@ const options = await generateRegistrationOptions({
   attestationType: 'none',
   authenticatorSelection: {
     residentKey: 'preferred',
-    userVerification: 'preferred',
+    // Keep the browser ceremony aligned with verification, where
+    // SimpleWebAuthn requires the UV flag by default.
+    userVerification: 'required',
   },
   excludeCredentials: (input.excludeCredentials || input.excludeCredentialIDs || [])
     .map(credentialDescriptor),
