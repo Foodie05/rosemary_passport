@@ -3,17 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_client.dart';
 import 'rosemary_sign_in.dart';
 
 class RosmPassportAccountConfig {
   const RosmPassportAccountConfig({
     this.requestCaptchaToken,
+    this.aliyunCaptcha = const RosmAliyunCaptchaProvider(),
     this.reauthenticate,
     this.signInConfig,
   });
 
   final Future<String?> Function()? requestCaptchaToken;
+  final RosmAliyunCaptchaProvider? aliyunCaptcha;
   final Future<bool> Function()? reauthenticate;
   final RosmPassportSignInConfig? signInConfig;
 }
@@ -299,11 +302,17 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   }
 
   Future<String> _captchaToken() async {
-    final token = await widget.config.requestCaptchaToken?.call();
+    final supplied = await widget.config.requestCaptchaToken?.call();
+    final token = supplied?.trim().isNotEmpty == true
+        ? supplied!.trim()
+        : await widget.config.aliyunCaptcha?.requestToken(
+            context,
+            widget.client,
+          );
     if (token == null || token.trim().isEmpty) {
       throw const RosmApiException('captcha_required', '请先完成人机验证。');
     }
-    return token;
+    return token.trim();
   }
 
   Future<void> _saveNickname() async {

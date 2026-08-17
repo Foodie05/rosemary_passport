@@ -168,6 +168,39 @@ void main() {
   );
 
   test(
+    'reads configured Aliyun captcha details from the public endpoint',
+    () async {
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://api.example.com'),
+        clientId: 'app',
+        redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+        tokenStore: _MemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/api/v1/public/config');
+          return http.Response(
+            jsonEncode({
+              'captcha': {
+                'provider': 'aliyun',
+                'prefix': 'abc123',
+                'scene_id': 'login01',
+                'region': 'cn',
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final config = await client.aliyunCaptchaConfig();
+
+      expect(config?.prefix, 'abc123');
+      expect(config?.sceneId, 'login01');
+      expect(config?.region, 'cn');
+    },
+  );
+
+  test(
     'completes server handoff with authorization code and verifier',
     () async {
       late http.Request captured;
