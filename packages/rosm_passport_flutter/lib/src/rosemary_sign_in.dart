@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
-import 'rosm_native_passkeys.dart';
 import 'rosm_passport_client.dart';
+import 'token_store.dart';
 
 typedef RosmCaptchaTokenProvider = Future<String?> Function();
-typedef RosmPasskeyAuthenticator =
-    Future<RosmWebAuthnCredential> Function(RosmWebAuthnOptions options);
 
 class RosmPassportSignInConfig {
   const RosmPassportSignInConfig({
@@ -18,11 +16,9 @@ class RosmPassportSignInConfig {
     this.state,
     this.nonce,
     this.requestCaptchaToken,
-    this.authenticatePasskey,
     this.enableEmailCode = true,
     this.enablePhoneCode = true,
     this.enablePassword = true,
-    this.enablePasskey = true,
     this.enableRegistration = true,
   });
 
@@ -32,11 +28,9 @@ class RosmPassportSignInConfig {
   final String? state;
   final String? nonce;
   final RosmCaptchaTokenProvider? requestCaptchaToken;
-  final RosmPasskeyAuthenticator? authenticatePasskey;
   final bool enableEmailCode;
   final bool enablePhoneCode;
   final bool enablePassword;
-  final bool enablePasskey;
   final bool enableRegistration;
 }
 
@@ -127,6 +121,25 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       serverHandoff: widget.config.serverHandoffEndpoint != null,
     );
     _loadAuthorization();
+    _prefillLastSignIn();
+  }
+
+  Future<void> _prefillLastSignIn() async {
+    final hint = await widget.client.lastSignIn();
+    if (!mounted || hint == null) return;
+    setState(() {
+      switch (hint.method) {
+        case RosmSignInMethod.phoneCode:
+          _mode = _SignInMode.phone;
+          _phone.text = hint.identifier;
+        case RosmSignInMethod.emailCode:
+          _mode = _SignInMode.email;
+          _email.text = hint.identifier;
+        case RosmSignInMethod.password:
+          _mode = _SignInMode.password;
+          _passwordEmail.text = hint.identifier;
+      }
+    });
   }
 
   @override
@@ -234,7 +247,15 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         return;
       }
       setState(() {
-        _passwordMfaFactors = factors.factors;
+        _passwordMfaFactors = factors.factors
+            .where(
+              (factor) => const {
+                'email_code',
+                'phone_code',
+                'authenticator',
+              }.contains(factor),
+            )
+            .toList(growable: false);
         _selectedPasswordMfaFactor = null;
         _passwordMfaCodeSent = false;
         _passwordMfaMode = true;
@@ -278,10 +299,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     if (factor == null) {
       return;
     }
-    if (factor == 'webauthn') {
-      await _loginWithPasskeyForPasswordMfa();
-      return;
-    }
     await _run(() async {
       final auth = await widget.client.loginWithPassword(
         email: _passwordEmail.text.trim(),
@@ -293,86 +310,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             ? _mfaCode.text.trim()
             : null,
         captchaToken: await widget.config.requestCaptchaToken?.call(),
-      );
-      _showConsent(auth);
-    });
-  }
-
-  Future<void> _loginWithPasskeyForPasswordMfa() async {
-    final authenticator =
-        widget.config.authenticatePasskey ??
-        (options) => RosmNativePasskeys(
-          logger: widget.client.logger,
-        ).authenticate(options);
-    await _run(() async {
-      final email = _passwordEmail.text.trim();
-      widget.client.logger.info(
-        'Password MFA passkey options request started.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.mfa.options.start',
-        context: {'has_email': email.isNotEmpty},
-      );
-      final options = await widget.client.beginWebAuthnLogin(email: email);
-      widget.client.logger.info(
-        'Password MFA passkey options received.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.mfa.options.success',
-      );
-      final credential = await authenticator(options);
-      widget.client.logger.info(
-        'Password MFA passkey credential received; verifying with server.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.mfa.verify.start',
-        context: _credentialSummary(credential),
-      );
-      final auth = await widget.client.completeWebAuthnLogin(
-        email: email,
-        credential: credential,
-      );
-      widget.client.logger.info(
-        'Password MFA passkey verification completed.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.mfa.verify.success',
-      );
-      _showConsent(auth);
-    });
-  }
-
-  Future<void> _loginWithPasskey() async {
-    final authenticator =
-        widget.config.authenticatePasskey ??
-        (options) => RosmNativePasskeys(
-          logger: widget.client.logger,
-        ).authenticate(options);
-    await _run(() async {
-      final email = _email.text.trim().isEmpty ? null : _email.text.trim();
-      widget.client.logger.info(
-        'Passkey login options request started.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.login.options.start',
-        context: {'has_email': email != null},
-      );
-      final options = await widget.client.beginWebAuthnLogin(email: email);
-      widget.client.logger.info(
-        'Passkey login options received.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.login.options.success',
-      );
-      final credential = await authenticator(options);
-      widget.client.logger.info(
-        'Passkey login credential received; verifying with server.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.login.verify.start',
-        context: _credentialSummary(credential),
-      );
-      final auth = await widget.client.completeWebAuthnLogin(
-        email: email,
-        credential: credential,
-      );
-      widget.client.logger.info(
-        'Passkey login verification completed.',
-        source: 'rosm_passport.ui.sign_in',
-        event: 'passkey.login.verify.success',
       );
       _showConsent(auth);
     });
@@ -564,20 +501,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       };
     }
     return {'error_type': error.runtimeType.toString()};
-  }
-
-  Map<String, Object?> _credentialSummary(RosmWebAuthnCredential credential) {
-    final response = credential.response['response'];
-    final responseMap = response is Map ? response : const {};
-    return {
-      'credential_id_length': credential.response['id']?.toString().length ?? 0,
-      'raw_id_length': credential.response['rawId']?.toString().length ?? 0,
-      'type': credential.response['type']?.toString(),
-      'has_client_data_json': responseMap.containsKey('clientDataJSON'),
-      'has_authenticator_data': responseMap.containsKey('authenticatorData'),
-      'has_signature': responseMap.containsKey('signature'),
-      'has_attestation_object': responseMap.containsKey('attestationObject'),
-    };
   }
 
   int _cooldownFor(_CooldownKind kind) => _cooldowns[kind] ?? 0;
@@ -812,7 +735,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     return [
       if (widget.config.enablePhoneCode) _SignInMode.phone,
       if (widget.config.enableEmailCode) _SignInMode.email,
-      if (widget.config.enablePasskey) _SignInMode.passkey,
       if (widget.config.enablePassword) _SignInMode.password,
     ];
   }
@@ -858,33 +780,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 ? null
                 : () => setState(() => _recoveryMode = true),
             child: const Text('忘记密码'),
-          ),
-          if (widget.config.enableRegistration)
-            _RegisterPrompt(onTap: _openRegister),
-        ],
-      );
-    }
-
-    if (_mode == _SignInMode.passkey) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: '邮箱（可选）',
-              prefixIcon: Icon(Icons.mail_outline_rounded),
-            ),
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: _busy ? null : _loginWithPasskey,
-            child: _ButtonContent(
-              busy: _busy,
-              label: '使用通行密钥登录  →',
-              light: true,
-            ),
           ),
           if (widget.config.enableRegistration)
             _RegisterPrompt(onTap: _openRegister),
@@ -1039,11 +934,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           const SizedBox(height: 22),
           FilledButton(
             onPressed: _busy ? null : _completePasswordMfa,
-            child: _ButtonContent(
-              busy: _busy,
-              label: factor == 'webauthn' ? '使用通行密钥验证  →' : '完成登录  →',
-              light: true,
-            ),
+            child: _ButtonContent(busy: _busy, label: '完成登录  →', light: true),
           ),
           TextButton(
             onPressed: _busy
@@ -1569,7 +1460,7 @@ class _RegisterPrompt extends StatelessWidget {
   }
 }
 
-enum _SignInMode { phone, email, passkey, password }
+enum _SignInMode { phone, email, password }
 
 enum _CooldownKind { login, passwordMfa, register, recovery }
 
@@ -1577,7 +1468,6 @@ String _labelFor(_SignInMode mode) {
   return switch (mode) {
     _SignInMode.phone => '手机',
     _SignInMode.email => '验证码',
-    _SignInMode.passkey => '通行密钥',
     _SignInMode.password => '密码',
   };
 }
@@ -1587,7 +1477,6 @@ String _passwordMfaTitle(String factor) {
     'email_code' => '邮箱验证码',
     'phone_code' => '手机验证码',
     'authenticator' => 'Authenticator 验证器',
-    'webauthn' => '系统通行密钥',
     _ => '二次验证',
   };
 }
@@ -1597,7 +1486,6 @@ String _passwordMfaIntro(String factor) {
     'email_code' => '发送一次登录验证码到当前账户邮箱。',
     'phone_code' => '发送一次登录验证码到当前账户已绑定手机号。',
     'authenticator' => '输入动态口令应用中当前显示的 6 位验证码。',
-    'webauthn' => '使用系统通行密钥完成本次安全验证。',
     _ => '完成账号安全验证后继续登录。',
   };
 }
@@ -1607,7 +1495,6 @@ IconData _passwordMfaIcon(String factor) {
     'email_code' => Icons.mail_outline_rounded,
     'phone_code' => Icons.phone_iphone_rounded,
     'authenticator' => Icons.shield_outlined,
-    'webauthn' => Icons.fingerprint_rounded,
     _ => Icons.verified_user_outlined,
   };
 }
@@ -1619,7 +1506,6 @@ String _introFor(_SignInMode mode, String? appName) {
   return switch (mode) {
     _SignInMode.phone => '请输入手机号并使用短信验证码$suffix',
     _SignInMode.email => '请输入邮箱并使用验证码$suffix',
-    _SignInMode.passkey => '使用系统通行密钥安全$suffix',
     _SignInMode.password => '请输入邮箱和密码$suffix',
   };
 }

@@ -107,7 +107,6 @@ RosmSecurityState _$RosmSecurityStateFromJson(Map<String, dynamic> json) =>
     RosmSecurityState(
       mustBindEmail: json['must_bind_email'] as bool? ?? false,
       adminMfaRequired: json['admin_mfa_required'] as bool? ?? false,
-      hasPasskey: json['has_passkey'] as bool? ?? false,
       hasAuthenticator: json['has_authenticator'] as bool? ?? false,
       hasPhone: json['has_phone'] as bool? ?? false,
     );
@@ -118,8 +117,6 @@ RosmAuthResult _$RosmAuthResultFromJson(Map<String, dynamic> json) =>
       security: RosmSecurityState.fromJson(
         json['security'] as Map<String, dynamic>,
       ),
-      postRegisterPasskeyBootstrap:
-          json['post_register_passkey_bootstrap'] as bool,
       tokens: json['tokens'] == null
           ? null
           : RosmTokenSet.fromJson(json['tokens'] as Map<String, dynamic>),
@@ -155,15 +152,6 @@ RosmPasswordFactors _$RosmPasswordFactorsFromJson(Map<String, dynamic> json) =>
       defaultFactor: json['default_factor'] as String?,
     );
 
-RosmOperationResult _$RosmOperationResultFromJson(Map<String, dynamic> json) =>
-    RosmOperationResult(
-      sent: json['sent'] as bool? ?? false,
-      updated: json['updated'] as bool? ?? false,
-      deleted: json['deleted'] as bool? ?? false,
-      message: json['message'] as String?,
-      retryAfter: (json['retry_after'] as num?)?.toInt(),
-    );
-
 RosmAuthenticatorSetup _$RosmAuthenticatorSetupFromJson(
   Map<String, dynamic> json,
 ) => RosmAuthenticatorSetup(
@@ -171,29 +159,13 @@ RosmAuthenticatorSetup _$RosmAuthenticatorSetupFromJson(
   otpauthUri: json['otpauth_uri'] as String,
 );
 
-RosmWebAuthnCredentialInfo _$RosmWebAuthnCredentialInfoFromJson(
-  Map<String, dynamic> json,
-) => RosmWebAuthnCredentialInfo(
-  credentialId: json['credential_id'] as String,
-  createdAt: DateTime.parse(json['created_at'] as String),
-  deviceType: json['device_type'] as String?,
-  backedUp: json['backed_up'] as bool? ?? false,
-  transports:
-      (json['transports'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList() ??
-      const [],
-);
-
-RosmPasskeyList _$RosmPasskeyListFromJson(Map<String, dynamic> json) =>
-    RosmPasskeyList(
-      credentials: (json['credentials'] as List<dynamic>)
-          .map(
-            (e) =>
-                RosmWebAuthnCredentialInfo.fromJson(e as Map<String, dynamic>),
-          )
-          .toList(),
-      maxCount: (json['max_count'] as num).toInt(),
+RosmOperationResult _$RosmOperationResultFromJson(Map<String, dynamic> json) =>
+    RosmOperationResult(
+      sent: json['sent'] as bool? ?? false,
+      updated: json['updated'] as bool? ?? false,
+      deleted: json['deleted'] as bool? ?? false,
+      message: json['message'] as String?,
+      retryAfter: (json['retry_after'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$RosmPasswordFactorsRequestToJson(
@@ -232,10 +204,6 @@ Map<String, dynamic> _$RosmEmailRegisterRequestToJson(
   'email_code': instance.emailCode,
 };
 
-Map<String, dynamic> _$RosmWebAuthnLoginOptionsRequestToJson(
-  RosmWebAuthnLoginOptionsRequest instance,
-) => <String, dynamic>{'email': ?instance.email};
-
 Map<String, dynamic> _$RosmPasswordRecoveryCodeRequestToJson(
   RosmPasswordRecoveryCodeRequest instance,
 ) => <String, dynamic>{
@@ -251,11 +219,4 @@ Map<String, dynamic> _$RosmPasswordResetByCodeRequestToJson(
   'method': const RosmPasswordRecoveryMethodConverter().toJson(instance.method),
   'code': instance.code,
   'new_password': instance.newPassword,
-};
-
-Map<String, dynamic> _$RosmPasskeyRegistrationOptionsRequestToJson(
-  RosmPasskeyRegistrationOptionsRequest instance,
-) => <String, dynamic>{
-  'current_password': ?instance.currentPassword,
-  'post_register_bootstrap': instance.postRegisterBootstrap,
 };
