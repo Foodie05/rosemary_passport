@@ -36,7 +36,6 @@ final result = await showRosmPassportSignIn(
   client: passport,
   config: RosmPassportSignInConfig(
     serverHandoffEndpoint: Uri.parse('https://api.example.com/auth/rosm/sdk/complete'),
-    requestCaptchaToken: () => yourCaptchaProvider(),
     enableRegistration: true,
   ),
 );
@@ -45,6 +44,8 @@ final appSession = result?.serverPayload;
 ```
 
 The built-in UI supports email code login, phone code login, password login, password MFA, password recovery, email registration, and the final consent page. Registration is enabled by default. Set `enableRegistration: false` if an app wants to hide account creation.
+
+The SDK uses ROSM's public configuration to run the built-in Aliyun Captcha 2.0 challenge before sending a login, registration, recovery, or MFA code. It sends the returned `captchaVerifyParam` as `captcha_token`; apps do not provide or store Aliyun credentials. To use an existing in-app captcha implementation instead, supply `requestCaptchaToken`; its non-empty return value takes precedence.
 
 After a successful email-code, phone-code, or password login, the SDK securely stores only the selected method and its email address or phone number. The next built-in sign-in screen uses these values to preselect the method and prefill the identifier; it still always requires a new authentication. Call `client.clearLastSignIn()` if the app needs to remove this convenience data. `client.signOut()` clears it as well.
 
@@ -200,7 +201,7 @@ For password login, call `passwordFactors` before the final password login reque
 
 ## Registration
 
-The built-in UI can create a ROSM account with email, nickname, password, and an email verification code. The app must provide `requestCaptchaToken` because ROSM requires captcha before sending registration codes.
+The built-in UI can create a ROSM account with email, nickname, password, and an email verification code. It opens the configured Aliyun Captcha challenge before requesting a registration code.
 
 ```dart
 await passport.sendRegisterCode(
@@ -227,7 +228,6 @@ await showRosmPassportAccountManagement(
   context,
   client: passport,
   config: RosmPassportAccountConfig(
-    requestCaptchaToken: () => yourCaptchaProvider(),
     signInConfig: signInConfig,
   ),
 );

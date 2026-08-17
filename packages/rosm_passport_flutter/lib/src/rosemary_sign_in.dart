@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_client.dart';
 import 'token_store.dart';
 
@@ -16,6 +17,7 @@ class RosmPassportSignInConfig {
     this.state,
     this.nonce,
     this.requestCaptchaToken,
+    this.aliyunCaptcha = const RosmAliyunCaptchaProvider(),
     this.enableEmailCode = true,
     this.enablePhoneCode = true,
     this.enablePassword = true,
@@ -28,6 +30,7 @@ class RosmPassportSignInConfig {
   final String? state;
   final String? nonce;
   final RosmCaptchaTokenProvider? requestCaptchaToken;
+  final RosmAliyunCaptchaProvider? aliyunCaptcha;
   final bool enableEmailCode;
   final bool enablePhoneCode;
   final bool enablePassword;
@@ -198,7 +201,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _sendCode() async {
     await _run(() async {
-      final captchaToken = await widget.config.requestCaptchaToken?.call();
+      final captchaToken = await _requestCaptchaToken();
       if (_mode == _SignInMode.email) {
         final result = await widget.client.sendEmailLoginCode(
           email: _email.text.trim(),
@@ -214,6 +217,20 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       }
       setState(() => _sent = true);
     });
+  }
+
+  Future<String> _requestCaptchaToken() async {
+    final supplied = await widget.config.requestCaptchaToken?.call();
+    final token = supplied?.trim().isNotEmpty == true
+        ? supplied!.trim()
+        : await widget.config.aliyunCaptcha?.requestToken(
+            context,
+            widget.client,
+          );
+    if (token == null || token.trim().isEmpty) {
+      throw const RosmApiException('captcha_required', '请先完成人机验证。');
+    }
+    return token.trim();
   }
 
   Future<void> _loginWithCode() async {
@@ -236,7 +253,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       final factors = await widget.client.passwordFactors(
         email: _passwordEmail.text.trim(),
         password: _password.text,
-        captchaToken: await widget.config.requestCaptchaToken?.call(),
+        captchaToken: await _requestCaptchaToken(),
       );
       if (factors.directLogin) {
         final auth = await widget.client.loginWithPassword(
@@ -287,7 +304,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         email: _passwordEmail.text.trim(),
         password: _password.text,
         factorType: factorType,
-        captchaToken: await widget.config.requestCaptchaToken?.call(),
+        captchaToken: await _requestCaptchaToken(),
       );
       _startCooldown(_CooldownKind.passwordMfa, result.retryAfter ?? 45);
       setState(() => _passwordMfaCodeSent = true);
@@ -309,7 +326,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         authenticatorCode: factor == 'authenticator'
             ? _mfaCode.text.trim()
             : null,
-        captchaToken: await widget.config.requestCaptchaToken?.call(),
+        captchaToken: await _requestCaptchaToken(),
       );
       _showConsent(auth);
     });
@@ -318,10 +335,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   Future<void> _sendRecoveryCode() async {
     await _run(() async {
       final account = _recoveryAccount.text.trim();
-      final captchaToken = await widget.config.requestCaptchaToken?.call();
-      if (captchaToken == null || captchaToken.isEmpty) {
-        throw const RosmApiException('captcha_required', '请先完成人机验证。');
-      }
+      final captchaToken = await _requestCaptchaToken();
       final result = await widget.client.sendPasswordRecoveryCode(
         account: account,
         method: account.contains('@')
@@ -356,10 +370,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _sendRegisterCode() async {
     await _run(() async {
-      final captchaToken = await widget.config.requestCaptchaToken?.call();
-      if (captchaToken == null || captchaToken.isEmpty) {
-        throw const RosmApiException('captcha_required', '请先完成人机验证。');
-      }
+      final captchaToken = await _requestCaptchaToken();
       final result = await widget.client.sendRegisterCode(
         email: _registerEmail.text.trim(),
         captchaToken: captchaToken,

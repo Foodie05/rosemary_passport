@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import 'models.dart';
 import 'pkce.dart';
+import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_logger.dart';
 import 'token_store.dart';
 
@@ -154,6 +155,22 @@ class RosmPassportClient {
   Future<RosmAccountState> account() async {
     final json = await _getJson('/api/v1/me');
     return RosmAccountState.fromJson(json);
+  }
+
+  /// Reads the public Aliyun Captcha 2.0 configuration from the ROSM issuer.
+  /// No Aliyun secret is ever returned to or stored by the application.
+  Future<RosmAliyunCaptchaConfig?> aliyunCaptchaConfig() async {
+    final json = await _getJson('/api/v1/public/config');
+    final captcha = json['captcha'];
+    if (captcha is! Map) return null;
+    if ((captcha['provider'] ?? '').toString().trim().toLowerCase() !=
+        'aliyun') {
+      return null;
+    }
+    final config = RosmAliyunCaptchaConfig.fromJson(
+      Map<String, dynamic>.from(captcha),
+    );
+    return config.isConfigured ? config : null;
   }
 
   Future<RosmOperationResult> updateAccount({
