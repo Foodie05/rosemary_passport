@@ -3,21 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
-import 'rosm_native_passkeys.dart';
 import 'rosm_passport_client.dart';
 import 'rosemary_sign_in.dart';
 
 class RosmPassportAccountConfig {
   const RosmPassportAccountConfig({
     this.requestCaptchaToken,
-    this.registerPasskey,
     this.reauthenticate,
     this.signInConfig,
   });
 
   final Future<String?> Function()? requestCaptchaToken;
-  final Future<RosmWebAuthnCredential> Function(RosmWebAuthnOptions options)?
-  registerPasskey;
   final Future<bool> Function()? reauthenticate;
   final RosmPassportSignInConfig? signInConfig;
 }
@@ -52,7 +48,6 @@ class RosmPassportAccountPage extends StatefulWidget {
 
 class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   RosmAccountState? _account;
-  RosmPasskeyList? _passkeys;
   var _loading = true;
   var _busy = false;
   var _sessionExpired = false;
@@ -74,7 +69,20 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
+  }
+
+  Future<void> _initialize() async {
+    final restored = await _reauthenticate();
+    if (!mounted) return;
+    if (!restored) {
+      setState(() {
+        _loading = false;
+        _error = '需要重新验证身份才能进入账号中心。';
+      });
+      return;
+    }
+    await _load();
   }
 
   @override
@@ -103,21 +111,9 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         event: 'account.load.start',
       );
       final account = await widget.client.account();
-      RosmPasskeyList? passkeys;
-      try {
-        passkeys = await widget.client.listPasskeys();
-      } on Object {
-        widget.client.logger.warning(
-          'Passkey list loading failed while loading account state.',
-          source: 'rosm_passport.ui.account',
-          event: 'passkey.list.failure',
-        );
-        passkeys = null;
-      }
       if (!mounted) return;
       setState(() {
         _account = account;
-        _passkeys = passkeys;
         _nickname.text = account.user.nickname;
         _loading = false;
       });
@@ -125,7 +121,6 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
         'Account management state loaded.',
         source: 'rosm_passport.ui.account',
         event: 'account.load.success',
-        context: {'passkeys_count': passkeys?.credentials.length},
       );
     } on Object catch (error, stackTrace) {
       if (await _recoverExpiredSession(error)) {
@@ -253,23 +248,17 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     return true;
   }
 
-  bool get _hasReauthenticationFlow =>
-      widget.config.reauthenticate != null ||
-      widget.config.signInConfig != null;
+  bool get _hasReauthenticationFlow => true;
 
   Future<bool> _reauthenticate() async {
     final reauthenticate = widget.config.reauthenticate;
     if (reauthenticate != null) {
       return reauthenticate();
     }
-    final signInConfig = widget.config.signInConfig;
-    if (signInConfig == null) {
-      return false;
-    }
     final result = await showRosmPassportSignIn(
       context,
       client: widget.client,
-      config: signInConfig,
+      config: widget.config.signInConfig ?? const RosmPassportSignInConfig(),
     );
     return result != null;
   }
@@ -507,75 +496,6 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     );
   }
 
-  Future<void> _openPasskeyDialog() async {
-    _currentPassword.clear();
-    await _showSheet(
-      title: '系统通行密钥',
-      child: StatefulBuilder(
-        builder: (context, setSheetState) {
-          return _SheetBody(
-            error: _error,
-            child: _PasskeySheet(
-              passkeys: _passkeys,
-              currentPassword: _currentPassword,
-              busy: _busy,
-              canRegister: true,
-              onRefresh: () => _runInSheet(setSheetState, () async {
-                final passkeys = await widget.client.listPasskeys();
-                setState(() => _passkeys = passkeys);
-              }),
-              onRegister: () => _runInSheet(setSheetState, () async {
-                final registrar =
-                    widget.config.registerPasskey ??
-                    (options) => RosmNativePasskeys(
-                      logger: widget.client.logger,
-                    ).register(options);
-                widget.client.logger.info(
-                  'Passkey registration options request started.',
-                  source: 'rosm_passport.ui.account',
-                  event: 'passkey.register.options.start',
-                );
-                final options = await widget.client.beginPasskeyRegistration(
-                  currentPassword: _currentPassword.text,
-                );
-                widget.client.logger.info(
-                  'Passkey registration options received.',
-                  source: 'rosm_passport.ui.account',
-                  event: 'passkey.register.options.success',
-                );
-                final credential = await registrar(options);
-                widget.client.logger.info(
-                  'Passkey registration credential received; verifying with server.',
-                  source: 'rosm_passport.ui.account',
-                  event: 'passkey.register.verify.start',
-                  context: _credentialSummary(credential),
-                );
-                await widget.client.completePasskeyRegistration(
-                  credential: credential,
-                );
-                widget.client.logger.info(
-                  'Passkey registration verification completed.',
-                  source: 'rosm_passport.ui.account',
-                  event: 'passkey.register.verify.success',
-                );
-                final passkeys = await widget.client.listPasskeys();
-                setState(() => _passkeys = passkeys);
-                _currentPassword.clear();
-                await _load();
-              }),
-              onDelete: (credentialId) => _runInSheet(setSheetState, () async {
-                await widget.client.deletePasskey(credentialId);
-                final passkeys = await widget.client.listPasskeys();
-                setState(() => _passkeys = passkeys);
-                await _load();
-              }),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Map<String, Object?> _errorContext(Object error) {
     if (error is RosmApiException) {
       return {
@@ -584,20 +504,6 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
       };
     }
     return {'error_type': error.runtimeType.toString()};
-  }
-
-  Map<String, Object?> _credentialSummary(RosmWebAuthnCredential credential) {
-    final response = credential.response['response'];
-    final responseMap = response is Map ? response : const {};
-    return {
-      'credential_id_length': credential.response['id']?.toString().length ?? 0,
-      'raw_id_length': credential.response['rawId']?.toString().length ?? 0,
-      'type': credential.response['type']?.toString(),
-      'has_client_data_json': responseMap.containsKey('clientDataJSON'),
-      'has_authenticator_data': responseMap.containsKey('authenticatorData'),
-      'has_signature': responseMap.containsKey('signature'),
-      'has_attestation_object': responseMap.containsKey('attestationObject'),
-    };
   }
 
   Future<void> _showSheet({required String title, required Widget child}) {
@@ -786,14 +692,6 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                     text: '多因素验证',
                   ),
                   _ActionTile(
-                    icon: Icons.fingerprint_rounded,
-                    title: '系统通行密钥',
-                    subtitle:
-                        '${_passkeys?.credentials.length ?? (account.security.hasPasskey ? 1 : 0)} 个已连接',
-                    trailing: '管理',
-                    onTap: _busy ? null : _openPasskeyDialog,
-                  ),
-                  _ActionTile(
                     icon: Icons.shield_outlined,
                     title: 'Authenticator 验证器',
                     subtitle: account.security.hasAuthenticator ? '已连接' : '未设置',
@@ -875,10 +773,6 @@ class _ProfileCard extends StatelessWidget {
               _StatusPill(
                 text: account.security.mustBindEmail ? '待绑定邮箱' : '邮箱已绑定',
                 active: !account.security.mustBindEmail,
-              ),
-              _StatusPill(
-                text: account.security.hasPasskey ? '通行密钥已连接' : '未连接通行密钥',
-                active: account.security.hasPasskey,
               ),
               _StatusPill(
                 text: account.security.hasAuthenticator ? '验证器已连接' : '未设置验证器',
@@ -1216,93 +1110,6 @@ class _AuthenticatorSheet extends StatelessWidget {
             child: _BusyText(busy: busy, text: '完成设置'),
           ),
         ],
-      ],
-    );
-  }
-}
-
-class _PasskeySheet extends StatelessWidget {
-  const _PasskeySheet({
-    required this.passkeys,
-    required this.currentPassword,
-    required this.busy,
-    required this.canRegister,
-    required this.onRefresh,
-    required this.onRegister,
-    required this.onDelete,
-  });
-
-  final RosmPasskeyList? passkeys;
-  final TextEditingController currentPassword;
-  final bool busy;
-  final bool canRegister;
-  final VoidCallback onRefresh;
-  final VoidCallback onRegister;
-  final void Function(String credentialId) onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final list = passkeys?.credentials ?? const <RosmWebAuthnCredentialInfo>[];
-    final max = passkeys?.maxCount ?? 5;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text('已连接 ${list.length} / $max')),
-            TextButton(
-              onPressed: busy ? null : onRefresh,
-              child: const Text('刷新'),
-            ),
-          ],
-        ),
-        for (final credential in list)
-          _AccountCard(
-            child: Row(
-              children: [
-                const Icon(Icons.fingerprint_rounded),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    credential.credentialId,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => onDelete(credential.credentialId),
-                  child: const Text('移除'),
-                ),
-              ],
-            ),
-          ),
-        if (list.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('当前还没有已连接的系统通行密钥。'),
-          ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: currentPassword,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: '当前密码'),
-        ),
-        const SizedBox(height: 18),
-        FilledButton(
-          onPressed: busy || !canRegister || list.length >= max
-              ? null
-              : onRegister,
-          child: _BusyText(
-            busy: busy,
-            text: !canRegister
-                ? '应用未接入通行密钥注册'
-                : list.length >= max
-                ? '已达上限'
-                : '新增通行密钥',
-          ),
-        ),
       ],
     );
   }

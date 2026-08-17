@@ -127,93 +127,45 @@ void main() {
     });
   });
 
-  test('uses WebAuthn origin when requesting passkey options', () async {
-    late http.Request captured;
-    final client = RosmPassportClient(
-      issuer: Uri.parse('https://api.example.com'),
-      clientId: 'app',
-      redirectUri: Uri.parse('com.example.app:/oidc/callback'),
-      webAuthnOrigin: Uri.parse('https://auth.example.com'),
-      tokenStore: _MemoryTokenStore(),
-      httpClient: MockClient((request) async {
-        captured = request;
-        return http.Response(
-          jsonEncode({'challenge': 'challenge', 'rpId': 'auth.example.com'}),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }),
-    );
+  test(
+    'remembers only the last successful login method and identifier',
+    () async {
+      final hints = RosmMemoryLastSignInStore();
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://api.example.com'),
+        clientId: 'app',
+        redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+        tokenStore: _MemoryTokenStore(),
+        lastSignInStore: hints,
+        httpClient: MockClient((_) async {
+          return http.Response(
+            jsonEncode({
+              'user': {
+                'id': 'user-1',
+                'email': 'user@example.com',
+                'nickname': 'User',
+                'roles': ['user'],
+              },
+              'security': {},
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
 
-    final options = await client.beginWebAuthnLogin(email: 'user@example.com');
+      await client.loginWithEmailCode(
+        email: 'user@example.com',
+        emailCode: '123456',
+      );
 
-    expect(options.options['challenge'], 'challenge');
-    expect(captured.method, 'POST');
-    expect(captured.url.path, '/api/v1/auth/webauthn/options');
-    expect(captured.headers['origin'], 'https://auth.example.com');
-    expect(jsonDecode(captured.body), {'email': 'user@example.com'});
-  });
-
-  test('generates passkey platform association snippets', () {
-    const config = RosmPasskeyPlatformConfig(
-      rpDomain: 'auth.cruty.cn',
-      appleTeamId: 'Y6AYA4F7T3',
-      appleBundleId: 'com.cruos.zion',
-      androidPackageName: 'com.cruos.zion',
-      androidSha256CertFingerprints: ['AA:BB:CC'],
-    );
-
-    expect(config.appleAssociatedDomain, 'webcredentials:auth.cruty.cn');
-    expect(config.appleAppSiteAssociation(), {
-      'webcredentials': {
-        'apps': ['Y6AYA4F7T3.com.cruos.zion'],
-      },
-    });
-    expect(config.androidAssetLinks(), [
-      {
-        'relation': ['delegate_permission/common.get_login_creds'],
-        'target': {
-          'namespace': 'android_app',
-          'package_name': 'com.cruos.zion',
-          'sha256_cert_fingerprints': ['AA:BB:CC'],
-        },
-      },
-    ]);
-    expect(config.androidAssetStatementsInclude(), {
-      'include': 'https://auth.cruty.cn/.well-known/assetlinks.json',
-    });
-  });
-
-  test('normalizes passkey credential descriptors for native plugins', () {
-    final options = RosmWebAuthnOptions({
-      'challenge': 'challenge',
-      'rp': {'id': 'auth.cruty.cn', 'name': 'ROSM'},
-      'user': {'id': 'user-id', 'name': 'user@example.com'},
-      'excludeCredentials': [
-        {'id': 'credential-id'},
-      ],
-      'allowCredentials': [
-        {
-          'id': 'allowed-id',
-          'type': '',
-          'transports': ['internal'],
-        },
-      ],
-    });
-
-    final normalized = RosmNativePasskeys.normalizeOptionsForPlatform(options);
-
-    expect(normalized['excludeCredentials'], [
-      {'id': 'credential-id', 'type': 'public-key', 'transports': <String>[]},
-    ]);
-    expect(normalized['allowCredentials'], [
-      {
-        'id': 'allowed-id',
-        'type': 'public-key',
-        'transports': ['internal'],
-      },
-    ]);
-  });
+      final hint = await client.lastSignIn();
+      expect(hint?.method, RosmSignInMethod.emailCode);
+      expect(hint?.identifier, 'user@example.com');
+      await client.clearLastSignIn();
+      expect(await client.lastSignIn(), isNull);
+    },
+  );
 
   test(
     'completes server handoff with authorization code and verifier',
@@ -391,56 +343,6 @@ void main() {
       expect((await store.read())?.refreshToken, 'refresh-2');
     },
   );
-
-  test('lists and deletes passkeys', () async {
-    final requests = <http.Request>[];
-    final client = RosmPassportClient(
-      issuer: Uri.parse('https://api.example.com'),
-      clientId: 'app',
-      redirectUri: Uri.parse('com.example.app:/oidc/callback'),
-      tokenStore: _MemoryTokenStore(),
-      httpClient: MockClient((request) async {
-        requests.add(request);
-        if (request.method == 'GET') {
-          return http.Response(
-            jsonEncode({
-              'credentials': [
-                {
-                  'credential_id': 'cred/1',
-                  'device_type': 'platform',
-                  'backed_up': true,
-                  'transports': ['internal'],
-                  'created_at': '2026-07-14T12:00:00.000Z',
-                },
-              ],
-              'max_count': 5,
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }
-        return http.Response(
-          jsonEncode({'deleted': true}),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }),
-    );
-
-    final list = await client.listPasskeys();
-    final deleted = await client.deletePasskey(
-      list.credentials.first.credentialId,
-    );
-
-    expect(list.maxCount, 5);
-    expect(list.credentials.single.credentialId, 'cred/1');
-    expect(list.credentials.single.backedUp, isTrue);
-    expect(deleted.deleted, isTrue);
-    expect(requests[0].method, 'GET');
-    expect(requests[0].url.path, '/api/v1/me/webauthn/credentials');
-    expect(requests[1].method, 'DELETE');
-    expect(requests[1].url.path, '/api/v1/me/webauthn/credentials/cred%2F1');
-  });
 }
 
 class _MemoryTokenStore implements RosmTokenStore {

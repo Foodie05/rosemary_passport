@@ -73,3 +73,80 @@ class RosmMemoryTokenStore implements RosmTokenStore {
     _tokens = null;
   }
 }
+
+/// The non-secret information needed to make a subsequent sign-in faster.
+///
+/// This never contains a password, one-time code, token, or device credential.
+class RosmLastSignIn {
+  const RosmLastSignIn({required this.method, required this.identifier});
+
+  final RosmSignInMethod method;
+  final String identifier;
+}
+
+enum RosmSignInMethod { phoneCode, emailCode, password }
+
+abstract interface class RosmLastSignInStore {
+  Future<void> save(RosmLastSignIn hint);
+
+  Future<RosmLastSignIn?> read();
+
+  Future<void> clear();
+}
+
+class RosmSecureLastSignInStore implements RosmLastSignInStore {
+  RosmSecureLastSignInStore({
+    FlutterSecureStorage? storage,
+    this.prefix = 'rosm_passport',
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  final FlutterSecureStorage _storage;
+  final String prefix;
+
+  @override
+  Future<void> save(RosmLastSignIn hint) async {
+    await _storage.write(
+      key: '$prefix.last_sign_in.method',
+      value: hint.method.name,
+    );
+    await _storage.write(
+      key: '$prefix.last_sign_in.identifier',
+      value: hint.identifier,
+    );
+  }
+
+  @override
+  Future<RosmLastSignIn?> read() async {
+    final method = await _storage.read(key: '$prefix.last_sign_in.method');
+    final identifier = await _storage.read(
+      key: '$prefix.last_sign_in.identifier',
+    );
+    if (method == null || identifier == null || identifier.trim().isEmpty)
+      return null;
+    final parsed = RosmSignInMethod.values.where(
+      (value) => value.name == method,
+    );
+    return parsed.isEmpty
+        ? null
+        : RosmLastSignIn(method: parsed.first, identifier: identifier);
+  }
+
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: '$prefix.last_sign_in.method');
+    await _storage.delete(key: '$prefix.last_sign_in.identifier');
+  }
+}
+
+class RosmMemoryLastSignInStore implements RosmLastSignInStore {
+  RosmLastSignIn? _hint;
+
+  @override
+  Future<void> clear() async => _hint = null;
+
+  @override
+  Future<RosmLastSignIn?> read() async => _hint;
+
+  @override
+  Future<void> save(RosmLastSignIn hint) async => _hint = hint;
+}

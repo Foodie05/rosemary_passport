@@ -13,25 +13,24 @@ class RosmPassportClient {
     required this.clientId,
     required this.redirectUri,
     Set<String> scopes = const {'openid', 'profile', 'email'},
-    Uri? webAuthnOrigin,
     http.Client? httpClient,
     RosmTokenStore? tokenStore,
+    RosmLastSignInStore? lastSignInStore,
     RosmPassportLogger? logger,
   }) : scopes = Set.unmodifiable(scopes),
-       webAuthnOrigin =
-           webAuthnOrigin ?? issuer.replace(path: '', query: '', fragment: ''),
        _http = httpClient ?? http.Client(),
        _tokenStore = tokenStore ?? RosmSecureTokenStore(),
+       _lastSignInStore = lastSignInStore ?? RosmSecureLastSignInStore(),
        logger = logger ?? RosmPassportLogging.logger;
 
   final Uri issuer;
   final String clientId;
   final Uri redirectUri;
   final Set<String> scopes;
-  final Uri webAuthnOrigin;
   final RosmPassportLogger logger;
   final http.Client _http;
   final RosmTokenStore _tokenStore;
+  final RosmLastSignInStore _lastSignInStore;
   final Map<String, String> _cookies = {};
 
   RosmAuthorizationRequest createAuthorizationRequest({
@@ -276,7 +275,12 @@ class RosmPassportClient {
     }
     _cookies.clear();
     await _tokenStore.clear();
+    await _lastSignInStore.clear();
   }
+
+  Future<RosmLastSignIn?> lastSignIn() => _lastSignInStore.read();
+
+  Future<void> clearLastSignIn() => _lastSignInStore.clear();
 
   Future<RosmPasswordFactors> passwordFactors({
     required String email,
@@ -315,7 +319,13 @@ class RosmPassportClient {
         captchaToken: captchaToken,
       ).toJson(),
     );
-    return _authResultFromJson(json);
+    return _authResultFromJson(
+      json,
+      lastSignIn: RosmLastSignIn(
+        method: RosmSignInMethod.password,
+        identifier: email.trim(),
+      ),
+    );
   }
 
   Future<RosmOperationResult> sendPasswordMfaCode({
@@ -355,7 +365,13 @@ class RosmPassportClient {
       'email': email,
       'email_code': emailCode,
     });
-    return _authResultFromJson(json);
+    return _authResultFromJson(
+      json,
+      lastSignIn: RosmLastSignIn(
+        method: RosmSignInMethod.emailCode,
+        identifier: email.trim(),
+      ),
+    );
   }
 
   Future<RosmOperationResult> sendPhoneLoginCode({
@@ -377,7 +393,13 @@ class RosmPassportClient {
       'phone_number': phoneNumber,
       'verify_code': verifyCode,
     });
-    return _authResultFromJson(json);
+    return _authResultFromJson(
+      json,
+      lastSignIn: RosmLastSignIn(
+        method: RosmSignInMethod.phoneCode,
+        identifier: phoneNumber.trim(),
+      ),
+    );
   }
 
   Future<RosmOperationResult> sendRegisterCode({
@@ -412,30 +434,6 @@ class RosmPassportClient {
     return _authResultFromJson(json);
   }
 
-  Future<RosmWebAuthnOptions> beginWebAuthnLogin({
-    String? email,
-    Uri? origin,
-  }) async {
-    final json = await _postJson(
-      '/api/v1/auth/webauthn/options',
-      RosmWebAuthnLoginOptionsRequest(email: email).toJson(),
-      headers: _webAuthnHeaders(origin),
-    );
-    return RosmWebAuthnOptions.fromJson(json);
-  }
-
-  Future<RosmAuthResult> completeWebAuthnLogin({
-    String? email,
-    required RosmWebAuthnCredential credential,
-    Uri? origin,
-  }) async {
-    final json = await _postJson('/api/v1/auth/webauthn/verify', {
-      if (email != null) 'email': email,
-      'response': credential.response,
-    }, headers: _webAuthnHeaders(origin));
-    return _authResultFromJson(json);
-  }
-
   Future<RosmOperationResult> sendPasswordRecoveryCode({
     required String account,
     required RosmPasswordRecoveryMethod method,
@@ -452,11 +450,17 @@ class RosmPassportClient {
     return RosmOperationResult.fromJson(json);
   }
 
-  Future<RosmAuthResult> _authResultFromJson(Map<String, dynamic> json) async {
+  Future<RosmAuthResult> _authResultFromJson(
+    Map<String, dynamic> json, {
+    RosmLastSignIn? lastSignIn,
+  }) async {
     final result = RosmAuthResult.fromJson(json);
     final tokens = result.tokens;
     if (tokens != null) {
       await _tokenStore.save(tokens);
+    }
+    if (lastSignIn != null && lastSignIn.identifier.isNotEmpty) {
+      await _lastSignInStore.save(lastSignIn);
     }
     return result;
   }
@@ -475,44 +479,6 @@ class RosmPassportClient {
         code: code,
         newPassword: newPassword,
       ).toJson(),
-    );
-    return RosmOperationResult.fromJson(json);
-  }
-
-  Future<RosmWebAuthnOptions> beginPasskeyRegistration({
-    String? currentPassword,
-    bool postRegisterBootstrap = false,
-    Uri? origin,
-  }) async {
-    final json = await _postJson(
-      '/api/v1/me/webauthn/register/options',
-      RosmPasskeyRegistrationOptionsRequest(
-        currentPassword: currentPassword,
-        postRegisterBootstrap: postRegisterBootstrap,
-      ).toJson(),
-      headers: _webAuthnHeaders(origin),
-    );
-    return RosmWebAuthnOptions.fromJson(json);
-  }
-
-  Future<RosmOperationResult> completePasskeyRegistration({
-    required RosmWebAuthnCredential credential,
-    Uri? origin,
-  }) async {
-    final json = await _postJson('/api/v1/me/webauthn/register/verify', {
-      'response': credential.response,
-    }, headers: _webAuthnHeaders(origin));
-    return RosmOperationResult.fromJson(json);
-  }
-
-  Future<RosmPasskeyList> listPasskeys() async {
-    final json = await _getJson('/api/v1/me/webauthn/credentials');
-    return RosmPasskeyList.fromJson(json);
-  }
-
-  Future<RosmOperationResult> deletePasskey(String credentialId) async {
-    final json = await _deleteJson(
-      '/api/v1/me/webauthn/credentials/${Uri.encodeComponent(credentialId)}',
     );
     return RosmOperationResult.fromJson(json);
   }
@@ -656,34 +622,6 @@ class RosmPassportClient {
       _failHttpLog('POST', endpoint, stopwatch, error, stackTrace);
       rethrow;
     }
-  }
-
-  Future<Map<String, dynamic>> _deleteJson(
-    String path, {
-    bool retryOnUnauthorized = true,
-  }) async {
-    final uri = issuer.resolve(path);
-    final stopwatch = _startHttpLog('DELETE', uri);
-    try {
-      var response = await _http.delete(uri, headers: await _authHeaders());
-      _storeCookies(response);
-      if (retryOnUnauthorized &&
-          response.statusCode == 401 &&
-          await _refreshAfterUnauthorized()) {
-        response = await _http.delete(uri, headers: await _authHeaders());
-        _storeCookies(response);
-      }
-      final json = _decodeJsonResponse(response);
-      _finishHttpLog('DELETE', uri, response.statusCode, stopwatch);
-      return json;
-    } on Object catch (error, stackTrace) {
-      _failHttpLog('DELETE', uri, stopwatch, error, stackTrace);
-      rethrow;
-    }
-  }
-
-  Map<String, String> _webAuthnHeaders(Uri? origin) {
-    return {'origin': (origin ?? webAuthnOrigin).toString()};
   }
 
   Stopwatch _startHttpLog(String method, Uri uri) {
@@ -844,7 +782,6 @@ class RosmPassportClient {
         'missing_access_token' ||
         'invalid_access_token' => '登录状态已过期，请重新登录。',
         'invalid_grant' => '登录凭据已失效，请重新登录。',
-        'webauthn_unavailable' => '当前服务器未启用通行密钥，请稍后再试。',
         _ => normalized,
       };
     }
