@@ -12,8 +12,9 @@ import {
   ShieldCheck,
   User,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from '../theme';
+import { getUserErrorMessage } from '../lib/errors';
 import {
   preparePublicKeyRequestOptions,
   serializeAuthenticationCredential,
@@ -91,6 +92,32 @@ function CodeInputWithAction({
         </button>
       </div>
     </div>
+  );
+}
+
+function RememberMeCheckbox({ checked, onChange }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 px-1 text-sm text-sage-500">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
+      />
+      保持登录状态（3 天）
+    </label>
+  );
+}
+
+function AccountCenterLink() {
+  return (
+    <Link
+      to="/account"
+      className="mx-auto flex w-fit items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-sage-500 transition-colors hover:bg-sage-100 hover:text-sage-800"
+    >
+      ROSM 账号中心
+      <ArrowRight size={15} aria-hidden="true" />
+    </Link>
   );
 }
 
@@ -174,10 +201,7 @@ function getWebAuthnErrorMessage(error) {
   if (error?.name === 'InvalidStateError') {
     return '当前通行密钥状态异常，请重新尝试。';
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return '通行密钥登录失败，请重试。';
+  return getUserErrorMessage(error, '通行密钥登录失败，请重试。');
 }
 
 export function LoginPage({
@@ -185,6 +209,8 @@ export function LoginPage({
   setLoginForm,
   loginMethod,
   setLoginMethod,
+  rememberMe,
+  setRememberMe,
   loginStep,
   setLoginStep,
   loading,
@@ -235,6 +261,21 @@ export function LoginPage({
     setLoginMethod(nextMethod);
     setLoginStep('credentials');
     setSelectedPasswordFactor('');
+  }
+
+  function switchAccount() {
+    setLoginForm({
+      email: '',
+      phone_number: '',
+      password: '',
+      email_code: '',
+      phone_code: '',
+      authenticator_code: '',
+    });
+    setLoginMethod('phone_code');
+    setLoginStep('credentials');
+    setSelectedPasswordFactor('');
+    setWebauthnError('');
   }
 
   function renderPanel(view) {
@@ -346,6 +387,7 @@ export function LoginPage({
               await completeWebAuthnLogin(
                 '',
                 serializeAuthenticationCredential(credential),
+                rememberMe,
               );
             } catch (error) {
               setWebauthnError(getWebAuthnErrorMessage(error));
@@ -384,12 +426,6 @@ export function LoginPage({
           />
 
           <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="remember" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" />
-              <label htmlFor="remember" className="text-sm text-sage-500">
-                保持登录状态
-              </label>
-            </div>
             <Link to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'} className="text-xs font-bold text-sage-600 transition-colors hover:text-sage-900">
               忘记密码？
             </Link>
@@ -509,6 +545,7 @@ export function LoginPage({
                   await completeWebAuthnLogin(
                     loginForm.email.trim(),
                     serializeAuthenticationCredential(credential),
+                    rememberMe,
                   );
                 } catch (error) {
                   setWebauthnError(getWebAuthnErrorMessage(error));
@@ -543,15 +580,24 @@ export function LoginPage({
         <div className="relative flex flex-col justify-center px-5 pb-10 pt-20 sm:p-12 lg:p-24">
           <div className="mx-auto w-full max-w-md space-y-10">
             <div className="space-y-3">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold text-sage-900">欢迎回来</h1>
-                <p className="text-sage-500">
-                  {loginMethod === 'phone_code'
-                    ? '请输入手机号并使用短信验证码完成登录。'
-                    : loginStep === 'credentials'
-                      ? '请输入您的凭据以访问账户。'
-                      : '请输入二因素验证信息以完成本次登录。'}
-                </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold text-sage-900">欢迎回来</h1>
+                  <p className="text-sage-500">
+                    {loginMethod === 'phone_code'
+                      ? '请输入手机号并使用短信验证码完成登录。'
+                      : loginStep === 'credentials'
+                        ? '请输入您的凭据以访问账户。'
+                        : '请输入二因素验证信息以完成本次登录。'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={switchAccount}
+                  className="shrink-0 rounded-xl border border-sage-200 bg-white px-3 py-2 text-sm font-semibold text-sage-600 shadow-sm transition-colors hover:border-sage-300 hover:bg-sage-50 hover:text-sage-900"
+                >
+                  切换账号
+                </button>
               </div>
               <div className="relative grid grid-cols-4 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
                 <button
@@ -637,6 +683,8 @@ export function LoginPage({
               </AnimatePresence>
             </motion.div>
 
+            <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
+
             <p className="text-center text-sm text-sage-500">
               还没有账户？
               {' '}
@@ -644,6 +692,7 @@ export function LoginPage({
                 立即注册
               </Link>
             </p>
+            <AccountCenterLink />
           </div>
         </div>
       </div>
@@ -667,6 +716,21 @@ export function RegisterPage({
   mountCaptcha,
   authNext = '',
 }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const method = params.get('method');
+    if (method === 'phone') {
+      const phoneNumber = params.get('phone_number') || '';
+      setRegisterMethod('phone');
+      setRegisterForm((current) => ({ ...current, phone_number: phoneNumber }));
+    } else if (method === 'email') {
+      const email = params.get('email') || '';
+      setRegisterMethod('email');
+      setRegisterForm((current) => ({ ...current, email }));
+    }
+  }, [location.search, setRegisterForm, setRegisterMethod]);
   useEffect(() => {
     mountCaptcha?.();
   }, [mountCaptcha]);
@@ -839,7 +903,7 @@ export function ForgotPasswordPage({
                       await sendRecoveryCode({ method, account: form.account });
                       setStep('verify');
                     } catch (e) {
-                      setError(e.message || '发送失败');
+                      setError(getUserErrorMessage(e, '发送失败，请稍后重试。'));
                     }
                   }} className="btn-primary w-full py-4 font-bold" type="button" disabled={loading}>
                     发送验证码
@@ -876,7 +940,7 @@ export function ForgotPasswordPage({
                       });
                       setStep('done');
                     } catch (e) {
-                      setError(e.message || '重置失败');
+                      setError(getUserErrorMessage(e, '重置失败，请稍后重试。'));
                     }
                   }} className="btn-primary mb-3 mt-4 w-full py-4 font-bold" type="button" disabled={loading}>
                     重置密码
@@ -1022,7 +1086,7 @@ export function PostRegisterBindingPrompt({
       setCodeSent(true);
       setCooldown(Math.max(1, Number(result?.retry_after || 60)));
     } catch (sendError) {
-      setError(sendError.message || '验证码发送失败，请稍后重试。');
+      setError(getUserErrorMessage(sendError, '验证码发送失败，请稍后重试。'));
     } finally {
       setSending(false);
     }
@@ -1034,7 +1098,7 @@ export function PostRegisterBindingPrompt({
     try {
       await onConfirm(account.trim(), code.trim());
     } catch (bindError) {
-      setError(bindError.message || '绑定失败，请检查验证码后重试。');
+      setError(getUserErrorMessage(bindError, '绑定失败，请检查验证码后重试。'));
     } finally {
       setSaving(false);
     }

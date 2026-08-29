@@ -6,6 +6,7 @@ import { AdminFlutterSdkDocsPage, AdminOIDCConfig, AdminOidcDocsPage, AdminSecur
 import { ForgotPasswordPage, LoginPage, PostRegisterBindingPrompt, PostRegisterPasskeyPrompt, RegisterPage } from './pages/AuthPages';
 import { UserAccountPage } from './pages/UserPages';
 import { useTheme } from './theme';
+import { getUserErrorMessage, getUserMessage } from './lib/errors';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
@@ -17,6 +18,8 @@ function AppRoutes({
   setLoginForm,
   loginMethod,
   setLoginMethod,
+  rememberMe,
+  setRememberMe,
   loginStep,
   setLoginStep,
   loading,
@@ -121,6 +124,8 @@ function AppRoutes({
                 setLoginForm={setLoginForm}
                 loginMethod={loginMethod}
                 setLoginMethod={setLoginMethod}
+                rememberMe={rememberMe}
+                setRememberMe={setRememberMe}
                 loginStep={loginStep}
                 setLoginStep={setLoginStep}
                 loading={loading}
@@ -246,6 +251,8 @@ function AppRoutes({
                 updateNicknameSilently={updateNicknameSilently}
                 sendBindEmailCode={sendBindEmailCode}
                 bindEmail={bindEmail}
+                sendBindPhoneCode={sendBindPhoneCode}
+                bindPhone={bindPhone}
                 sendPasswordResetCode={sendPasswordResetCode}
                 resetPasswordWithCode={resetPasswordWithCode}
                 beginAuthenticatorSetup={beginAuthenticatorSetup}
@@ -306,6 +313,7 @@ function App() {
 
   const [toast, setToast] = useState(null);
   const [loginMethod, setLoginMethod] = useState('phone_code');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginStep, setLoginStep] = useState('credentials');
   const [status, setStatus] = useState('');
   const [publicConfig, setPublicConfig] = useState(null);
@@ -368,6 +376,7 @@ function App() {
     scopes: 'openid\nprofile\nemail\nphone',
     grant_types: 'authorization_code\nrefresh_token',
     client_secret: '',
+    generate_client_secret: false,
     is_confidential: false,
     is_active: true,
   });
@@ -459,7 +468,7 @@ function App() {
   }, [loginCodeCooldownRemaining]);
 
   function showToast(message, type = 'info') {
-    setToast({ message, type });
+    setToast({ message: type === 'error' ? getUserMessage(message) : message, type });
   }
 
   function redirectToLoginWithToast(message) {
@@ -515,6 +524,7 @@ function App() {
         method,
         headers,
         credentials: 'include',
+        cache: method === 'GET' ? 'default' : 'no-store',
         body: body ? JSON.stringify(body) : undefined,
       });
     } catch (_) {
@@ -525,71 +535,26 @@ function App() {
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(data.message || `请求失败(${response.status})`);
+      const error = new Error();
       error.code = data.error || data.code || 'request_failed';
       error.status = response.status;
+      error.serverMessage = typeof data.message === 'string' ? data.message : '';
+      error.message = getUserErrorMessage(error);
       throw error;
     }
     return data;
   }
 
   function getAuthErrorMessage(error, context) {
-    const code = error?.code || 'request_failed';
-    if (code === 'network_error') {
-      return '当前无法连接到服务，请检查网络后重试。';
-    }
-    if (code === 'login_failed') {
-      return '账号或密码错误';
-    }
-    if (code === 'rate_limited') {
-      return '请求过于频繁，请稍后再试。';
-    }
-    if (code === 'mfa_required' || code === 'invalid_totp_code') {
-      return error.message || '验证信息无效，请重试。';
-    }
-    if (code === 'not_configured') {
-      return '当前账户未配置通行密钥。';
-    }
-    if (code === 'verification_failed') {
-      return '通行密钥校验未通过，请重试。';
-    }
-    if (code === 'invalid_factor') {
-      return '当前验证方式不可用，请重新选择。';
-    }
-    if (code === 'invalid_request') {
-      return error.message || '请求参数不完整，请检查后重试。';
-    }
-    if (code === 'captcha_failed') {
-      return error.message || '人机验证未通过，请重试。';
-    }
-    if (code === 'email_already_registered') {
-      return error.message || '该邮箱已注册。';
-    }
-    if (code === 'invalid_email_code') {
-      return error.message || '邮箱验证码无效或已过期。';
-    }
-    if (code === 'registration_email_not_allowed') {
-      return error.message || '当前邮箱暂不支持注册。';
-    }
-    if (code === 'temporary_issue') {
-      return error.message || '服务暂时不可用，请稍后重试。';
-    }
-    if (context === 'password_factor_select') {
-      return error.message || '无法读取当前账户可用的验证方式。';
-    }
-    if (context === 'password_code_send') {
-      return error.message || '邮箱验证码发送失败，请稍后重试。';
-    }
-    if (context === 'password_login') {
-      return error.message || '登录失败，请检查验证信息后重试。';
-    }
-    if (context === 'email_code_send') {
-      return error.message || '登录验证码发送失败，请稍后重试。';
-    }
-    if (context === 'email_code_login') {
-      return error.message || '登录失败，请检查验证码后重试。';
-    }
-    return error.message || '请求失败，请稍后重试。';
+    const fallbackByContext = {
+      password_factor_select: '无法读取当前账户可用的验证方式。',
+      password_code_send: '邮箱验证码发送失败，请稍后重试。',
+      password_login: '登录失败，请检查验证信息后重试。',
+      email_code_send: '登录验证码发送失败，请稍后重试。',
+      email_code_login: '登录失败，请检查验证码后重试。',
+    };
+    const fallback = fallbackByContext[context] || '请求失败，请稍后重试。';
+    return getUserErrorMessage(error, fallback);
   }
 
   function getPasskeySetupErrorMessage(error) {
@@ -612,14 +577,14 @@ function App() {
     if (error?.name === 'UnknownError' || normalizedMessage.includes('credential manager')) {
       return '系统凭据管理器暂时无法创建通行密钥。你可以改用最新版 Chrome 重试，或先选择“稍后再说”，这不会影响刚刚注册的账户和登录状态。';
     }
-    return error?.message || '通行密钥添加失败，请稍后再试。';
+    return getUserErrorMessage(error, '通行密钥添加失败，请稍后再试。');
   }
 
   const safely = useCallback(async (task, fallbackMessage) => {
     try {
       await task();
     } catch (error) {
-      showToast(error.message || fallbackMessage, 'error');
+      showToast(getUserErrorMessage(error, fallbackMessage), 'error');
     }
   }, []);
 
@@ -1033,6 +998,7 @@ function App() {
           email_code: loginForm.email_code.trim(),
           phone_code: loginForm.phone_code.trim(),
           authenticator_code: loginForm.authenticator_code.trim(),
+          remember_me: rememberMe,
           ...(captchaToken ? { captcha_token: captchaToken } : {}),
         },
       });
@@ -1059,6 +1025,9 @@ function App() {
       setLoginCodeCooldownRemaining(Number(data.retry_after || 0));
       showToast('登录验证码已发送，请检查邮箱。', 'success');
     } catch (error) {
+      if (redirectUnregisteredAccount(error, 'email')) {
+        return;
+      }
       showToast(getAuthErrorMessage(error, 'email_code_send'), 'error');
     } finally {
       resetBackgroundCaptcha();
@@ -1081,11 +1050,31 @@ function App() {
       setLoginCodeCooldownRemaining(Math.max(60, Number(data.retry_after || 0)));
       showToast('请求已受理。若该手机号已绑定账号，将收到短信验证码。', 'success');
     } catch (error) {
+      if (redirectUnregisteredAccount(error, 'phone')) {
+        return;
+      }
       showToast(error.message || '登录验证码发送失败，请稍后重试。', 'error');
     } finally {
       resetBackgroundCaptcha();
       setLoginCodeSending(false);
     }
+  }
+
+  function redirectUnregisteredAccount(error, method) {
+    if (error?.code !== 'account_not_found') {
+      return false;
+    }
+    const params = new URLSearchParams({ method });
+    const account = method === 'phone'
+      ? loginForm.phone_number.trim()
+      : loginForm.email.trim();
+    params.set(method === 'phone' ? 'phone_number' : 'email', account);
+    const next = new URLSearchParams(window.location.search).get('next')?.trim();
+    if (next) {
+      params.set('next', next);
+    }
+    window.location.assign(`/register?${params.toString()}`);
+    return true;
   }
 
   async function preparePhoneCodeLogin(event) {
@@ -1107,6 +1096,7 @@ function App() {
         body: {
           phone_number: loginForm.phone_number.trim(),
           verify_code: loginForm.phone_code.trim(),
+          remember_me: rememberMe,
         },
       });
       onLoginSuccess(payload);
@@ -1136,6 +1126,7 @@ function App() {
         body: {
           email: loginForm.email.trim(),
           email_code: loginForm.email_code.trim(),
+          remember_me: rememberMe,
         },
       });
       onLoginSuccess(payload);
@@ -1169,6 +1160,7 @@ function App() {
     setLoginStep('credentials');
     setPasswordLoginFactors([]);
     setSelectedPasswordFactor('phone_code');
+    setRememberMe(false);
     setLoginForm({
       email: payload.user?.email || '',
       phone_number: payload.user?.phone_number || '',
@@ -1486,10 +1478,10 @@ function App() {
     });
   }
 
-  async function completeWebAuthnLogin(email, response) {
+  async function completeWebAuthnLogin(email, response, remember = rememberMe) {
     const payload = await api('/api/v1/auth/webauthn/verify', {
       method: 'POST',
-      body: email ? { email, response } : { response },
+      body: email ? { email, response, remember_me: remember } : { response, remember_me: remember },
     });
     onLoginSuccess(payload);
     return payload;
@@ -1802,7 +1794,7 @@ function App() {
       ...(oidcForm.enable_app ? parseLines(oidcForm.app_redirect_uri) : []),
     ].reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
     try {
-      await api(`/api/v1/admin/oidc/clients/${encodeURIComponent(oidcForm.client_id.trim())}`, {
+      const result = await api(`/api/v1/admin/oidc/clients/${encodeURIComponent(oidcForm.client_id.trim())}`, {
         method: 'PUT',
         auth: true,
         body: {
@@ -1812,14 +1804,19 @@ function App() {
           redirect_uris: combinedRedirectUris,
           scopes: parseLines(oidcForm.scopes, ['openid', 'profile', 'email', 'phone']),
           grant_types: parseLines(oidcForm.grant_types, ['authorization_code', 'refresh_token']),
-          client_secret: oidcForm.client_secret,
+          generate_client_secret: Boolean(oidcForm.generate_client_secret),
           is_confidential: Boolean(oidcForm.is_confidential),
           is_active: Boolean(oidcForm.is_active),
         },
       });
-      await loadOidcClients();
       setOidcForm((current) => ({ ...current, client_secret: '' }));
       showToast('OIDC 客户端已保存', 'success');
+      try {
+        await loadOidcClients();
+      } catch (error) {
+        showToast(error.message || '客户端列表刷新失败，请稍后手动刷新', 'error');
+      }
+      return result;
     } catch (error) {
       showToast(error.message || '保存失败', 'error');
     }
@@ -1954,6 +1951,8 @@ function App() {
         setLoginForm={setLoginForm}
         loginMethod={loginMethod}
         setLoginMethod={setLoginMethod}
+        rememberMe={rememberMe}
+        setRememberMe={setRememberMe}
         loginStep={loginStep}
         setLoginStep={setLoginStep}
         loading={loading}

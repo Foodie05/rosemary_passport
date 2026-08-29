@@ -46,7 +46,7 @@ Future<Response> onRequest(RequestContext context) async {
     }
 
     try {
-      await service.upsertClient(
+      final result = await service.upsertClient(
         clientId: clientId,
         displayName: displayName,
         isOfficial: isOfficial,
@@ -56,12 +56,20 @@ Future<Response> onRequest(RequestContext context) async {
         isConfidential: isConfidential,
         isActive: isActive,
         clientSecret: clientSecret,
+        generateClientSecret: body['generate_client_secret'] == true,
+      );
+      return jsonResponse(
+        {
+          'updated': true,
+          if (result.generatedClientSecret case final secret?)
+            'client_secret': secret,
+        },
+        statusCode: 201,
+        headers: _sensitiveResponseHeaders,
       );
     } on ArgumentError catch (e) {
       return errorResponse('invalid_request', e.message.toString());
     }
-
-    return jsonResponse({'updated': true}, statusCode: 201);
   }
 
   return errorResponse(
@@ -70,6 +78,12 @@ Future<Response> onRequest(RequestContext context) async {
     statusCode: 405,
   );
 }
+
+const _sensitiveResponseHeaders = {
+  'cache-control': 'no-store, max-age=0',
+  'pragma': 'no-cache',
+  'referrer-policy': 'no-referrer',
+};
 
 List<String> _readStringList(dynamic raw, {required List<String> fallback}) {
   if (raw is List) {

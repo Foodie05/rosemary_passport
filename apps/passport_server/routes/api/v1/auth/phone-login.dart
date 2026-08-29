@@ -17,6 +17,7 @@ Future<Response> onRequest(RequestContext context) async {
 
   final phoneNumber = (body['phone_number'] ?? '').toString().trim();
   final verifyCode = (body['verify_code'] ?? '').toString().trim();
+  final rememberMe = body['remember_me'] == true;
   if (phoneNumber.isEmpty || verifyCode.isEmpty) {
     return errorResponse('invalid_request', '请输入手机号和验证码。');
   }
@@ -29,6 +30,7 @@ Future<Response> onRequest(RequestContext context) async {
     phoneNumber: phoneNumber,
     verifyCode: verifyCode,
     requestIp: requestIp,
+    rememberMe: rememberMe,
   );
   if (!attempt.ok) {
     return errorResponse(
@@ -48,5 +50,6 @@ Future<Response> onRequest(RequestContext context) async {
     context,
     responseBody,
     accessToken: result.tokens.accessToken,
+    accessTokenMaxAgeSeconds: result.tokens.expiresIn,
   );
 }

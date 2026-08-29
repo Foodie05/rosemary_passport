@@ -783,12 +783,17 @@ class AuthService {
     }
 
     final user = await _users.findByEmail(email);
-    if (user != null && !user.roles.contains('admin')) {
-      await _emailCodeService.issueLoginCode(
-        user.email,
-        templateName: 'login_verification',
+    if (user == null || user.roles.contains('admin')) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'account_not_found',
+        message: '该邮箱尚未注册。',
+        statusCode: 404,
       );
     }
+    await _emailCodeService.issueLoginCode(
+      user.email,
+      templateName: 'login_verification',
+    );
     await _startVerificationCodeCooldown(
       email: email,
       seconds: policy.loginCodeCooldownSeconds,
@@ -1174,6 +1179,7 @@ class AuthService {
     String? phoneCode,
     String? authenticatorCode,
     String? requestIp,
+    bool rememberMe = false,
   }) async {
     final policy = _policy == null
         ? SecurityPolicyService.defaultPolicy
@@ -1212,7 +1218,10 @@ class AuthService {
     }
 
     if (await isBootstrapAdmin(user)) {
-      final authResult = await _issueFirstPartyAuthResult(user);
+      final authResult = await _issueFirstPartyAuthResult(
+        user,
+        rememberMe: rememberMe,
+      );
       await _clearLoginGuards(email: email);
       await _audit.log(
         action: 'user.login',
@@ -1246,7 +1255,10 @@ class AuthService {
           statusCode: 401,
         );
       }
-      final authResult = await _issueFirstPartyAuthResult(user);
+      final authResult = await _issueFirstPartyAuthResult(
+        user,
+        rememberMe: rememberMe,
+      );
       final consumed = await _emailCodeService.consumeCode(codeId);
       if (!consumed) {
         return const LoginAttempt.failure(
@@ -1334,7 +1346,10 @@ class AuthService {
       );
     }
 
-    final authResult = await _issueFirstPartyAuthResult(user);
+    final authResult = await _issueFirstPartyAuthResult(
+      user,
+      rememberMe: rememberMe,
+    );
     await _clearLoginGuards(email: email);
 
     await _audit.log(
@@ -1354,6 +1369,7 @@ class AuthService {
     required String email,
     required String emailCode,
     String? requestIp,
+    bool rememberMe = false,
   }) async {
     final policy = _policy == null
         ? SecurityPolicyService.defaultPolicy
@@ -1391,7 +1407,10 @@ class AuthService {
       );
     }
 
-    final authResult = await _issueFirstPartyAuthResult(user);
+    final authResult = await _issueFirstPartyAuthResult(
+      user,
+      rememberMe: rememberMe,
+    );
     final consumed = await _emailCodeService.consumeCode(codeId);
     if (!consumed) {
       return const LoginAttempt.failure(
@@ -1436,7 +1455,11 @@ class AuthService {
     }
     final user = await _users.findByPhoneNumber(normalized);
     if (user == null) {
-      return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+      return const AdminLoginCodeAttempt.failure(
+        code: 'account_not_found',
+        message: '该手机号尚未注册。',
+        statusCode: 404,
+      );
     }
     final attempt = await phoneService.sendCode(
       phoneNumber: normalized,
@@ -1456,6 +1479,7 @@ class AuthService {
     required String phoneNumber,
     required String verifyCode,
     String? requestIp,
+    bool rememberMe = false,
   }) async {
     final phoneService = _phoneVerification;
     if (phoneService == null) {
@@ -1492,7 +1516,10 @@ class AuthService {
         statusCode: checked.statusCode,
       );
     }
-    final authResult = await _issueFirstPartyAuthResult(user);
+    final authResult = await _issueFirstPartyAuthResult(
+      user,
+      rememberMe: rememberMe,
+    );
     await _audit.log(
       action: 'user.login.phone_code',
       actorId: user.id,
@@ -2234,6 +2261,7 @@ class AuthService {
     String? email,
     required Map<String, dynamic> response,
     String? requestIp,
+    bool rememberMe = false,
   }) async {
     final webAuthn = _webAuthn;
     if (webAuthn == null) {
@@ -2295,7 +2323,10 @@ class AuthService {
       );
     }
 
-    final authResult = await _issueFirstPartyAuthResult(user);
+    final authResult = await _issueFirstPartyAuthResult(
+      user,
+      rememberMe: rememberMe,
+    );
     await _audit.log(
       action: 'user.login.webauthn',
       actorId: user.id,
@@ -2604,6 +2635,7 @@ class AuthService {
   Future<AuthResult> _issueFirstPartyAuthResult(
     UserRecord user, {
     bool postRegistrationPasskeyBootstrap = false,
+    bool rememberMe = false,
   }) async {
     // This short-lived claim is intentionally only minted on the access token
     // returned by self-registration. Later logins and refreshed sessions do
@@ -2620,8 +2652,12 @@ class AuthService {
                   .millisecondsSinceEpoch ~/
               1000
         : null;
+    final accessTokenTtlSeconds = _tokenService.firstPartyAccessTokenTtlSeconds(
+      rememberMe: rememberMe,
+    );
     final tokens = _tokenService.issueTokenPair(
       user.toAuthenticatedUser(),
+      accessTokenTtlSeconds: accessTokenTtlSeconds,
       additionalAccessClaims: {
         if (bootstrapUntilEpochSeconds != null)
           'post_register_passkey_bootstrap_until': bootstrapUntilEpochSeconds,
@@ -2632,7 +2668,7 @@ class AuthService {
       userId: user.id,
       clientId: 'first_party_web',
       expiresAt: DateTime.now().toUtc().add(
-        Duration(seconds: _tokenService.accessTokenTtlSeconds),
+        Duration(seconds: accessTokenTtlSeconds),
       ),
     );
     await _oidcRepository.storeRefreshToken(

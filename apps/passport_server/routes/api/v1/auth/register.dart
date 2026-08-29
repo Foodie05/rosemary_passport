@@ -55,5 +55,6 @@ Future<Response> onRequest(RequestContext context) async {
     responseBody,
     statusCode: 201,
     accessToken: authResult.tokens.accessToken,
+    accessTokenMaxAgeSeconds: authResult.tokens.expiresIn,
   );
 }

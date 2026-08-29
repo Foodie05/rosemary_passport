@@ -10,6 +10,14 @@ RewriteEngine On
   Header set Content-Type "application/json"
 </Files>
 
+# HTML is the release pointer and must be revalidated on every visit. Hashed
+# JS/CSS assets remain cacheable, while deployments take effect immediately.
+<FilesMatch "\.html$">
+  Header set Cache-Control "no-cache, no-store, must-revalidate"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</FilesMatch>
+
 # Let existing files and directories pass through directly.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

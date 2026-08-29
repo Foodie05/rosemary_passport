@@ -30,6 +30,7 @@ class PasswordLoginRequest {
     this.emailCode,
     this.phoneCode,
     this.authenticatorCode,
+    this.rememberMe = false,
   });
 
   factory PasswordLoginRequest.fromJson(Map<String, dynamic> json) =>
@@ -42,6 +43,7 @@ class PasswordLoginRequest {
   final String? emailCode;
   final String? phoneCode;
   final String? authenticatorCode;
+  final bool rememberMe;
 
   Map<String, dynamic> toJson() => _$PasswordLoginRequestToJson(this);
 }
@@ -51,6 +53,7 @@ class EmailLoginRequest {
   const EmailLoginRequest({
     required this.email,
     required this.emailCode,
+    this.rememberMe = false,
   });
 
   factory EmailLoginRequest.fromJson(Map<String, dynamic> json) =>
@@ -58,6 +61,7 @@ class EmailLoginRequest {
 
   final String email;
   final String emailCode;
+  final bool rememberMe;
 
   Map<String, dynamic> toJson() => _$EmailLoginRequestToJson(this);
 }
@@ -179,6 +183,7 @@ class WebAuthnVerifyRequest {
   const WebAuthnVerifyRequest({
     this.email,
     required this.response,
+    this.rememberMe = false,
   });
 
   factory WebAuthnVerifyRequest.fromJson(Map<String, dynamic> json) =>
@@ -186,6 +191,7 @@ class WebAuthnVerifyRequest {
 
   final String? email;
   final Map<String, dynamic> response;
+  final bool rememberMe;
 
   Map<String, dynamic> toJson() => _$WebAuthnVerifyRequestToJson(this);
 }

@@ -27,6 +27,7 @@ Future<Response> onRequest(RequestContext context) async {
     email: payload.email,
     response: payload.response,
     requestIp: requestIp,
+    rememberMe: payload.rememberMe,
   );
   if (!attempt.ok) {
     return errorResponse(
@@ -46,5 +47,6 @@ Future<Response> onRequest(RequestContext context) async {
     context,
     responseBody,
     accessToken: result.tokens.accessToken,
+    accessTokenMaxAgeSeconds: result.tokens.expiresIn,
   );
 }

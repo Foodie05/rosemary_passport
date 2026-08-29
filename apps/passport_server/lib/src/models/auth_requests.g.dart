@@ -32,6 +32,7 @@ PasswordLoginRequest _$PasswordLoginRequestFromJson(
   emailCode: json['email_code'] as String?,
   phoneCode: json['phone_code'] as String?,
   authenticatorCode: json['authenticator_code'] as String?,
+  rememberMe: json['remember_me'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$PasswordLoginRequestToJson(
@@ -44,18 +45,21 @@ Map<String, dynamic> _$PasswordLoginRequestToJson(
   'email_code': ?instance.emailCode,
   'phone_code': ?instance.phoneCode,
   'authenticator_code': ?instance.authenticatorCode,
+  'remember_me': instance.rememberMe,
 };
 
 EmailLoginRequest _$EmailLoginRequestFromJson(Map<String, dynamic> json) =>
     EmailLoginRequest(
       email: json['email'] as String,
       emailCode: json['email_code'] as String,
+      rememberMe: json['remember_me'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$EmailLoginRequestToJson(EmailLoginRequest instance) =>
     <String, dynamic>{
       'email': instance.email,
       'email_code': instance.emailCode,
+      'remember_me': instance.rememberMe,
     };
 
 EmailRequest _$EmailRequestFromJson(Map<String, dynamic> json) => EmailRequest(
@@ -140,8 +144,13 @@ WebAuthnVerifyRequest _$WebAuthnVerifyRequestFromJson(
 ) => WebAuthnVerifyRequest(
   email: json['email'] as String?,
   response: json['response'] as Map<String, dynamic>,
+  rememberMe: json['remember_me'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$WebAuthnVerifyRequestToJson(
   WebAuthnVerifyRequest instance,
-) => <String, dynamic>{'email': ?instance.email, 'response': instance.response};
+) => <String, dynamic>{
+  'email': ?instance.email,
+  'response': instance.response,
+  'remember_me': instance.rememberMe,
+};

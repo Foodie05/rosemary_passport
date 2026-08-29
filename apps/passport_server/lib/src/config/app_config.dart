@@ -64,6 +64,11 @@ class AppConfig {
 
   int get accessTokenTtlSeconds =>
       int.parse(_env['ACCESS_TOKEN_TTL_SECONDS'] ?? '900');
+  int get firstPartyAccessTokenTtlSeconds =>
+      int.parse(_env['FIRST_PARTY_ACCESS_TOKEN_TTL_SECONDS'] ?? '43200');
+  int get firstPartyRememberedAccessTokenTtlSeconds => int.parse(
+    _env['FIRST_PARTY_REMEMBERED_ACCESS_TOKEN_TTL_SECONDS'] ?? '259200',
+  );
   int get refreshTokenTtlSeconds =>
       int.parse(_env['REFRESH_TOKEN_TTL_SECONDS'] ?? '2592000');
 
@@ -225,11 +230,25 @@ class AppConfig {
     if (emailCodeHmacKey.trim().length < 32) {
       weakSecrets.add('EMAIL_CODE_HMAC_KEY');
     }
+    if (!_isLocalDevelopmentHost && !_usesHttps(serverBaseUrl)) {
+      weakSecrets.add('SERVER_BASE_URL must use HTTPS');
+    }
+    if (!_isLocalDevelopmentHost && !_usesHttps(webBaseUrl)) {
+      weakSecrets.add('WEB_BASE_URL must use HTTPS');
+    }
     if (weakSecrets.isEmpty || _isLocalDevelopmentHost) {
       return;
     }
     throw StateError(
       'Critical security configuration is missing or weak: ${weakSecrets.join(', ')}',
     );
+  }
+
+  bool _usesHttps(String value) {
+    try {
+      return Uri.parse(value).scheme.toLowerCase() == 'https';
+    } catch (_) {
+      return false;
+    }
   }
 }

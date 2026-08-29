@@ -37,6 +37,7 @@ Response authJsonResponse(
   Map<String, dynamic> data, {
   int statusCode = 200,
   String? accessToken,
+  int? accessTokenMaxAgeSeconds,
 }) {
   final config = context.read<AppConfig>();
   return jsonResponse(
@@ -47,7 +48,8 @@ Response authJsonResponse(
         'set-cookie': buildAccessTokenCookie(
           accessToken,
           config: config,
-          maxAgeSeconds: context.read<TokenService>().accessTokenTtlSeconds,
+          maxAgeSeconds: accessTokenMaxAgeSeconds ??
+              context.read<TokenService>().accessTokenTtlSeconds,
         ),
     },
   );

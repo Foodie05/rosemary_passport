@@ -50,6 +50,7 @@ Future<Response> onRequest(RequestContext context) async {
     phoneCode: payload.phoneCode,
     authenticatorCode: payload.authenticatorCode,
     requestIp: requestIp,
+    rememberMe: payload.rememberMe,
   );
   if (!attempt.ok) {
     var response = errorResponse(
@@ -78,5 +79,6 @@ Future<Response> onRequest(RequestContext context) async {
     context,
     responseBody,
     accessToken: result.tokens.accessToken,
+    accessTokenMaxAgeSeconds: result.tokens.expiresIn,
   );
 }

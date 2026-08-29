@@ -34,6 +34,8 @@
   - `POST /oidc/introspect`
   - `POST /oidc/revoke`
 
+管理员创建机密 OIDC 客户端时，服务端会生成 256 位随机 `client_secret`，只在创建或轮换响应中返回一次，并设置 `Cache-Control: no-store`。数据库仅保存 Argon2id 哈希；生产环境的 `SERVER_BASE_URL` 与 `WEB_BASE_URL` 必须使用 HTTPS。
+
 ## 手机号验证码（阿里云号码认证）
 
 需配置以下环境变量后自动启用：

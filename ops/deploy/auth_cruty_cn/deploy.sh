@@ -141,6 +141,12 @@ tar \
 
 if [[ -f "$TMP_DIR/target.env" ]]; then
   cp "$TMP_DIR/target.env" "$ENV_TARGET"
+  # Website session duration is intentionally updated with each release while
+  # all existing credentials and unrelated service settings stay preserved.
+  for key in FIRST_PARTY_ACCESS_TOKEN_TTL_SECONDS FIRST_PARTY_REMEMBERED_ACCESS_TOKEN_TTL_SECONDS; do
+    sed -i "/^${key}=/d" "$ENV_TARGET"
+    grep "^${key}=" "$ENV_SOURCE" >> "$ENV_TARGET"
+  done
 else
   cp "$ENV_SOURCE" "$ENV_TARGET"
 fi

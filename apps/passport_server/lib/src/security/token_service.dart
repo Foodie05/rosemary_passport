@@ -59,13 +59,21 @@ class TokenService {
   int get accessTokenTtlSeconds => _config.accessTokenTtlSeconds;
   int get refreshTokenTtlSeconds => _config.refreshTokenTtlSeconds;
 
+  int firstPartyAccessTokenTtlSeconds({required bool rememberMe}) =>
+      rememberMe
+          ? _config.firstPartyRememberedAccessTokenTtlSeconds
+          : _config.firstPartyAccessTokenTtlSeconds;
+
   TokenPair issueTokenPair(
     AuthenticatedUser user, {
     List<String> scopes = const ['openid', 'profile', 'email', 'phone'],
     String clientId = 'first_party_web',
     String? nonce,
     Map<String, dynamic> additionalAccessClaims = const {},
+    int? accessTokenTtlSeconds,
   }) {
+    final resolvedAccessTokenTtlSeconds =
+        accessTokenTtlSeconds ?? _config.accessTokenTtlSeconds;
     final accessJti = _uuid.v4();
     final refreshJti = _uuid.v4();
 
@@ -96,7 +104,7 @@ class TokenService {
         ).sign(
           _privateKey,
           algorithm: JWTAlgorithm.RS256,
-          expiresIn: Duration(seconds: _config.accessTokenTtlSeconds),
+          expiresIn: Duration(seconds: resolvedAccessTokenTtlSeconds),
         );
 
     final refresh =
@@ -138,14 +146,14 @@ class TokenService {
           ).sign(
             _privateKey,
             algorithm: JWTAlgorithm.RS256,
-            expiresIn: Duration(seconds: _config.accessTokenTtlSeconds),
+            expiresIn: Duration(seconds: resolvedAccessTokenTtlSeconds),
           );
     }
 
     return TokenPair(
       accessToken: access,
       refreshToken: refresh,
-      expiresIn: _config.accessTokenTtlSeconds,
+      expiresIn: resolvedAccessTokenTtlSeconds,
       tokenType: 'Bearer',
       accessTokenId: accessJti,
       refreshTokenId: refreshJti,

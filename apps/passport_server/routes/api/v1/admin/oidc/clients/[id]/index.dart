@@ -52,7 +52,7 @@ Future<Response> onRequest(RequestContext context, String id) async {
   }
 
   try {
-    await context.read<OidcAdminService>().upsertClient(
+    final result = await context.read<OidcAdminService>().upsertClient(
       clientId: id.trim(),
       displayName: displayName,
       isOfficial: isOfficial,
@@ -62,12 +62,16 @@ Future<Response> onRequest(RequestContext context, String id) async {
       isConfidential: isConfidential,
       isActive: isActive,
       clientSecret: clientSecret,
+      generateClientSecret: body['generate_client_secret'] == true,
     );
+    return jsonResponse({
+      'updated': true,
+      if (result.generatedClientSecret case final secret?)
+        'client_secret': secret,
+    }, headers: _sensitiveResponseHeaders);
   } on ArgumentError catch (e) {
     return errorResponse('invalid_request', e.message.toString());
   }
-
-  return jsonResponse({'updated': true});
 }
 
 List<String> _readStringList(dynamic raw, {List<String> fallback = const []}) {
@@ -80,3 +84,9 @@ List<String> _readStringList(dynamic raw, {List<String> fallback = const []}) {
   }
   return fallback;
 }
+
+const _sensitiveResponseHeaders = {
+  'cache-control': 'no-store, max-age=0',
+  'pragma': 'no-cache',
+  'referrer-policy': 'no-referrer',
+};

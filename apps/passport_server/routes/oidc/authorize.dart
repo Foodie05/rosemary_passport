@@ -4,6 +4,7 @@ import 'dart:math';
 
 import '../../lib/src/config/app_config.dart';
 import '../../lib/src/middleware/guards.dart';
+import '../../lib/src/services/auth_service.dart';
 import '../../lib/src/services/oidc_service.dart';
 import '../../lib/src/utils/auth_cookie.dart';
 import '../../lib/src/utils/oidc_error_page.dart';
@@ -21,8 +22,35 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final user = await currentUser(context);
+  final config = context.read<AppConfig>();
+  if (context.request.uri.queryParameters['switch_account'] == '1') {
+    final accessToken = readCookieValue(
+      context.request.headers['cookie'],
+      kAccessTokenCookieName,
+    );
+    await context.read<AuthService>().logoutFirstPartySession(
+      accessToken: accessToken,
+    );
+    final nextAuthorizeUrl = Uri.parse(config.serverBaseUrl)
+        .resolveUri(
+          context.request.uri.replace(
+            queryParameters: {...context.request.uri.queryParameters}
+              ..remove('switch_account'),
+          ),
+        )
+        .toString();
+    final loginUrl = Uri.parse(
+      config.webBaseUrl,
+    ).resolve('/login').replace(queryParameters: {'next': nextAuthorizeUrl});
+    return Response(
+      statusCode: 302,
+      headers: {
+        'location': loginUrl.toString(),
+        'set-cookie': buildExpiredAccessTokenCookie(config: config),
+      },
+    );
+  }
   if (user == null) {
-    final config = context.read<AppConfig>();
     final authorizeUrl = Uri.parse(
       config.serverBaseUrl,
     ).resolveUri(context.request.uri).toString();
@@ -247,6 +275,14 @@ Response _authorizationConsentPage(
         },
       )
       .toString();
+  final switchAccountUrl = requestUri
+      .replace(
+        queryParameters: {...requestUri.queryParameters, 'switch_account': '1'},
+      )
+      .toString();
+  final accountCenterUrl = Uri.parse(
+    context.read<AppConfig>().webBaseUrl,
+  ).resolve('/account').toString();
   final escapedTitle = _escapeHtml('是否授权登录 $clientDisplayName?');
   final badgeLabel = isOfficial ? '官方应用' : '第三方应用';
   final escapedBadgeLabel = _escapeHtml(badgeLabel);
@@ -388,14 +424,57 @@ Response _authorizationConsentPage(
         place-items: center;
         padding: 2rem;
       }
-      .panel {
+      .panel-stack {
         width: min(100%, 40rem);
+      }
+      .panel {
+        width: 100%;
         border: 1px solid var(--card-border);
         border-radius: 2rem;
         background: var(--card-bg);
         backdrop-filter: blur(16px);
         box-shadow: 0 24px 60px rgba(22,29,22,0.12);
         padding: 2rem;
+      }
+      .panel-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .switch-account {
+        flex: 0 0 auto;
+        border: 1px solid var(--card-border);
+        border-radius: 0.8rem;
+        padding: 0.55rem 0.75rem;
+        color: var(--text-subtle);
+        font-size: 0.84rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+      }
+      .switch-account:hover {
+        border-color: var(--sage-400);
+        background: rgba(139,168,139,0.12);
+        color: var(--text-main);
+      }
+      .account-center {
+        display: flex;
+        width: fit-content;
+        align-items: center;
+        gap: 0.4rem;
+        margin: 0.8rem auto 0;
+        padding: 0.55rem 0.8rem;
+        border-radius: 0.8rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background 160ms ease, color 160ms ease;
+      }
+      .account-center:hover {
+        background: rgba(139,168,139,0.14);
+        color: var(--text-main);
       }
       .brand {
         display: flex;
@@ -533,16 +612,20 @@ Response _authorizationConsentPage(
         </div>
       </section>
       <main class="main">
-        <section class="panel">
-          <div class="brand">
-            <div class="logo">
-              <img src="https://tianyue.s3.bitiful.net/logo/rosemary_pure.png" alt="ROSM" />
+        <div class="panel-stack">
+          <section class="panel">
+            <div class="panel-top">
+              <div class="brand">
+                <div class="logo">
+                  <img src="https://tianyue.s3.bitiful.net/logo/rosemary_pure.png" alt="ROSM" />
+                </div>
+                <div>
+                  <p class="eyebrow">ROSM 授权确认</p>
+                  <strong>ROSM Pass</strong>
+                </div>
+              </div>
+              <a class="switch-account" href="${_escapeHtml(switchAccountUrl)}">切换账号</a>
             </div>
-            <div>
-              <p class="eyebrow">ROSM 授权确认</p>
-              <strong>ROSM Pass</strong>
-            </div>
-          </div>
           <div class="trust-badge">
             <span class="trust-icon${isOfficial ? '' : ' hidden'}">
               <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -552,14 +635,14 @@ Response _authorizationConsentPage(
             $escapedBadgeLabel
           </div>
           <h1>$escapedTitle</h1>
-          ${scopeLines.isEmpty
-            ? '<p class="subtitle">该应用将使用 ROSM 验证你的登录状态。</p>'
-            : '<p class="permission-head">您将授权此应用获取你的：</p><ul class="permission-list">$scopeListHtml</ul>'}
+          ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 ROSM 验证你的登录状态。</p>' : '<p class="permission-head">您将授权此应用获取你的：</p><ul class="permission-list">$scopeListHtml</ul>'}
           <div class="actions">
             <a class="button secondary" href="$cancelUrl">取消</a>
             <a class="button primary" href="$approveUrl">确认</a>
           </div>
-        </section>
+          </section>
+          <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">ROSM 账号中心 <span aria-hidden="true">→</span></a>
+        </div>
       </main>
     </div>
   </body>

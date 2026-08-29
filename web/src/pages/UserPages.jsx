@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { KeyRound, Mail, Shield } from 'lucide-react';
 import { cleanDisplayName } from '../utils';
+import { getUserErrorMessage } from '../lib/errors';
 import { cn } from '../lib/utils';
 import {
   preparePublicKeyCreationOptions,
@@ -67,10 +68,7 @@ function getPasskeyErrorMessage(error) {
   if (error?.name === 'SecurityError') {
     return '当前环境不允许使用通行密钥，请检查域名与安全上下文。';
   }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return '通行密钥连接失败，请重试。';
+  return getUserErrorMessage(error, '通行密钥连接失败，请重试。');
 }
 
 export function UserAccountPage({
@@ -234,7 +232,7 @@ export function UserAccountPage({
       setBindCodeSent(true);
       setBindCooldownRemaining(Math.max(0, Number(result?.retry_after || 0)));
     } catch (error) {
-      setBindError(error.message || '发送失败');
+      setBindError(getUserErrorMessage(error, '发送失败，请稍后重试。'));
     } finally {
       setBindSending(false);
     }
@@ -249,7 +247,7 @@ export function UserAccountPage({
       setBindCodeSent(false);
       setBindForm({ email: '', current_password: '', email_code: '' });
     } catch (error) {
-      setBindError(error.message || '绑定失败');
+      setBindError(getUserErrorMessage(error, '绑定失败，请稍后重试。'));
     } finally {
       setBindSaving(false);
     }
@@ -263,7 +261,7 @@ export function UserAccountPage({
       setBindPhoneCodeSent(true);
       setBindPhoneCooldownRemaining(60);
     } catch (error) {
-      setBindPhoneError(error.message || '发送失败');
+      setBindPhoneError(getUserErrorMessage(error, '验证码发送失败，请稍后重试。'));
     } finally {
       setBindPhoneSending(false);
     }
@@ -278,7 +276,7 @@ export function UserAccountPage({
       setBindPhoneCodeSent(false);
       setBindPhoneForm({ phone_number: '', current_password: '', verify_code: '' });
     } catch (error) {
-      setBindPhoneError(error.message || '绑定失败');
+      setBindPhoneError(getUserErrorMessage(error, '绑定失败，请稍后重试。'));
     } finally {
       setBindPhoneSaving(false);
     }
@@ -292,7 +290,7 @@ export function UserAccountPage({
       setResetCodeSent(true);
       setResetCooldownRemaining(Math.max(0, Number(result?.retry_after || 0)));
     } catch (error) {
-      setResetError(error.message || '发送失败');
+      setResetError(getUserErrorMessage(error, '验证码发送失败，请稍后重试。'));
     } finally {
       setResetSending(false);
     }
@@ -307,7 +305,7 @@ export function UserAccountPage({
       setResetCodeSent(false);
       setResetForm({ new_password: '', email_code: '' });
     } catch (error) {
-      setResetError(error.message || '重置失败');
+      setResetError(getUserErrorMessage(error, '重置失败，请稍后重试。'));
     } finally {
       setResetSaving(false);
     }
@@ -323,7 +321,7 @@ export function UserAccountPage({
       setAuthenticatorSecret(payload.secret || '');
       setAuthenticatorOtpAuthUri(payload.otpauth_uri || '');
     } catch (error) {
-      setAuthenticatorError(error.message || '初始化失败');
+      setAuthenticatorError(getUserErrorMessage(error, '初始化失败，请稍后重试。'));
     } finally {
       setAuthenticatorSettingUp(false);
     }
@@ -337,7 +335,7 @@ export function UserAccountPage({
       setPasskeyCredentials(payload.credentials || []);
       setPasskeyMaxCount(Number(payload.max_count || 5));
     } catch (error) {
-      setPasskeyError(error.message || '读取失败');
+      setPasskeyError(getUserErrorMessage(error, '读取失败，请稍后重试。'));
     } finally {
       setPasskeyLoading(false);
     }
@@ -357,7 +355,7 @@ export function UserAccountPage({
       setAuthenticatorSecret('');
       setAuthenticatorOtpAuthUri('');
     } catch (error) {
-      setAuthenticatorError(error.message || '启用失败');
+      setAuthenticatorError(getUserErrorMessage(error, '启用失败，请稍后重试。'));
     } finally {
       setAuthenticatorSaving(false);
     }
@@ -398,7 +396,7 @@ export function UserAccountPage({
       await deleteWebAuthnCredential(credentialId);
       await loadPasskeys();
     } catch (error) {
-      setPasskeyError(error.message || '移除失败');
+      setPasskeyError(getUserErrorMessage(error, '移除失败，请稍后重试。'));
     } finally {
       setPasskeyRemovingId('');
     }

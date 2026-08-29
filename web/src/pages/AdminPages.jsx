@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, CircleHelp, Globe, Key, Mail, Pencil, Search, Settings2, Smartphone, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { BookOpen, Check, CircleHelp, Copy, Globe, Key, Mail, Pencil, Search, Settings2, Smartphone, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
@@ -788,6 +788,8 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
 export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcClients, loadOidcClients, safely, oidcForm, setOidcForm, saveOidcClient, deleteOidcClient }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingClientId, setEditingClientId] = useState('');
+  const [oneTimeSecret, setOneTimeSecret] = useState(null);
+  const [copyingSecret, setCopyingSecret] = useState(false);
 
   useEffect(() => {
     if (!discovery) {
@@ -811,6 +813,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
       scopes: 'openid\nprofile\nemail\nphone',
       grant_types: 'authorization_code\nrefresh_token',
       client_secret: '',
+      generate_client_secret: false,
       is_confidential: false,
       is_active: true,
     });
@@ -834,6 +837,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
       scopes: (client.scopes || []).join('\n'),
       grant_types: (client.grant_types || []).join('\n'),
       client_secret: '',
+      generate_client_secret: false,
       is_confidential: Boolean(client.is_confidential),
       is_active: client.is_active !== false,
     });
@@ -871,10 +875,41 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
         scopes: 'openid\nprofile\nemail\nphone\naccountRule',
         grant_types: 'authorization_code\nrefresh_token',
         client_secret: '',
+        generate_client_secret: false,
         is_confidential: false,
         is_active: true,
       };
     });
+  }
+
+  function discardOneTimeSecret() {
+    setOneTimeSecret(null);
+    setCopyingSecret(false);
+  }
+
+  async function copyOneTimeSecret() {
+    if (!oneTimeSecret?.value || copyingSecret) return;
+    setCopyingSecret(true);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(oneTimeSecret.value);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = oneTimeSecret.value;
+        textarea.setAttribute('readonly', 'true');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!copied) throw new Error('copy_failed');
+      }
+      discardOneTimeSecret();
+    } catch {
+      setCopyingSecret(false);
+      window.alert('复制失败，请手动复制后关闭窗口。');
+    }
   }
 
   return (
@@ -984,8 +1019,15 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                 className="btn-primary"
                 onClick={() =>
                   void safely(async () => {
-                    await saveOidcClient({ preventDefault() {} });
+                    const result = await saveOidcClient({ preventDefault() {} });
+                    if (!result) return;
                     setEditorOpen(false);
+                    if (result?.client_secret) {
+                      setOneTimeSecret({
+                        clientId: oidcForm.client_id.trim(),
+                        value: result.client_secret,
+                      });
+                    }
                   }, editingClientId ? '更新应用失败' : '添加应用失败')
                 }
               >
@@ -1052,9 +1094,20 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               <ConfigField label="Grant Types">
                 <textarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
               </ConfigField>
-              <ConfigField label="Client Secret">
-                <input type="password" className="input-field" placeholder={editingClientId ? '留空表示保持原密钥' : '机密客户端必填，Public 可留空'} value={oidcForm.client_secret} onChange={(event) => setOidcForm((current) => ({ ...current, client_secret: event.target.value }))} />
-              </ConfigField>
+              <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+                <p className="text-sm font-bold text-sage-800">Client Secret</p>
+                <p className="mt-2 text-xs leading-5 text-sage-500">
+                  {editingClientId
+                    ? '现有密钥不会显示。需要更换时勾选轮换，保存后仅展示一次新密钥。'
+                    : '机密客户端由服务端自动生成 256 位随机密钥，保存后仅展示一次。'}
+                </p>
+                {editingClientId && oidcForm.is_confidential ? (
+                  <label className="mt-3 flex items-center gap-2 text-sm text-sage-700">
+                    <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.generate_client_secret)} onChange={(event) => setOidcForm((current) => ({ ...current, generate_client_secret: event.target.checked }))} />
+                    保存时安全轮换密钥
+                  </label>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -1064,7 +1117,18 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               官方应用
             </label>
             <label className="flex items-center gap-2 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.is_confidential)} onChange={(event) => setOidcForm((current) => ({ ...current, is_confidential: event.target.checked }))} />
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
+                checked={Boolean(oidcForm.is_confidential)}
+                onChange={(event) => setOidcForm((current) => ({
+                  ...current,
+                  is_confidential: event.target.checked,
+                  generate_client_secret: event.target.checked && !current.is_confidential
+                    ? true
+                    : current.generate_client_secret,
+                }))}
+              />
               机密客户端
             </label>
             <label className="flex items-center gap-2 text-sm text-sage-600">
@@ -1074,6 +1138,29 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             <p className="basis-full text-xs leading-5 text-sage-500">
               同一个包名可以同时启用 Web/App。服务端交接模式可使用机密客户端和 HTTPS 回调；Public 直连模式必须关闭机密客户端并使用自定义 scheme。
             </p>
+          </div>
+        </Modal>
+      )}
+
+      {oneTimeSecret && (
+        <Modal
+          title="复制 Client Secret"
+          onClose={discardOneTimeSecret}
+          actions={(
+            <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => void copyOneTimeSecret()} disabled={copyingSecret}>
+              {copyingSecret ? <Check size={18} /> : <Copy size={18} />}
+              {copyingSecret ? '正在复制' : '复制一次并关闭'}
+            </button>
+          )}
+        >
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              这是应用 <strong>{oneTimeSecret.clientId}</strong> 的新密钥。服务端只保存哈希，关闭后无法再次查看；请立即复制到接入方服务器的密钥管理系统。
+            </div>
+            <code className="block break-all rounded-2xl border border-sage-200 bg-sage-950 p-4 font-mono text-sm leading-6 text-white" data-sensitive="true">
+              {oneTimeSecret.value}
+            </code>
+            <p className="text-xs leading-5 text-sage-500">生产环境请仅通过 HTTPS 管理页面操作。复制成功后，此页面中的明文会立即销毁。</p>
           </div>
         </Modal>
       )}
