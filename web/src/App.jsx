@@ -1,15 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AdminLayout, UserLayout } from './components/Layouts';
 import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
-import { AdminFlutterSdkDocsPage, AdminOIDCConfig, AdminOidcDocsPage, AdminSecurityPolicy, AdminServiceConfig, AdminUsers } from './pages/AdminPages';
-import { ForgotPasswordPage, LoginPage, PostRegisterBindingPrompt, PostRegisterPasskeyPrompt, RegisterPage } from './pages/AuthPages';
-import { UserAccountPage } from './pages/UserPages';
 import { useTheme } from './theme';
 import { getUserErrorMessage, getUserMessage } from './lib/errors';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
+const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
+const loadAdminPages = () => import('./pages/AdminPages');
+const loadAuthPages = () => import('./pages/AuthPages');
+const AdminFlutterSdkDocsPage = lazyNamed(loadAdminPages, 'AdminFlutterSdkDocsPage');
+const AdminOIDCConfig = lazyNamed(loadAdminPages, 'AdminOIDCConfig');
+const AdminOidcDocsPage = lazyNamed(loadAdminPages, 'AdminOidcDocsPage');
+const AdminSecurityPolicy = lazyNamed(loadAdminPages, 'AdminSecurityPolicy');
+const AdminServiceConfig = lazyNamed(loadAdminPages, 'AdminServiceConfig');
+const AdminUsers = lazyNamed(loadAdminPages, 'AdminUsers');
+const ForgotPasswordPage = lazyNamed(loadAuthPages, 'ForgotPasswordPage');
+const LoginPage = lazyNamed(loadAuthPages, 'LoginPage');
+const PostRegisterBindingPrompt = lazyNamed(loadAuthPages, 'PostRegisterBindingPrompt');
+const PostRegisterPasskeyPrompt = lazyNamed(loadAuthPages, 'PostRegisterPasskeyPrompt');
+const RegisterPage = lazyNamed(loadAuthPages, 'RegisterPage');
+const UserAccountPage = lazyNamed(() => import('./pages/UserPages'), 'UserAccountPage');
 
 function AppRoutes({
   isLoggedIn,
@@ -112,6 +124,7 @@ function AppRoutes({
     : '';
 
   return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" aria-busy="true" />}>
       <Routes location={location}>
         <Route
           path="/login"
@@ -269,6 +282,7 @@ function AppRoutes({
         <Route path="/" element={<Navigate to={isLoggedIn ? defaultAuthedPath : '/login'} replace />} />
         <Route path="*" element={<Navigate to={isLoggedIn ? defaultAuthedPath : '/login'} replace />} />
       </Routes>
+    </Suspense>
   );
 }
 
@@ -1025,9 +1039,6 @@ function App() {
       setLoginCodeCooldownRemaining(Number(data.retry_after || 0));
       showToast('登录验证码已发送，请检查邮箱。', 'success');
     } catch (error) {
-      if (redirectUnregisteredAccount(error, 'email')) {
-        return;
-      }
       showToast(getAuthErrorMessage(error, 'email_code_send'), 'error');
     } finally {
       resetBackgroundCaptcha();
@@ -1050,31 +1061,11 @@ function App() {
       setLoginCodeCooldownRemaining(Math.max(60, Number(data.retry_after || 0)));
       showToast('请求已受理。若该手机号已绑定账号，将收到短信验证码。', 'success');
     } catch (error) {
-      if (redirectUnregisteredAccount(error, 'phone')) {
-        return;
-      }
       showToast(error.message || '登录验证码发送失败，请稍后重试。', 'error');
     } finally {
       resetBackgroundCaptcha();
       setLoginCodeSending(false);
     }
-  }
-
-  function redirectUnregisteredAccount(error, method) {
-    if (error?.code !== 'account_not_found') {
-      return false;
-    }
-    const params = new URLSearchParams({ method });
-    const account = method === 'phone'
-      ? loginForm.phone_number.trim()
-      : loginForm.email.trim();
-    params.set(method === 'phone' ? 'phone_number' : 'email', account);
-    const next = new URLSearchParams(window.location.search).get('next')?.trim();
-    if (next) {
-      params.set('next', next);
-    }
-    window.location.assign(`/register?${params.toString()}`);
-    return true;
   }
 
   async function preparePhoneCodeLogin(event) {

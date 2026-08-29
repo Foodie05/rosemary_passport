@@ -21,6 +21,7 @@ try {
     expectedChallenge: input.expectedChallenge,
     expectedOrigin: input.expectedOrigin,
     expectedRPID: input.expectedRPID,
+    requireUserVerification: true,
   });
 
   const info = verification.registrationInfo;
@@ -35,6 +36,7 @@ try {
             transports: info.credential.transports || [],
             deviceType: info.credentialDeviceType,
             backedUp: info.credentialBackedUp,
+            userVerified: info.userVerified === true,
           }
         : null,
     }),

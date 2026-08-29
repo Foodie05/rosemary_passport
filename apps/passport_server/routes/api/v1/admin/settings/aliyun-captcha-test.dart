@@ -1,6 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import '../../../../../lib/src/models/authenticated_user.dart';
 import '../../../../../lib/src/services/admin_settings_service.dart';
+import '../../../../../lib/src/services/audit_service.dart';
 import '../../../../../lib/src/utils/http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
@@ -20,5 +22,15 @@ Future<Response> onRequest(RequestContext context) async {
   final result = await context
       .read<AdminSettingsService>()
       .testAliyunCaptchaConnection(token);
+  final actor = context.read<AuthenticatedUser>();
+  await context.read<AuditService>().log(
+    action: 'admin.integration_test.captcha',
+    actorId: actor.id,
+    actorType: 'admin',
+    resourceType: 'system_settings',
+    resourceId: 'aliyun_captcha',
+    metadata: {'ok': result['ok'] == true},
+    ip: context.request.headers['x-forwarded-for'],
+  );
   return jsonResponse(result, statusCode: result['ok'] == true ? 200 : 400);
 }

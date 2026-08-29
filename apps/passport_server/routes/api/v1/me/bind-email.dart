@@ -11,7 +11,10 @@ Future<Response> onRequest(RequestContext context) async {
 
   final body = await tryParseJsonObject(context.request);
   if (body == null) {
-    return errorResponse('invalid_request', 'Request body must be a JSON object.');
+    return errorResponse(
+      'invalid_request',
+      'Request body must be a JSON object.',
+    );
   }
 
   final email = body['email']?.toString() ?? '';
@@ -28,14 +31,14 @@ Future<Response> onRequest(RequestContext context) async {
 
   final user = context.read<AuthenticatedUser>();
   final result = await context.read<AuthService>().bindEmailWithCode(
-        userId: user.id,
-        newEmail: email,
-        currentPassword: currentPassword,
-        emailCode: emailCode,
-        preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
-            ? user.accessTokenId
-            : null,
-      );
+    userId: user.id,
+    newEmail: email,
+    currentPassword: currentPassword,
+    emailCode: emailCode,
+    preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
+        ? user.accessTokenId
+        : null,
+  );
 
   if (!result.ok) {
     return errorResponse(

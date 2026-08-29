@@ -5,6 +5,7 @@ import '../../../../../lib/src/config/app_config.dart';
 import '../../../../../lib/src/models/authenticated_user.dart';
 import '../../../../../lib/src/repositories/user_repository.dart';
 import '../../../../../lib/src/security/password_hasher.dart';
+import '../../../../../lib/src/security/password_policy.dart';
 import '../../../../../lib/src/services/audit_service.dart';
 import '../../../../../lib/src/utils/http.dart';
 
@@ -33,7 +34,9 @@ Future<Response> onRequest(RequestContext context) async {
         'page': safePage,
         'page_size': safePageSize,
         'total': total,
-        'total_pages': total == 0 ? 0 : ((total + safePageSize - 1) ~/ safePageSize),
+        'total_pages': total == 0
+            ? 0
+            : ((total + safePageSize - 1) ~/ safePageSize),
       },
     });
   }
@@ -41,15 +44,31 @@ Future<Response> onRequest(RequestContext context) async {
   if (context.request.method == HttpMethod.post) {
     final body = await tryParseJsonObject(context.request);
     if (body == null) {
-      return errorResponse('invalid_request', 'Request body must be a JSON object.');
+      return errorResponse(
+        'invalid_request',
+        'Request body must be a JSON object.',
+      );
     }
 
     final email = (body['email'] ?? '').toString().trim();
     final nickname = (body['nickname'] ?? '').toString().trim();
     final password = (body['password'] ?? '').toString();
     final rawRoles = body['roles'];
-    if (email.isEmpty || nickname.isEmpty || password.isEmpty || rawRoles is! List) {
-      return errorResponse('invalid_request', 'email, nickname, password and roles are required.');
+    if (email.isEmpty ||
+        nickname.isEmpty ||
+        password.isEmpty ||
+        rawRoles is! List) {
+      return errorResponse(
+        'invalid_request',
+        'email, nickname, password and roles are required.',
+      );
+    }
+    final passwordPolicy = context.read<PasswordPolicy>().validate(password);
+    if (!passwordPolicy.ok) {
+      return errorResponse(
+        'password_policy_violation',
+        passwordPolicy.message!,
+      );
     }
 
     final roles = rawRoles
@@ -58,7 +77,10 @@ Future<Response> onRequest(RequestContext context) async {
         .toSet()
         .toList();
     if (roles.isEmpty) {
-      return errorResponse('invalid_request', 'roles must contain at least one non-empty role.');
+      return errorResponse(
+        'invalid_request',
+        'roles must contain at least one non-empty role.',
+      );
     }
     if (!roles.every(AuthenticatedUser.allowedRoles.contains)) {
       return errorResponse(
@@ -66,7 +88,8 @@ Future<Response> onRequest(RequestContext context) async {
         'roles contains unsupported values.',
       );
     }
-    if (roles.contains('admin') && email.toLowerCase().endsWith('@rosm.local')) {
+    if (roles.contains('admin') &&
+        email.toLowerCase().endsWith('@rosm.local')) {
       return errorResponse(
         'invalid_request',
         'reserved bootstrap admin email cannot be created from the admin panel.',
@@ -76,7 +99,11 @@ Future<Response> onRequest(RequestContext context) async {
     final repository = context.read<UserRepository>();
     final existing = await repository.findByEmail(email);
     if (existing != null) {
-      return errorResponse('conflict', 'email already exists.', statusCode: 409);
+      return errorResponse(
+        'conflict',
+        'email already exists.',
+        statusCode: 409,
+      );
     }
 
     final config = AppConfig.fromEnv();
@@ -94,24 +121,21 @@ Future<Response> onRequest(RequestContext context) async {
 
     final actor = context.read<AuthenticatedUser>();
     await context.read<AuditService>().log(
-          action: 'admin.user.create',
-          actorId: actor.id,
-          actorType: 'admin',
-          resourceType: 'user',
-          resourceId: userId,
-          metadata: {
-            'email': email,
-            'nickname': nickname,
-            'roles': roles,
-          },
-          ip: context.request.headers['x-forwarded-for'],
-        );
+      action: 'admin.user.create',
+      actorId: actor.id,
+      actorType: 'admin',
+      resourceType: 'user',
+      resourceId: userId,
+      metadata: {'email': email, 'nickname': nickname, 'roles': roles},
+      ip: context.request.headers['x-forwarded-for'],
+    );
 
-    return jsonResponse({
-      'created': true,
-      'user_id': userId,
-    }, statusCode: 201);
+    return jsonResponse({'created': true, 'user_id': userId}, statusCode: 201);
   }
 
-  return errorResponse('method_not_allowed', 'Use GET or POST.', statusCode: 405);
+  return errorResponse(
+    'method_not_allowed',
+    'Use GET or POST.',
+    statusCode: 405,
+  );
 }

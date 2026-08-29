@@ -28,6 +28,8 @@ class AdminSettingsService {
     final smtpPassword = (smtp['password'] ?? '').toString();
     final captchaAccessKeySecret =
         (security['aliyun_captcha_access_key_secret'] ?? '').toString();
+    final captchaAccessKeyId = (security['aliyun_captcha_access_key_id'] ?? '')
+        .toString();
     return {
       'smtp': {
         ...smtp,
@@ -36,14 +38,22 @@ class AdminSettingsService {
       },
       'security': {
         ...security,
+        'aliyun_captcha_access_key_id': '',
+        'aliyun_captcha_access_key_id_configured': captchaAccessKeyId
+            .trim()
+            .isNotEmpty,
         'aliyun_captcha_access_key_secret': '',
         'aliyun_captcha_access_key_secret_configured': captchaAccessKeySecret
             .trim()
             .isNotEmpty,
         'phone_verification_enabled':
             (security['phone_verification_enabled'] ?? true) == true,
-        'phone_sms_access_key_id': (security['phone_sms_access_key_id'] ?? '')
-            .toString(),
+        'phone_sms_access_key_id': '',
+        'phone_sms_access_key_id_configured':
+            (security['phone_sms_access_key_id'] ?? '')
+                .toString()
+                .trim()
+                .isNotEmpty,
         'phone_sms_access_key_secret': '',
         'phone_sms_access_key_secret_configured':
             (security['phone_sms_access_key_secret'] ?? '')
@@ -121,6 +131,14 @@ class AdminSettingsService {
               .isNotEmpty) {
         nextSecurity.remove('aliyun_captcha_access_key_secret');
       }
+      if ((nextSecurity['aliyun_captcha_access_key_id'] ?? '')
+              .toString()
+              .isEmpty &&
+          (current['aliyun_captcha_access_key_id'] ?? '')
+              .toString()
+              .isNotEmpty) {
+        nextSecurity.remove('aliyun_captcha_access_key_id');
+      }
       if ((nextSecurity['phone_sms_access_key_secret'] ?? '')
               .toString()
               .isEmpty &&
@@ -128,6 +146,10 @@ class AdminSettingsService {
               .toString()
               .isNotEmpty) {
         nextSecurity.remove('phone_sms_access_key_secret');
+      }
+      if ((nextSecurity['phone_sms_access_key_id'] ?? '').toString().isEmpty &&
+          (current['phone_sms_access_key_id'] ?? '').toString().isNotEmpty) {
+        nextSecurity.remove('phone_sms_access_key_id');
       }
       final next = _policyService.sanitizeSecuritySettings({
         ...current,

@@ -39,10 +39,7 @@ class EmailCodeRepository {
       order by created_at desc
       limit 1
       ''',
-      params: {
-        'email': email,
-        'purpose': purpose,
-      },
+      params: {'email': email, 'purpose': purpose},
     );
 
     if (result.isEmpty) {

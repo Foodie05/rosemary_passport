@@ -18,10 +18,7 @@ Future<Response> onRequest(RequestContext context) async {
 
   final captchaToken = body['captcha_token']?.toString() ?? '';
   if (captchaToken.trim().isEmpty) {
-    return errorResponse(
-      'invalid_request',
-      '请先完成人机验证。',
-    );
+    return errorResponse('invalid_request', '请先完成人机验证。');
   }
 
   final requestIp = clientIpFromRequest(
@@ -29,21 +26,20 @@ Future<Response> onRequest(RequestContext context) async {
     config: context.read<AppConfig>(),
   );
   final captchaOk = await context.read<AuthService>().verifyCaptcha(
-        captchaToken.trim(),
-        ip: requestIp,
-      );
+    captchaToken.trim(),
+    ip: requestIp,
+  );
   if (!captchaOk) {
-    return errorResponse('captcha_failed', '人机验证未通过，请重试。',
-        statusCode: 400);
+    return errorResponse('captcha_failed', '人机验证未通过，请重试。', statusCode: 400);
   }
 
   final user = context.read<AuthenticatedUser>();
   late final result;
   try {
     result = await context.read<AuthService>().sendPasswordResetCode(
-          userId: user.id,
-          requestIp: requestIp,
-        );
+      userId: user.id,
+      requestIp: requestIp,
+    );
   } on EmailDeliveryException {
     return errorResponse(
       'temporary_issue',
@@ -51,11 +47,7 @@ Future<Response> onRequest(RequestContext context) async {
       statusCode: 503,
     );
   } catch (_) {
-    return errorResponse(
-      'temporary_issue',
-      '验证码发送失败，请稍后重试。',
-      statusCode: 503,
-    );
+    return errorResponse('temporary_issue', '验证码发送失败，请稍后重试。', statusCode: 503);
   }
 
   if (!result.ok) {
@@ -65,10 +57,9 @@ Future<Response> onRequest(RequestContext context) async {
       statusCode: result.statusCode,
     );
     if (result.statusCode == 429) {
-      final retryAfter = await context.read<AuthService>().passwordResetCodeRetryAfter(
-            email: user.email,
-            requestIp: requestIp,
-          );
+      final retryAfter = await context
+          .read<AuthService>()
+          .passwordResetCodeRetryAfter(email: user.email, requestIp: requestIp);
       response = response.copyWith(
         headers: {'retry-after': '${retryAfter ?? 60}'},
       );
@@ -78,8 +69,8 @@ Future<Response> onRequest(RequestContext context) async {
 
   return jsonResponse({
     'sent': true,
-    'retry_after': await context.read<AuthService>().passwordResetCodeCooldownRetryAfter(
-          email: user.email,
-        ),
+    'retry_after': await context
+        .read<AuthService>()
+        .passwordResetCodeCooldownRetryAfter(email: user.email),
   });
 }

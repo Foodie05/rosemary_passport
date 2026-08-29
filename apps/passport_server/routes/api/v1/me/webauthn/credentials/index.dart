@@ -11,7 +11,7 @@ Future<Response> onRequest(RequestContext context) async {
 
   final user = context.read<AuthenticatedUser>();
   final credentials = await context.read<AuthService>().listWebAuthnCredentials(
-        userId: user.id,
-      );
+    userId: user.id,
+  );
   return jsonResponse({'credentials': credentials, 'max_count': 5});
 }

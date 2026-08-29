@@ -12,7 +12,10 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   final body = await tryParseJsonObject(context.request);
   if (body == null) {
-    return errorResponse('invalid_request', 'Request body must be a JSON object.');
+    return errorResponse(
+      'invalid_request',
+      'Request body must be a JSON object.',
+    );
   }
   final rawRoles = body['roles'];
   if (rawRoles is! List) {
@@ -54,14 +57,14 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   final actor = context.read<AuthenticatedUser>();
   await context.read<AuditService>().log(
-        action: 'admin.user.roles.update',
-        actorId: actor.id,
-        actorType: 'admin',
-        resourceType: 'user',
-        resourceId: id,
-        metadata: {'roles': roles},
-        ip: context.request.headers['x-forwarded-for'],
-      );
+    action: 'admin.user.roles.update',
+    actorId: actor.id,
+    actorType: 'admin',
+    resourceType: 'user',
+    resourceId: id,
+    metadata: {'roles': roles},
+    ip: context.request.headers['x-forwarded-for'],
+  );
 
   return jsonResponse({'updated': true});
 }

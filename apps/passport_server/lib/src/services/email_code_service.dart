@@ -144,7 +144,10 @@ class EmailCodeService {
     required String code,
     required String purpose,
   }) async {
-    final item = await _repository.findLatestCode(email: email, purpose: purpose);
+    final item = await _repository.findLatestCode(
+      email: email,
+      purpose: purpose,
+    );
     if (item == null) {
       return null;
     }

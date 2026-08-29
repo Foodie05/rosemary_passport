@@ -1,6 +1,7 @@
 import '../config/app_config.dart';
 import '../db/database.dart';
 import '../models/authenticated_user.dart';
+import '../security/settings_cipher.dart';
 import 'package:postgres/postgres.dart';
 
 class UserRecord {
@@ -53,10 +54,11 @@ class UserRecord {
 }
 
 class UserRepository {
-  UserRepository(this._db, this._config);
+  UserRepository(this._db, this._config, this._cipher);
 
   final Database _db;
   final AppConfig _config;
+  final SettingsCipher _cipher;
 
   Future<UserRecord?> findByEmail(String email) async {
     final result = await _db.execute(
@@ -179,27 +181,46 @@ class UserRepository {
   Future<String?> findAuthenticatorSecretByUserId(String userId) async {
     final result = await _db.execute(
       '''
-      select case
-               when u.authenticator_secret is null or
-                    length(trim(u.authenticator_secret)) = 0 then null
-               when u.authenticator_secret like 'enc:%' then
-                 pgp_sym_decrypt(
-                   decode(substring(u.authenticator_secret from 5), 'base64')::bytea,
-                   @encryption_key
-                 )
-               else u.authenticator_secret
-             end as authenticator_secret
+      select authenticator_secret
       from users u
       where u.id = @user_id
       ''',
-      params: {'user_id': userId, 'encryption_key': _config.dataEncryptionKey},
+      params: {'user_id': userId},
     );
 
     if (result.isEmpty) {
       return null;
     }
 
-    return result.first[0] as String?;
+    final stored = (result.first[0] as String?)?.trim() ?? '';
+    if (stored.isEmpty) {
+      return null;
+    }
+    if (stored.startsWith('a256gcm:')) {
+      return _cipher.decryptString(stored);
+    }
+    if (!stored.startsWith('enc:')) {
+      return stored;
+    }
+    for (final key in _config.dataEncryptionKeys.values) {
+      try {
+        final decrypted = await _db.execute(
+          '''
+          select pgp_sym_decrypt(
+            decode(substring(@stored from 5), 'base64')::bytea,
+            @encryption_key
+          )
+          ''',
+          params: {'stored': stored, 'encryption_key': key},
+        );
+        if (decrypted.isNotEmpty) {
+          return decrypted.first[0] as String?;
+        }
+      } catch (_) {
+        // Try the next retained key during a key rotation overlap window.
+      }
+    }
+    throw StateError('Unable to decrypt the historical authenticator secret.');
   }
 
   Future<void> createUser({
@@ -328,46 +349,46 @@ class UserRepository {
     required String userId,
     required String authenticatorSecret,
   }) async {
+    final encrypted = await _cipher.encryptString(authenticatorSecret);
     await _db.execute(
       '''
       update users
-      set authenticator_secret = concat(
-            'enc:',
-            encode(
-              pgp_sym_encrypt(@authenticator_secret, @encryption_key),
-              'base64'
-            )
-          ),
+      set authenticator_secret = @authenticator_secret,
           authenticator_verified_at = now(),
           updated_at = now()
       where id = @user_id
       ''',
-      params: {
-        'authenticator_secret': authenticatorSecret,
-        'encryption_key': _config.dataEncryptionKey,
-        'user_id': userId,
-      },
+      params: {'authenticator_secret': encrypted, 'user_id': userId},
     );
   }
 
-  Future<void> migratePlaintextAuthenticatorSecrets() async {
-    await _db.execute(
-      '''
-      update users
-      set authenticator_secret = concat(
-            'enc:',
-            encode(
-              pgp_sym_encrypt(authenticator_secret, @encryption_key),
-              'base64'
-            )
-          ),
-          updated_at = now()
+  Future<int> migratePlaintextAuthenticatorSecrets() async {
+    final result = await _db.execute('''
+      select id
+      from users
       where authenticator_secret is not null
         and length(trim(authenticator_secret)) > 0
-        and authenticator_secret not like 'enc:%'
-      ''',
-      params: {'encryption_key': _config.dataEncryptionKey},
-    );
+        and authenticator_secret not like 'a256gcm:%'
+      ''');
+    var migrated = 0;
+    for (final row in result) {
+      final userId = row[0].toString();
+      final plaintext = await findAuthenticatorSecretByUserId(userId);
+      if (plaintext == null || plaintext.isEmpty) {
+        continue;
+      }
+      final encrypted = await _cipher.encryptString(plaintext);
+      await _db.execute(
+        '''
+        update users
+        set authenticator_secret = @secret, updated_at = now()
+        where id = @user_id and authenticator_secret not like 'a256gcm:%'
+        ''',
+        params: {'secret': encrypted, 'user_id': userId},
+      );
+      migrated++;
+    }
+    return migrated;
   }
 
   Future<List<Map<String, dynamic>>> listUsers({

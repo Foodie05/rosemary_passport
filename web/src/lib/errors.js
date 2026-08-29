@@ -1,5 +1,4 @@
 const ERROR_MESSAGES = {
-  account_not_found: '该账号尚未注册。',
   captcha_failed: '人机验证未通过，请重新验证后再试。',
   conflict: '提交的信息与现有数据冲突，请检查后重试。',
   forbidden: '你没有权限执行此操作。',

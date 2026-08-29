@@ -11,9 +11,11 @@ dependencies:
   dart_frog_auth: ^1.1.0
   dotenv: ^4.2.0
   postgres: ^3.3.0
-  jose: ^0.3.4
+  pool: ^1.5.2
+  jose: ^0.3.5+2
   uuid: ^4.5.1
   crypto: ^3.0.3
+  cryptography: ^2.7.0
   collection: ^1.18.0
   dart_jsonwebtoken: ^2.14.1
   argon2: ^1.0.1
@@ -27,3 +29,4 @@ dev_dependencies:
   dart_frog_cli: ^1.2.6
   json_serializable: ^6.8.0
   very_good_analysis: ^6.0.0
+  test: ^1.25.0

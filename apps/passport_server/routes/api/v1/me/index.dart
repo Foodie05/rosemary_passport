@@ -8,7 +8,8 @@ Future<Response> onRequest(RequestContext context) async {
   final user = context.read<AuthenticatedUser>();
   final authService = context.read<AuthService>();
   if (context.request.method == HttpMethod.get) {
-    final mustBindEmail = user.roles.contains('admin') &&
+    final mustBindEmail =
+        user.roles.contains('admin') &&
         user.email.toLowerCase().trim().endsWith('@rosm.local');
     final securityState = await authService.getSecurityState(userId: user.id);
     return jsonResponse({
@@ -24,7 +25,10 @@ Future<Response> onRequest(RequestContext context) async {
   if (context.request.method == HttpMethod.patch) {
     final body = await tryParseJsonObject(context.request);
     if (body == null) {
-      return errorResponse('invalid_request', 'Request body must be a JSON object.');
+      return errorResponse(
+        'invalid_request',
+        'Request body must be a JSON object.',
+      );
     }
     final nickname = body['nickname']?.toString();
     final newEmail = body['email']?.toString();
@@ -62,6 +66,9 @@ Future<Response> onRequest(RequestContext context) async {
     });
   }
 
-  return errorResponse('method_not_allowed', 'Use GET or PATCH.',
-      statusCode: 405);
+  return errorResponse(
+    'method_not_allowed',
+    'Use GET or PATCH.',
+    statusCode: 405,
+  );
 }

@@ -17,20 +17,21 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final body = await tryParseJsonObject(context.request);
+  final body = await tryParseJsonOrFormObject(context.request);
   if (body == null) {
     return oidcErrorResponse(
       context,
       code: 'invalid_request',
-      message: 'Request body must be a JSON object.',
+      message: 'Request body must be JSON or form encoded.',
       statusCode: 400,
       title: '这个应用暂时无法校验登录状态',
       description: '应用发来的令牌校验请求格式不正确。',
     );
   }
   final token = body['token']?.toString();
-  final clientId = body['client_id']?.toString();
-  final clientSecret = body['client_secret']?.toString();
+  final clientCredentials = oauthClientCredentials(context.request, body);
+  final clientId = clientCredentials['client_id'];
+  final clientSecret = clientCredentials['client_secret'];
   if (token == null || clientId == null) {
     return oidcErrorResponse(
       context,

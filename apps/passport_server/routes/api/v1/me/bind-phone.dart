@@ -17,20 +17,25 @@ Future<Response> onRequest(RequestContext context) async {
   final phoneNumber = (body['phone_number'] ?? '').toString();
   final currentPassword = (body['current_password'] ?? '').toString();
   final verifyCode = (body['verify_code'] ?? '').toString();
-  if (phoneNumber.trim().isEmpty || currentPassword.trim().isEmpty || verifyCode.trim().isEmpty) {
-    return errorResponse('invalid_request', 'phone_number, current_password and verify_code are required.');
+  if (phoneNumber.trim().isEmpty ||
+      currentPassword.trim().isEmpty ||
+      verifyCode.trim().isEmpty) {
+    return errorResponse(
+      'invalid_request',
+      'phone_number, current_password and verify_code are required.',
+    );
   }
 
   final user = context.read<AuthenticatedUser>();
   final result = await context.read<AuthService>().bindPhoneWithCode(
-        userId: user.id,
-        phoneNumber: phoneNumber,
-        currentPassword: currentPassword,
-        verifyCode: verifyCode,
-        preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
-            ? user.accessTokenId
-            : null,
-      );
+    userId: user.id,
+    phoneNumber: phoneNumber,
+    currentPassword: currentPassword,
+    verifyCode: verifyCode,
+    preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
+        ? user.accessTokenId
+        : null,
+  );
 
   if (!result.ok) {
     return errorResponse(

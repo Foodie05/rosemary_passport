@@ -24,13 +24,14 @@ class EmailService {
     String templateName = 'register_verification',
   }) async {
     final smtp = await _resolveSmtpSettings();
-    final template = await _settingsRepository.getEmailTemplate(
-          templateName,
-        ) ??
+    final template =
+        await _settingsRepository.getEmailTemplate(templateName) ??
         _defaultTemplate();
 
-    final subject =
-        _renderTemplate(template['subject']?.toString() ?? '', code);
+    final subject = _renderTemplate(
+      template['subject']?.toString() ?? '',
+      code,
+    );
     final html = _renderTemplate(template['html']?.toString() ?? '', code);
     final text = _renderTemplate(template['text']?.toString() ?? '', code);
 
@@ -54,7 +55,7 @@ class EmailService {
       username: username.isEmpty ? null : username,
       password: password.isEmpty ? null : password,
       ssl: secure,
-      allowInsecure: !secure,
+      allowInsecure: false,
     );
 
     final message = Message()
@@ -66,10 +67,15 @@ class EmailService {
 
     try {
       await send(message, smtpServer);
-    } catch (e, st) {
-      print('[EMAIL] SMTP delivery failed: ${e.runtimeType}: $e');
-      print('[EMAIL] StackTrace: $st');
-      throw EmailDeliveryException('SMTP delivery failed: ${e.runtimeType}: $e');
+    } catch (error) {
+      // The exception may contain SMTP credentials or recipient details.
+      // Log only its type and keep the client-facing error stable.
+      // ignore: avoid_print
+      print(
+        '{"level":"error","event":"email.delivery_failed",'
+        '"error_type":"${error.runtimeType}"}',
+      );
+      throw EmailDeliveryException('SMTP delivery failed.');
     }
   }
 

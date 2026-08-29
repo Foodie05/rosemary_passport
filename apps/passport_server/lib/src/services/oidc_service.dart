@@ -197,19 +197,17 @@ class OidcService {
       clientId: clientId,
       nonce: authCode['nonce'] as String?,
     );
-    await _oidcRepository.storeAccessToken(
-      tokenId: tokens.accessTokenId,
+    final now = DateTime.now().toUtc();
+    await _oidcRepository.storeTokenPair(
+      accessTokenId: tokens.accessTokenId,
+      refreshTokenId: tokens.refreshTokenId,
+      familyId: tokens.familyId,
       userId: user.id,
       clientId: clientId,
-      expiresAt: DateTime.now().toUtc().add(
+      accessExpiresAt: now.add(
         Duration(seconds: _config.accessTokenTtlSeconds),
       ),
-    );
-    await _oidcRepository.storeRefreshToken(
-      tokenId: tokens.refreshTokenId,
-      userId: user.id,
-      clientId: clientId,
-      expiresAt: DateTime.now().toUtc().add(
+      refreshExpiresAt: now.add(
         Duration(seconds: _config.refreshTokenTtlSeconds),
       ),
     );

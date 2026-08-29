@@ -1,14 +1,44 @@
 services:
   postgres:
-    image: postgres:16
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+      args:
+        POSTGRES_IMAGE: ${POSTGRES_IMAGE}
+    image: rosm-passport-postgres:${RELEASE_TAG:-current}
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/rosm-passport/db_password
       POSTGRES_DB: ${POSTGRES_DB}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION:-auto}
     volumes:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
       - ./data/postgres:/var/lib/postgresql/data
+      - ${ROSM_SECRETS_DIR:-/etc/rosm-passport/secrets}:/run/secrets/rosm-passport:ro
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300s
+      - -c
+      - archive_command=/usr/local/bin/archive-wal.sh %p %f
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -19,9 +49,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        NODE_IMAGE: ${NODE_IMAGE}
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      identity_helper:
         condition: service_healthy
     environment:
       PORT: 8091
@@ -30,31 +64,43 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD_FILE: /run/secrets/rosm-passport/db_password
       DB_NAME: ${POSTGRES_DB}
       DB_SSL_MODE: disable
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
-      JWT_PRIVATE_KEY_PEM_B64: ${JWT_PRIVATE_KEY_PEM_B64}
-      JWT_PUBLIC_KEY_PEM_B64: ${JWT_PUBLIC_KEY_PEM_B64}
-      JWT_BINDING_KEY: ${JWT_BINDING_KEY}
-      EMAIL_CODE_HMAC_KEY: ${EMAIL_CODE_HMAC_KEY}
-      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
+      JWT_ACTIVE_KID: ${JWT_ACTIVE_KID:-signing-v1}
+      JWT_SIGNING_KEYS_DIR: /run/secrets/rosm-passport/jwt
+      JWT_BINDING_KEY_FILE: /run/secrets/rosm-passport/jwt_binding_key
+      EMAIL_CODE_HMAC_KEY_FILE: /run/secrets/rosm-passport/email_code_hmac_key
+      DATA_ENCRYPTION_ACTIVE_KID: ${DATA_ENCRYPTION_ACTIVE_KID:-data-v1}
+      DATA_ENCRYPTION_KEYS_DIR: /run/secrets/rosm-passport/data_keys
+      DATA_ENCRYPTION_KEY_FILE: /run/secrets/rosm-passport/data_keys/${DATA_ENCRYPTION_ACTIVE_KID:-data-v1}.key
+      REQUIRE_FILE_SECRETS: "true"
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS}
-      FIRST_PARTY_ACCESS_TOKEN_TTL_SECONDS: ${FIRST_PARTY_ACCESS_TOKEN_TTL_SECONDS}
-      FIRST_PARTY_REMEMBERED_ACCESS_TOKEN_TTL_SECONDS: ${FIRST_PARTY_REMEMBERED_ACCESS_TOKEN_TTL_SECONDS}
+      FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS: ${FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS:-43200}
+      FIRST_PARTY_REMEMBERED_REFRESH_TOKEN_TTL_SECONDS: ${FIRST_PARTY_REMEMBERED_REFRESH_TOKEN_TTL_SECONDS:-2592000}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS}
+      DB_POOL_MIN_CONNECTIONS: ${DB_POOL_MIN_CONNECTIONS:-2}
+      DB_POOL_MAX_CONNECTIONS: ${DB_POOL_MAX_CONNECTIONS:-20}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-2}
+      DB_POOL_ACQUIRE_TIMEOUT_SECONDS: ${DB_POOL_ACQUIRE_TIMEOUT_SECONDS:-2}
+      DB_QUERY_TIMEOUT_SECONDS: ${DB_QUERY_TIMEOUT_SECONDS:-5}
+      DB_LOCK_TIMEOUT_MILLISECONDS: ${DB_LOCK_TIMEOUT_MILLISECONDS:-1000}
+      HELPER_TIMEOUT_SECONDS: ${HELPER_TIMEOUT_SECONDS:-3}
+      HELPER_BASE_URL: http://identity_helper:8092
+      HELPER_SHARED_KEY_FILE: /run/secrets/rosm-passport/helper_shared_key
       ARGON2_MEMORY_KB: ${ARGON2_MEMORY_KB}
       ARGON2_ITERATIONS: ${ARGON2_ITERATIONS}
       ARGON2_PARALLELISM: ${ARGON2_PARALLELISM}
       ALIYUN_CAPTCHA_PREFIX: ${ALIYUN_CAPTCHA_PREFIX}
       ALIYUN_CAPTCHA_SCENE_ID: ${ALIYUN_CAPTCHA_SCENE_ID}
-      ALIYUN_CAPTCHA_ACCESS_KEY_ID: ${ALIYUN_CAPTCHA_ACCESS_KEY_ID}
-      ALIYUN_CAPTCHA_ACCESS_KEY_SECRET: ${ALIYUN_CAPTCHA_ACCESS_KEY_SECRET}
+      ALIYUN_CAPTCHA_ACCESS_KEY_ID_FILE: /run/secrets/rosm-passport/aliyun_captcha_access_key_id
+      ALIYUN_CAPTCHA_ACCESS_KEY_SECRET_FILE: /run/secrets/rosm-passport/aliyun_captcha_access_key_secret
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_PASSWORD_FILE: /run/secrets/rosm-passport/smtp_password
       SMTP_FROM: ${SMTP_FROM}
       SMTP_SECURE: ${SMTP_SECURE}
       EMAIL_CODE_TTL_SECONDS: ${EMAIL_CODE_TTL_SECONDS}
@@ -63,7 +109,70 @@ services:
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL}
-      LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD}
+      LOCAL_ADMIN_PASSWORD_FILE: /run/secrets/rosm-passport/local_admin_password
       LOCAL_ADMIN_NICKNAME: ${LOCAL_ADMIN_NICKNAME}
+    volumes:
+      - ${ROSM_SECRETS_DIR:-/etc/rosm-passport/secrets}:/run/secrets/rosm-passport:ro
     ports:
       - "127.0.0.1:8091:8091"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8091/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  identity_helper:
+    build:
+      context: .
+      dockerfile: Dockerfile.helper
+      args:
+        NODE_IMAGE: ${NODE_IMAGE}
+    image: rosm-passport-helper:${RELEASE_TAG:-current}
+    restart: unless-stopped
+    environment:
+      HELPER_PORT: 8092
+      HELPER_MAX_CONCURRENCY: ${HELPER_MAX_CONCURRENCY:-8}
+      HELPER_EXEC_TIMEOUT_MS: ${HELPER_EXEC_TIMEOUT_MS:-2800}
+      HELPER_SHARED_KEY_FILE: /run/secrets/rosm-passport/helper_shared_key
+    volumes:
+      - ${ROSM_SECRETS_DIR:-/etc/rosm-passport/secrets}:/run/secrets/rosm-passport:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8092/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

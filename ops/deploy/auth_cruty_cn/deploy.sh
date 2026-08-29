@@ -5,186 +5,179 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$SCRIPT_DIR"
 TARGET_DIR="${1:-}"
 FRONTEND_TARGET_DIR="${2:-${APACHE_FRONTEND_ROOT:-}}"
-CLEAR_DATABASE_ONCE="${CLEAR_DATABASE_ONCE:-false}"
+RUNTIME_ENV_FILE="${3:-${ROSM_RUNTIME_ENV_FILE:-/etc/rosm-passport/runtime.env}}"
+SECRETS_DIR="${4:-${ROSM_SECRETS_DIR:-/etc/rosm-passport/secrets}}"
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 
-log() {
-  printf '[deploy][%s] %s\n' "$1" "$2"
-}
-
-info() {
-  log INFO "$1"
-}
-
-warn() {
-  log WARN "$1"
-}
-
-error() {
-  log ERROR "$1" >&2
-}
-
-die() {
-  error "$1"
-  exit 1
-}
+log() { printf '[deploy][%s] %s\n' "$1" "$2"; }
+info() { log INFO "$1"; }
+error() { log ERROR "$1" >&2; }
+die() { error "$1"; exit 1; }
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./deploy.sh /absolute/path/to/current-release /absolute/path/to/apache-web-root
+  ./deploy.sh /absolute/path/to/current-release /absolute/path/to/apache-web-root \
+    [/etc/rosm-passport/runtime.env] [/etc/rosm-passport/secrets]
 
-Behavior:
-  - Backs up the current deployment (excluding postgres data) into .deploy_backups
-  - Preserves an existing .env if present
-  - Syncs the new release files into the target directory
-  - Publishes frontend/dist into the Apache web root with stale files removed
-  - Optionally clears postgres data once when CLEAR_DATABASE_ONCE=true
-  - Rebuilds and restarts containers with docker compose
+The runtime env contains non-secret settings only. Secrets must be mounted from
+the external secrets directory and are never copied into a release or backup.
 EOF
 }
 
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
+require_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
 cleanup() {
+  if [[ "${MAINTENANCE_ENABLED:-false}" == true && -e "$FRONTEND_TARGET_DIR/.maintenance" ]]; then
+    unlink "$FRONTEND_TARGET_DIR/.maintenance" || true
+  fi
   if [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR:-}" ]]; then
     rm -rf "$TMP_DIR"
   fi
 }
-
 trap cleanup EXIT
 
-[[ -n "$TARGET_DIR" ]] || {
-  usage
-  exit 64
-}
+[[ -n "$TARGET_DIR" && -n "$FRONTEND_TARGET_DIR" ]] || { usage; exit 64; }
+[[ "$TARGET_DIR" = /* ]] || die "target directory must be absolute"
+[[ "$FRONTEND_TARGET_DIR" = /* ]] || die "frontend directory must be absolute"
 
-case "$TARGET_DIR" in
-  /*) ;;
-  *) die "target directory must be an absolute path: $TARGET_DIR" ;;
-esac
+for command in docker tar rsync curl mkdir ln mv grep readlink aws openssl \
+  sha256sum pg_restore sed tail awk; do require_cmd "$command"; done
+docker compose version >/dev/null 2>&1 || die "docker compose is unavailable"
 
-[[ -n "$FRONTEND_TARGET_DIR" ]] || die "apache frontend directory is required as arg #2 or APACHE_FRONTEND_ROOT"
-
-case "$FRONTEND_TARGET_DIR" in
-  /*) ;;
-  *) die "apache frontend directory must be an absolute path: $FRONTEND_TARGET_DIR" ;;
-esac
-
-require_cmd docker
-require_cmd tar
-require_cmd cp
-require_cmd mkdir
-require_cmd rsync
-
-if ! docker compose version >/dev/null 2>&1; then
-  die "docker compose is not available on this server"
-fi
-
-TMP_DIR="$(mktemp -d)"
 TARGET_DIR="${TARGET_DIR%/}"
 FRONTEND_TARGET_DIR="${FRONTEND_TARGET_DIR%/}"
 BACKUP_DIR="$TARGET_DIR/.deploy_backups"
 BACKUP_ARCHIVE="$BACKUP_DIR/release-$TIMESTAMP.tar.gz"
 FRONTEND_BACKUP_ARCHIVE="$BACKUP_DIR/frontend-$TIMESTAMP.tar.gz"
-ENV_SOURCE="$SOURCE_DIR/.env"
-ENV_TARGET="$TARGET_DIR/.env"
+FRONTEND_RELEASES_DIR="${FRONTEND_TARGET_DIR}.releases"
+FRONTEND_STAGE_DIR="$FRONTEND_RELEASES_DIR/$TIMESTAMP"
+TMP_DIR="$(mktemp -d)"
 
-info "source package: $SOURCE_DIR"
-info "target directory: $TARGET_DIR"
-info "apache frontend root: $FRONTEND_TARGET_DIR"
-info "clear database once: $CLEAR_DATABASE_ONCE"
+[[ -f "$SOURCE_DIR/docker-compose.yml" ]] || die "release is missing docker-compose.yml"
+[[ -f "$SOURCE_DIR/Dockerfile.backend" ]] || die "release is missing Dockerfile.backend"
+[[ -d "$SOURCE_DIR/backend" ]] || die "release is missing backend/"
+[[ -f "$SOURCE_DIR/frontend/dist/index.html" ]] || die "release is missing frontend/dist/index.html"
+[[ -f "$SOURCE_DIR/frontend/dist/maintenance.html" ]] || die "release is missing maintenance page"
+[[ -f "$RUNTIME_ENV_FILE" ]] || die "runtime env is missing: $RUNTIME_ENV_FILE"
+[[ -d "$SECRETS_DIR" ]] || die "secrets directory is missing: $SECRETS_DIR"
+[[ ! -f "$TARGET_DIR/.env" ]] || die "legacy .env must be migrated outside the release directory first"
 
-[[ -f "$SOURCE_DIR/docker-compose.yml" ]] || die "source package is incomplete: missing docker-compose.yml"
-[[ -f "$SOURCE_DIR/Dockerfile.backend" ]] || die "source package is incomplete: missing Dockerfile.backend"
-[[ -d "$SOURCE_DIR/backend" ]] || die "source package is incomplete: missing backend/"
-[[ -d "$SOURCE_DIR/frontend/dist" ]] || die "source package is incomplete: missing frontend/dist/"
+required_secret_files=(
+  db_password jwt_binding_key email_code_hmac_key smtp_password
+  local_admin_password aliyun_captcha_access_key_id
+  aliyun_captcha_access_key_secret backup_encryption_key
+  s3_access_key_id s3_secret_access_key helper_shared_key
+)
+for secret_file in "${required_secret_files[@]}"; do
+  [[ -f "$SECRETS_DIR/$secret_file" ]] || die "missing secret: $SECRETS_DIR/$secret_file"
+done
+for secret_file in db_password jwt_binding_key email_code_hmac_key \
+  local_admin_password backup_encryption_key s3_access_key_id \
+  s3_secret_access_key helper_shared_key; do
+  [[ -s "$SECRETS_DIR/$secret_file" ]] || die "empty required secret: $SECRETS_DIR/$secret_file"
+done
+[[ -s "$SECRETS_DIR/audit_signing.private.pem" ]] || die "missing audit signing private key"
+[[ -s "$SECRETS_DIR/audit_signing.public.pem" ]] || die "missing audit signing public key"
+[[ -d "$SECRETS_DIR/jwt" ]] || die "missing JWT keyring"
+[[ -d "$SECRETS_DIR/data_keys" ]] || die "missing data keyring"
+if grep -Eq 'REPLACE_WITH_VERIFIED_DIGEST|^[[:space:]]*(POSTGRES_IMAGE|NODE_IMAGE)=[^@]*$' "$RUNTIME_ENV_FILE"; then
+  die "runtime images must use verified sha256 digests"
+fi
 
-mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_TARGET_DIR"
+compose() { docker compose --env-file "$RUNTIME_ENV_FILE" "$@"; }
 
-if [[ -f "$ENV_TARGET" ]]; then
-  info "preserving existing .env from target"
-  cp "$ENV_TARGET" "$TMP_DIR/target.env"
-  warn "existing .env preserved; bootstrap admin credentials printed during a new build do not overwrite an existing deployment"
-else
-  warn "target has no .env yet; generated .env from package will be used"
-  [[ -f "$ENV_SOURCE" ]] || die "package does not include a generated .env"
+mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_RELEASES_DIR"
+previous_frontend=""
+if [[ -L "$FRONTEND_TARGET_DIR" ]]; then
+  previous_frontend="$(readlink "$FRONTEND_TARGET_DIR")"
 fi
 
 if [[ -f "$TARGET_DIR/docker-compose.yml" ]]; then
-  info "creating backup archive: $BACKUP_ARCHIVE"
-  tar \
-    --exclude='./data/postgres' \
-    --exclude='./.deploy_backups' \
-    -C "$TARGET_DIR" \
-    -czf "$BACKUP_ARCHIVE" \
-    .
-else
-  info "target looks empty; skipping deployment backup"
+  info "creating credential-free code backup"
+  tar --exclude='./data/postgres' --exclude='./.deploy_backups' \
+    --exclude='./.env' -C "$TARGET_DIR" -czf "$BACKUP_ARCHIVE" .
 fi
-
-if find "$FRONTEND_TARGET_DIR" -mindepth 1 -maxdepth 1 | read -r _; then
-  info "creating frontend backup archive: $FRONTEND_BACKUP_ARCHIVE"
+if [[ -e "$FRONTEND_TARGET_DIR" ]]; then
   tar -C "$FRONTEND_TARGET_DIR" -czf "$FRONTEND_BACKUP_ARCHIVE" .
+fi
+
+if [[ -f "$TARGET_DIR/docker-compose.yml" ]]; then
+  info "creating encrypted off-host database backup"
+  "$SOURCE_DIR/backup_to_s3.sh" "$TARGET_DIR" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
+  "$SOURCE_DIR/physical_backup_to_s3.sh" "$TARGET_DIR" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
 else
-  info "apache frontend root looks empty; skipping frontend backup"
+  info "first deployment: no existing database backup is required"
 fi
 
-info "syncing new release into target"
-tar \
-  --exclude='./.env' \
-  -C "$SOURCE_DIR" \
-  -cf - \
-  . | tar -C "$TARGET_DIR" -xf -
+info "syncing credential-free release"
+tar --exclude='./.env' -C "$SOURCE_DIR" -cf - . | tar -C "$TARGET_DIR" -xf -
+chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
+  "$TARGET_DIR/physical_backup_to_s3.sh" \
+  "$TARGET_DIR/archive_audit_to_s3.sh" \
+  "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/provision_secrets.sh" \
+  "$TARGET_DIR/backend/entrypoint.sh"
 
-if [[ -f "$TMP_DIR/target.env" ]]; then
-  cp "$TMP_DIR/target.env" "$ENV_TARGET"
-  # Website session duration is intentionally updated with each release while
-  # all existing credentials and unrelated service settings stay preserved.
-  for key in FIRST_PARTY_ACCESS_TOKEN_TTL_SECONDS FIRST_PARTY_REMEMBERED_ACCESS_TOKEN_TTL_SECONDS; do
-    sed -i "/^${key}=/d" "$ENV_TARGET"
-    grep "^${key}=" "$ENV_SOURCE" >> "$ENV_TARGET"
-  done
-else
-  cp "$ENV_SOURCE" "$ENV_TARGET"
-fi
-
-chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backend/entrypoint.sh" || true
-
-if [[ -f "$TARGET_DIR/.env" ]]; then
-  info "active .env: $TARGET_DIR/.env"
-fi
-
-info "publishing frontend assets to apache web root"
-rsync -a --delete \
-  --exclude='.user.ini' \
-  "$SOURCE_DIR/frontend/dist/" \
-  "$FRONTEND_TARGET_DIR/"
-
-if [[ ! -f "$FRONTEND_TARGET_DIR/index.html" ]]; then
-  die "frontend publish failed: index.html not found in $FRONTEND_TARGET_DIR"
-fi
-
-if [[ "$CLEAR_DATABASE_ONCE" == "true" ]]; then
-  warn "CLEAR_DATABASE_ONCE=true, removing postgres volume data before restart"
-  (
-    cd "$TARGET_DIR"
-    docker compose down -v || true
-  )
-  rm -rf "$TARGET_DIR/data/postgres"
-  mkdir -p "$TARGET_DIR/data/postgres"
-fi
-
-info "building and starting containers"
+info "building containers before maintenance"
 (
   cd "$TARGET_DIR"
-  docker compose up -d --build
+  compose build
 )
 
-info "deployment completed successfully"
-info "backup archive: $BACKUP_ARCHIVE"
-info "frontend backup archive: $FRONTEND_BACKUP_ARCHIVE"
-info "check status with: cd $TARGET_DIR && docker compose ps"
-info "tail server logs with: cd $TARGET_DIR && docker compose logs -f passport_server"
+info "staging frontend"
+mkdir -p "$FRONTEND_STAGE_DIR"
+rsync -a --delete --exclude='.user.ini' \
+  "$SOURCE_DIR/frontend/dist/" "$FRONTEND_STAGE_DIR/"
+[[ -f "$FRONTEND_STAGE_DIR/index.html" ]] || die "frontend staging failed"
+if [[ -d "$FRONTEND_TARGET_DIR" && ! -L "$FRONTEND_TARGET_DIR" ]]; then
+  legacy_frontend="$FRONTEND_RELEASES_DIR/legacy-$TIMESTAMP"
+  mv "$FRONTEND_TARGET_DIR" "$legacy_frontend"
+  previous_frontend="$legacy_frontend"
+  ln -s "$legacy_frontend" "$FRONTEND_TARGET_DIR"
+fi
+
+MAINTENANCE_ENABLED=false
+if [[ -e "$FRONTEND_TARGET_DIR" ]]; then
+  info "enabling maintenance mode"
+  cp "$SOURCE_DIR/frontend/dist/maintenance.html" "$FRONTEND_TARGET_DIR/maintenance.html"
+  touch "$FRONTEND_TARGET_DIR/.maintenance"
+  MAINTENANCE_ENABLED=true
+fi
+
+info "starting migrated backend"
+(
+  cd "$TARGET_DIR"
+  compose up -d --no-build
+)
+
+ready=false
+for _ in {1..40}; do
+  if curl --fail --silent --max-time 3 http://127.0.0.1:8091/health/ready >/dev/null; then
+    ready=true
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$ready" != true ]]; then
+  error "readiness failed; rolling back application files"
+  if [[ -f "$BACKUP_ARCHIVE" ]]; then
+    tar -C "$TARGET_DIR" -xzf "$BACKUP_ARCHIVE"
+    (
+      cd "$TARGET_DIR"
+      compose up -d --build || true
+    )
+  fi
+  exit 1
+fi
+
+info "atomically switching frontend and restoring traffic"
+ln -sfn "$FRONTEND_STAGE_DIR" "$FRONTEND_TARGET_DIR.next"
+mv -Tf "$FRONTEND_TARGET_DIR.next" "$FRONTEND_TARGET_DIR"
+if [[ "$MAINTENANCE_ENABLED" == true && -n "$previous_frontend" && -e "$previous_frontend/.maintenance" ]]; then
+  unlink "$previous_frontend/.maintenance"
+fi
+MAINTENANCE_ENABLED=false
+
+info "deployment completed and readiness passed"
+info "code backup: $BACKUP_ARCHIVE"
+info "frontend backup: $FRONTEND_BACKUP_ARCHIVE"

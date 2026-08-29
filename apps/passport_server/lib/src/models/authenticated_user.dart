@@ -27,11 +27,11 @@ class AuthenticatedUser {
       DateTime.now().toUtc().isBefore(postRegistrationPasskeyBootstrapUntil!);
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'email': email,
-        'phone_number': phoneNumber,
-        'is_phone_verified': isPhoneVerified,
-        'nickname': nickname,
-        'roles': roles,
-      };
+    'id': id,
+    'email': email,
+    'phone_number': phoneNumber,
+    'is_phone_verified': isPhoneVerified,
+    'nickname': nickname,
+    'roles': roles,
+  };
 }

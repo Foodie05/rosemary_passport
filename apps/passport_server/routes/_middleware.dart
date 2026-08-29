@@ -1,11 +1,13 @@
 import 'package:dart_frog/dart_frog.dart';
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 import '../lib/src/bootstrap.dart';
 import '../lib/src/config/app_config.dart';
 import '../lib/src/repositories/oidc_repository.dart';
 import '../lib/src/repositories/user_repository.dart';
 import '../lib/src/security/token_service.dart';
+import '../lib/src/security/password_policy.dart';
 import '../lib/src/services/audit_service.dart';
 import '../lib/src/services/admin_settings_service.dart';
 import '../lib/src/services/auth_service.dart';
@@ -16,13 +18,21 @@ import '../lib/src/services/security_service.dart';
 import '../lib/src/services/token_validation_service.dart';
 import '../lib/src/utils/http.dart';
 
+class _RequestTrace {
+  const _RequestTrace(this.id);
+
+  final String id;
+}
+
 Handler middleware(Handler handler) {
   final services = AppServices.instance;
 
   return handler
       .use(_errorBoundary())
+      .use(_requestLogging())
       .use(provider<AppConfig>((_) => services.config))
       .use(provider<TokenService>((_) => services.tokenService))
+      .use(provider<PasswordPolicy>((_) => services.passwordPolicy))
       .use(
         provider<TokenValidationService>(
           (_) => services.tokenValidationService,
@@ -51,16 +61,63 @@ Middleware _errorBoundary() {
         return await handler(context);
       } catch (error, stackTrace) {
         final request = context.request;
+        String? requestId;
+        try {
+          requestId = context.read<_RequestTrace>().id;
+        } catch (_) {
+          requestId = request.headers['x-request-id'];
+        }
         final details = jsonEncode({
+          'level': 'error',
+          'event': 'request.unhandled_error',
           'method': request.method.name,
           'path': request.uri.path,
-          'query': request.uri.query,
-          'content_type': request.headers['content-type'],
+          'request_id': requestId,
+          'error_type': error.runtimeType.toString(),
         });
         // ignore: avoid_print
-        print('Unhandled request error: $details\n$error\n$stackTrace');
+        print(details);
+        if (Uri.parse(AppServices.instance.config.serverBaseUrl).host ==
+            'localhost') {
+          // ignore: avoid_print
+          print(stackTrace);
+        }
         return errorResponse('server_error', '服务器处理请求时发生错误。', statusCode: 500);
       }
+    };
+  };
+}
+
+Middleware _requestLogging() {
+  const uuid = Uuid();
+  return (handler) {
+    return (context) async {
+      final requestId = context.request.headers['x-request-id']?.trim();
+      final resolvedRequestId = requestId == null || requestId.isEmpty
+          ? uuid.v4()
+          : requestId.substring(0, requestId.length.clamp(0, 128));
+      final started = DateTime.now().toUtc();
+      final nextContext = context.provide<_RequestTrace>(
+        () => _RequestTrace(resolvedRequestId),
+      );
+      final response = await handler(nextContext);
+      final duration = DateTime.now()
+          .toUtc()
+          .difference(started)
+          .inMilliseconds;
+      // ignore: avoid_print
+      print(
+        jsonEncode({
+          'level': 'info',
+          'event': 'request.completed',
+          'request_id': resolvedRequestId,
+          'method': context.request.method.name,
+          'path': context.request.uri.path,
+          'status': response.statusCode,
+          'duration_ms': duration,
+        }),
+      );
+      return response.copyWith(headers: {'x-request-id': resolvedRequestId});
     };
   };
 }
@@ -78,7 +135,6 @@ Middleware _securityHeaders() {
       final response = await handler(context);
       return response.copyWith(
         headers: {
-          ...response.headers,
           ..._corsHeaders(context.request, AppServices.instance.config),
           'strict-transport-security':
               response.headers['strict-transport-security'] ??

@@ -1,18 +1,35 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import '../config/app_config.dart';
 import '../repositories/webauthn_repository.dart';
+import 'helper_client.dart';
 
 class WebAuthnService {
   WebAuthnService({
     required AppConfig config,
     required WebAuthnRepository repository,
+    required HelperClient helperClient,
   }) : _config = config,
-       _repository = repository;
+       _repository = repository,
+       _helperClient = helperClient;
 
   final AppConfig _config;
   final WebAuthnRepository _repository;
+  final HelperClient _helperClient;
+
+  Future<bool> healthCheck() async {
+    if (_helperClient.enabled) {
+      return _helperClient.healthCheck();
+    }
+    try {
+      final result = await _runHelper('helper-health.mjs', const {});
+      return result['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<bool> hasCredentials(String userId) async {
     final credentials = await _repository.listCredentialsForUser(userId);
@@ -143,6 +160,7 @@ class WebAuthnService {
     String? email,
     required String origin,
     String? userId,
+    bool requireUserVerification = false,
   }) async {
     final credentials = userId == null
         ? const <WebAuthnCredentialRecord>[]
@@ -153,6 +171,7 @@ class WebAuthnService {
     final rpId = _rpIdFromOrigin(origin);
     final payload = await _runHelper('webauthn-auth-options.mjs', {
       'rpID': rpId,
+      'requireUserVerification': requireUserVerification,
       if (credentials.isNotEmpty)
         'allowCredentials': credentials
             .map(
@@ -182,6 +201,7 @@ class WebAuthnService {
     String? userId,
     String? email,
     required Map<String, dynamic> response,
+    bool forceUserVerification = false,
   }) async {
     final credentialId = ((response['id'] ?? response['rawId']) ?? '')
         .toString();
@@ -195,6 +215,11 @@ class WebAuthnService {
     }
 
     final resolvedUserId = userId ?? credential.userId;
+    final graceExpired =
+        credential.uvGraceExpiresAt != null &&
+        credential.uvGraceExpiresAt!.isBefore(DateTime.now().toUtc());
+    final requireUserVerification =
+        forceUserVerification || credential.uvRequired || graceExpired;
     final challenge = await _repository.findLatestChallenge(
       userId: userId == null ? null : resolvedUserId,
       email: email,
@@ -210,6 +235,7 @@ class WebAuthnService {
       'expectedChallenge': challenge.challenge,
       'expectedOrigin': _expectedOrigins(challenge.origin),
       'expectedRPID': challenge.rpId,
+      'requireUserVerification': requireUserVerification,
       'credential': {
         'id': credential.credentialId,
         'publicKey': credential.publicKey,
@@ -239,6 +265,9 @@ class WebAuthnService {
           int.tryParse('${authenticationInfo['newCounter']}') ??
           credential.counter,
     );
+    if (authenticationInfo['userVerified'] == true) {
+      await _repository.markUserVerified(credential.credentialId);
+    }
     await _repository.deleteChallenge(challenge.id);
     return true;
   }
@@ -247,15 +276,30 @@ class WebAuthnService {
     String scriptName,
     Map<String, dynamic> payload,
   ) async {
+    if (_helperClient.enabled) {
+      return _helperClient.execute(scriptName, payload);
+    }
     final process = await Process.start('node', [
       'scripts/$scriptName',
     ], workingDirectory: _helperWorkingDirectory);
     process.stdin.writeln(jsonEncode(payload));
     await process.stdin.close();
 
-    final stdout = await process.stdout.transform(utf8.decoder).join();
-    final stderr = await process.stderr.transform(utf8.decoder).join();
-    final exitCode = await process.exitCode;
+    final output =
+        await Future.wait<dynamic>([
+          process.stdout.transform(utf8.decoder).join(),
+          process.stderr.transform(utf8.decoder).join(),
+          process.exitCode,
+        ]).timeout(
+          Duration(seconds: _config.helperTimeoutSeconds),
+          onTimeout: () {
+            process.kill(ProcessSignal.sigkill);
+            throw TimeoutException('WebAuthn helper timed out.');
+          },
+        );
+    final stdout = output[0] as String;
+    final stderr = output[1] as String;
+    final exitCode = output[2] as int;
 
     if (exitCode != 0) {
       throw StateError('WebAuthn helper failed: $stderr');

@@ -1,6 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import '../../../../../../../lib/src/models/authenticated_user.dart';
 import '../../../../../../../lib/src/services/admin_settings_service.dart';
+import '../../../../../../../lib/src/services/audit_service.dart';
 import '../../../../../../../lib/src/utils/http.dart';
 
 Future<Response> onRequest(RequestContext context, String name) async {
@@ -17,14 +19,19 @@ Future<Response> onRequest(RequestContext context, String name) async {
   if (context.request.method == HttpMethod.put) {
     final body = await tryParseJsonObject(context.request);
     if (body == null) {
-      return errorResponse('invalid_request', 'Request body must be a JSON object.');
+      return errorResponse(
+        'invalid_request',
+        'Request body must be a JSON object.',
+      );
     }
     final subject = body['subject']?.toString() ?? '';
     final html = body['html']?.toString() ?? '';
     final text = body['text']?.toString() ?? '';
     if (subject.isEmpty || html.isEmpty || text.isEmpty) {
       return errorResponse(
-          'invalid_request', 'subject/html/text are required.');
+        'invalid_request',
+        'subject/html/text are required.',
+      );
     }
 
     await service.upsertTemplate(
@@ -33,9 +40,22 @@ Future<Response> onRequest(RequestContext context, String name) async {
       html: html,
       text: text,
     );
+    final actor = context.read<AuthenticatedUser>();
+    await context.read<AuditService>().log(
+      action: 'admin.email_template.update',
+      actorId: actor.id,
+      actorType: 'admin',
+      resourceType: 'email_template',
+      resourceId: name,
+      metadata: const {},
+      ip: context.request.headers['x-forwarded-for'],
+    );
     return jsonResponse({'updated': true});
   }
 
-  return errorResponse('method_not_allowed', 'Use GET or PUT.',
-      statusCode: 405);
+  return errorResponse(
+    'method_not_allowed',
+    'Use GET or PUT.',
+    statusCode: 405,
+  );
 }

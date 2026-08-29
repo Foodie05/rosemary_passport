@@ -68,10 +68,7 @@ class EmailLoginRequest {
 
 @JsonSerializable(fieldRename: FieldRename.snake, includeIfNull: false)
 class EmailRequest {
-  const EmailRequest({
-    required this.email,
-    this.captchaToken,
-  });
+  const EmailRequest({required this.email, this.captchaToken});
 
   factory EmailRequest.fromJson(Map<String, dynamic> json) =>
       _$EmailRequestFromJson(json);
@@ -138,9 +135,7 @@ class SendRegisterCodeRequest {
 
 @JsonSerializable(fieldRename: FieldRename.snake, includeIfNull: false)
 class CaptchaRequest {
-  const CaptchaRequest({
-    required this.captchaToken,
-  });
+  const CaptchaRequest({required this.captchaToken});
 
   factory CaptchaRequest.fromJson(Map<String, dynamic> json) =>
       _$CaptchaRequestFromJson(json);
@@ -152,9 +147,7 @@ class CaptchaRequest {
 
 @JsonSerializable(fieldRename: FieldRename.snake, includeIfNull: false)
 class RefreshRequest {
-  const RefreshRequest({
-    required this.refreshToken,
-  });
+  const RefreshRequest({required this.refreshToken});
 
   factory RefreshRequest.fromJson(Map<String, dynamic> json) =>
       _$RefreshRequestFromJson(json);
@@ -166,9 +159,7 @@ class RefreshRequest {
 
 @JsonSerializable(fieldRename: FieldRename.snake, includeIfNull: false)
 class WebAuthnOptionsRequest {
-  const WebAuthnOptionsRequest({
-    this.email,
-  });
+  const WebAuthnOptionsRequest({this.email});
 
   factory WebAuthnOptionsRequest.fromJson(Map<String, dynamic> json) =>
       _$WebAuthnOptionsRequestFromJson(json);

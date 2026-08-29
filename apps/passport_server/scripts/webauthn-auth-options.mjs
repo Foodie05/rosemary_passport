@@ -25,7 +25,7 @@ const credentialDescriptor = (credential) => {
 
 const options = await generateAuthenticationOptions({
   rpID: input.rpID,
-  userVerification: 'preferred',
+  userVerification: input.requireUserVerification === true ? 'required' : 'preferred',
   allowCredentials: (input.allowCredentials || input.allowCredentialIDs || [])
     .map(credentialDescriptor),
 });

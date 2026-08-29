@@ -4,12 +4,14 @@ import 'dart:io';
 
 import '../config/app_config.dart';
 import '../repositories/settings_repository.dart';
+import 'helper_client.dart';
 
 class CaptchaService {
-  CaptchaService(this._config, [this._settingsRepository]);
+  CaptchaService(this._config, [this._settingsRepository, this._helperClient]);
 
   final AppConfig _config;
   final SettingsRepository? _settingsRepository;
+  final HelperClient? _helperClient;
 
   static const _verifyTimeout = Duration(seconds: 8);
 
@@ -28,6 +30,21 @@ class CaptchaService {
         '[ALIYUN_CAPTCHA] Verification skipped: configuration is incomplete.',
       );
       return {'ok': false, 'message': '阿里云验证码配置不完整。'};
+    }
+
+    final helperClient = _helperClient;
+    if (helperClient != null && helperClient.enabled) {
+      try {
+        final body = await helperClient.execute('captcha-verify.mjs', {
+          'accessKeyId': provider['accessKeyId'],
+          'accessKeySecret': provider['accessKeySecret'],
+          'sceneId': provider['sceneId'],
+          'captchaVerifyParam': token,
+        });
+        return _captchaResult(body, token);
+      } catch (_) {
+        return {'ok': false, 'message': '无法连接到验证码辅助服务，请稍后重试。'};
+      }
     }
 
     late final Process process;
@@ -80,44 +97,9 @@ class CaptchaService {
       }
 
       final body = Map<String, dynamic>.from(jsonDecode(output) as Map);
-      final providerAccepted = body['success'] == true;
-      final verified = body['verifyResult'] == true;
-      if (providerAccepted && verified) {
-        // ignore: avoid_print
-        print(
-          '[ALIYUN_CAPTCHA] Verification succeeded '
-          '(token_length=${token.length}, request_id=${body['requestId'] ?? ''}).',
-        );
-        return {'ok': true, 'message': '阿里云验证码校验成功。'};
-      }
-
-      final verifyCode = '${body['verifyCode'] ?? ''}';
-      final providerCode = '${body['code'] ?? ''}';
-      final providerMessage = _safeDiagnosticValue(body['message']);
-      final requestId = _safeDiagnosticValue(body['requestId']);
-      // ignore: avoid_print
-      print(
-        '[ALIYUN_CAPTCHA] Verification rejected by provider '
-        '(code=$providerCode, verify_code=$verifyCode, '
-        'message=$providerMessage, request_id=$requestId, '
-        'token_length=${token.length}).',
-      );
-      final details = <String>[
-        if (providerMessage.isNotEmpty) providerMessage,
-        if (providerCode.isNotEmpty && providerCode != verifyCode)
-          '接口代码：$providerCode',
-        if (requestId.isNotEmpty) '请求 ID：$requestId',
-      ];
-      final detailSuffix = details.isEmpty ? '' : ' ${details.join('；')}';
-      return {
-        'ok': false,
-        'message': verifyCode.isEmpty
-            ? '阿里云验证码校验失败。$detailSuffix'
-            : '阿里云验证码校验未通过（$verifyCode）。$detailSuffix',
-      };
+      return _captchaResult(body, token);
     } on TimeoutException {
       process.kill();
-      // Never log the token or secret; lengths are enough for diagnostics.
       // ignore: avoid_print
       print(
         '[ALIYUN_CAPTCHA] Verification timed out after '
@@ -132,6 +114,44 @@ class CaptchaService {
       );
       return {'ok': false, 'message': '无法连接到阿里云验证码校验服务，请检查服务器网络与配置。'};
     }
+  }
+
+  Map<String, dynamic> _captchaResult(Map<String, dynamic> body, String token) {
+    final providerAccepted = body['success'] == true;
+    final verified = body['verifyResult'] == true;
+    if (providerAccepted && verified) {
+      // ignore: avoid_print
+      print(
+        '[ALIYUN_CAPTCHA] Verification succeeded '
+        '(token_length=${token.length}, request_id=${body['requestId'] ?? ''}).',
+      );
+      return {'ok': true, 'message': '阿里云验证码校验成功。'};
+    }
+
+    final verifyCode = '${body['verifyCode'] ?? ''}';
+    final providerCode = '${body['code'] ?? ''}';
+    final providerMessage = _safeDiagnosticValue(body['message']);
+    final requestId = _safeDiagnosticValue(body['requestId']);
+    // ignore: avoid_print
+    print(
+      '[ALIYUN_CAPTCHA] Verification rejected by provider '
+      '(code=$providerCode, verify_code=$verifyCode, '
+      'message=$providerMessage, request_id=$requestId, '
+      'token_length=${token.length}).',
+    );
+    final details = <String>[
+      if (providerMessage.isNotEmpty) providerMessage,
+      if (providerCode.isNotEmpty && providerCode != verifyCode)
+        '接口代码：$providerCode',
+      if (requestId.isNotEmpty) '请求 ID：$requestId',
+    ];
+    final detailSuffix = details.isEmpty ? '' : ' ${details.join('；')}';
+    return <String, dynamic>{
+      'ok': false,
+      'message': verifyCode.isEmpty
+          ? '阿里云验证码校验失败。$detailSuffix'
+          : '阿里云验证码校验未通过（$verifyCode）。$detailSuffix',
+    };
   }
 
   static String _safeDiagnosticValue(dynamic value) {

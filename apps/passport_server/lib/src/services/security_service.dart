@@ -1,10 +1,7 @@
 import '../repositories/security_repository.dart';
 
 class ThrottleDecision {
-  const ThrottleDecision({
-    required this.allowed,
-    this.retryAfterSeconds,
-  });
+  const ThrottleDecision({required this.allowed, this.retryAfterSeconds});
 
   final bool allowed;
   final int? retryAfterSeconds;
@@ -65,15 +62,13 @@ class SecurityService {
       return null;
     }
 
-    final seconds =
-        state.blockedUntil!.difference(DateTime.now().toUtc()).inSeconds;
+    final seconds = state.blockedUntil!
+        .difference(DateTime.now().toUtc())
+        .inSeconds;
     return seconds < 1 ? 1 : seconds;
   }
 
-  Future<void> clear({
-    required String scope,
-    required String subject,
-  }) {
+  Future<void> clear({required String scope, required String subject}) {
     return _repository.clearThrottle(scope: scope, subject: subject);
   }
 

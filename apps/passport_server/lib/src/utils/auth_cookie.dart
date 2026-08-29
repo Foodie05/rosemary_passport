@@ -1,6 +1,8 @@
 import '../config/app_config.dart';
 
 const kAccessTokenCookieName = 'rosm_access_token';
+const kLegacyRefreshTokenCookieName = 'rosm_refresh_token';
+const kSecureRefreshTokenCookieName = '__Host-rosm_refresh_token';
 
 String buildAccessTokenCookie(
   String accessToken, {
@@ -18,6 +20,31 @@ String buildAccessTokenCookie(
   return attributes.join('; ');
 }
 
+String buildRefreshTokenCookie(
+  String refreshToken, {
+  required AppConfig config,
+  required int maxAgeSeconds,
+}) {
+  final attributes = <String>[
+    '${refreshTokenCookieName(config)}=$refreshToken',
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=$maxAgeSeconds',
+    if (_isSecureCookie(config)) 'Secure',
+  ];
+  return attributes.join('; ');
+}
+
+String refreshTokenCookieName(AppConfig config) => _isSecureCookie(config)
+    ? kSecureRefreshTokenCookieName
+    : kLegacyRefreshTokenCookieName;
+
+String? readRefreshTokenCookie(String? header, AppConfig config) {
+  return readCookieValue(header, refreshTokenCookieName(config)) ??
+      readCookieValue(header, kLegacyRefreshTokenCookieName);
+}
+
 String buildOidcConsentCookie(String token, {required AppConfig config}) {
   final attributes = <String>[
     'rosm_oidc_consent=$token',
@@ -32,6 +59,18 @@ String buildOidcConsentCookie(String token, {required AppConfig config}) {
 String buildExpiredAccessTokenCookie({required AppConfig config}) {
   final attributes = <String>[
     '$kAccessTokenCookieName=',
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=0',
+    if (_isSecureCookie(config)) 'Secure',
+  ];
+  return attributes.join('; ');
+}
+
+String buildExpiredRefreshTokenCookie({required AppConfig config}) {
+  final attributes = <String>[
+    '${refreshTokenCookieName(config)}=',
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',

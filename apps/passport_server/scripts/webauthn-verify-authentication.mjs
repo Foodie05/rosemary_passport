@@ -33,6 +33,7 @@ try {
       authenticationInfo: info
         ? {
             newCounter: info.newCounter,
+            userVerified: info.userVerified === true,
           }
         : null,
     }),

@@ -1,6 +1,8 @@
 import '../db/database.dart';
 import 'package:postgres/postgres.dart';
 
+enum RefreshRotationStatus { success, invalid, reused }
+
 class OidcRepository {
   OidcRepository(this._db);
 
@@ -59,6 +61,7 @@ class OidcRepository {
         token_id text primary key,
         user_id uuid not null references users(id) on delete cascade,
         client_id text not null references oidc_clients(client_id),
+        family_id uuid,
         expires_at timestamptz not null,
         revoked_at timestamptz,
         created_at timestamptz not null default now()
@@ -69,11 +72,37 @@ class OidcRepository {
         token_id text primary key,
         user_id uuid not null references users(id) on delete cascade,
         client_id text not null references oidc_clients(client_id),
+        family_id uuid,
+        parent_token_id text,
+        replaced_by_token_id text,
+        consumed_at timestamptz,
+        reuse_detected_at timestamptz,
         expires_at timestamptz not null,
         revoked_at timestamptz,
         created_at timestamptz not null default now()
       )
       ''');
+    await _db.execute(
+      'alter table oidc_access_tokens add column if not exists family_id uuid',
+    );
+    await _db.execute(
+      'alter table oidc_refresh_tokens add column if not exists family_id uuid',
+    );
+    await _db.execute(
+      'alter table oidc_refresh_tokens add column if not exists parent_token_id text',
+    );
+    await _db.execute(
+      'alter table oidc_refresh_tokens add column if not exists replaced_by_token_id text',
+    );
+    await _db.execute(
+      'alter table oidc_refresh_tokens add column if not exists consumed_at timestamptz',
+    );
+    await _db.execute(
+      'alter table oidc_refresh_tokens add column if not exists reuse_detected_at timestamptz',
+    );
+    await _db.execute(
+      'update oidc_refresh_tokens set family_id = gen_random_uuid() where family_id is null',
+    );
     await _db.execute('''
       insert into oidc_clients(
         client_id,
@@ -159,7 +188,8 @@ class OidcRepository {
     await _ensureSchema();
     final result = await _db.execute(
       '''
-      select token_id, user_id, client_id, expires_at, revoked_at
+      select token_id, user_id, client_id, expires_at, revoked_at,
+             family_id, consumed_at, replaced_by_token_id
       from oidc_refresh_tokens
       where token_id = @token_id
       ''',
@@ -177,6 +207,9 @@ class OidcRepository {
       'client_id': row[2],
       'expires_at': row[3] as DateTime,
       'revoked_at': row[4] as DateTime?,
+      'family_id': row[5]?.toString(),
+      'consumed_at': row[6] as DateTime?,
+      'replaced_by_token_id': row[7] as String?,
     };
   }
 
@@ -284,18 +317,20 @@ class OidcRepository {
     required String userId,
     required String clientId,
     required DateTime expiresAt,
+    String? familyId,
   }) async {
     await _ensureSchema();
     await _db.execute(
       '''
-      insert into oidc_access_tokens(token_id, user_id, client_id, expires_at)
-      values (@token_id, @user_id, @client_id, @expires_at)
+      insert into oidc_access_tokens(token_id, user_id, client_id, expires_at, family_id)
+      values (@token_id, @user_id, @client_id, @expires_at, cast(@family_id as uuid))
       ''',
       params: {
         'token_id': tokenId,
         'user_id': userId,
         'client_id': clientId,
         'expires_at': expiresAt,
+        'family_id': familyId,
       },
     );
   }
@@ -326,20 +361,205 @@ class OidcRepository {
     required String userId,
     required String clientId,
     required DateTime expiresAt,
+    String? familyId,
+    String? parentTokenId,
   }) async {
     await _ensureSchema();
     await _db.execute(
       '''
-      insert into oidc_refresh_tokens(token_id, user_id, client_id, expires_at)
-      values (@token_id, @user_id, @client_id, @expires_at)
+      insert into oidc_refresh_tokens(
+        token_id, user_id, client_id, expires_at, family_id, parent_token_id
+      )
+      values (
+        @token_id, @user_id, @client_id, @expires_at,
+        cast(@family_id as uuid), @parent_token_id
+      )
       ''',
       params: {
         'token_id': tokenId,
         'user_id': userId,
         'client_id': clientId,
         'expires_at': expiresAt,
+        'family_id': familyId,
+        'parent_token_id': parentTokenId,
       },
     );
+  }
+
+  Future<void> storeTokenPair({
+    required String accessTokenId,
+    required String refreshTokenId,
+    required String familyId,
+    required String userId,
+    required String clientId,
+    required DateTime accessExpiresAt,
+    required DateTime refreshExpiresAt,
+  }) async {
+    await _ensureSchema();
+    await _db.runTx((tx) async {
+      await tx.execute(
+        Sql.named('''
+          insert into oidc_access_tokens(
+            token_id, user_id, client_id, expires_at, family_id
+          ) values (
+            @access_token_id, @user_id, @client_id, @access_expires_at,
+            cast(@family_id as uuid)
+          )
+        '''),
+        parameters: {
+          'access_token_id': accessTokenId,
+          'user_id': userId,
+          'client_id': clientId,
+          'access_expires_at': accessExpiresAt,
+          'family_id': familyId,
+        },
+      );
+      await tx.execute(
+        Sql.named('''
+          insert into oidc_refresh_tokens(
+            token_id, user_id, client_id, expires_at, family_id
+          ) values (
+            @refresh_token_id, @user_id, @client_id, @refresh_expires_at,
+            cast(@family_id as uuid)
+          )
+        '''),
+        parameters: {
+          'refresh_token_id': refreshTokenId,
+          'user_id': userId,
+          'client_id': clientId,
+          'refresh_expires_at': refreshExpiresAt,
+          'family_id': familyId,
+        },
+      );
+    });
+  }
+
+  Future<RefreshRotationStatus> rotateRefreshToken({
+    required String oldTokenId,
+    required String newAccessTokenId,
+    required String newRefreshTokenId,
+    required String familyId,
+    required String userId,
+    required String clientId,
+    required DateTime accessExpiresAt,
+    required DateTime refreshExpiresAt,
+  }) async {
+    await _ensureSchema();
+    return _db.runTx((tx) async {
+      final result = await tx.execute(
+        Sql.named('''
+          select user_id, client_id, expires_at, revoked_at, consumed_at,
+                 family_id
+          from oidc_refresh_tokens
+          where token_id = @token_id
+          for update
+        '''),
+        parameters: {'token_id': oldTokenId},
+      );
+      if (result.isEmpty) {
+        return RefreshRotationStatus.invalid;
+      }
+      final row = result.first;
+      final storedFamilyId = row[5]?.toString();
+      if (storedFamilyId == null || storedFamilyId != familyId) {
+        return RefreshRotationStatus.invalid;
+      }
+      if (row[3] != null || row[4] != null) {
+        await tx.execute(
+          Sql.named('''
+            update oidc_refresh_tokens
+            set revoked_at = coalesce(revoked_at, now()),
+                reuse_detected_at = coalesce(reuse_detected_at, now())
+            where family_id = cast(@family_id as uuid)
+          '''),
+          parameters: {'family_id': familyId},
+        );
+        await tx.execute(
+          Sql.named('''
+            update oidc_access_tokens
+            set revoked_at = coalesce(revoked_at, now())
+            where family_id = cast(@family_id as uuid)
+          '''),
+          parameters: {'family_id': familyId},
+        );
+        return RefreshRotationStatus.reused;
+      }
+      if (row[0]?.toString() != userId ||
+          row[1]?.toString() != clientId ||
+          !(row[2] as DateTime).isAfter(DateTime.now().toUtc())) {
+        return RefreshRotationStatus.invalid;
+      }
+      await tx.execute(
+        Sql.named('''
+          update oidc_refresh_tokens
+          set consumed_at = now(), revoked_at = now(),
+              replaced_by_token_id = @new_refresh_token_id
+          where token_id = @old_token_id
+        '''),
+        parameters: {
+          'old_token_id': oldTokenId,
+          'new_refresh_token_id': newRefreshTokenId,
+        },
+      );
+      await tx.execute(
+        Sql.named('''
+          insert into oidc_access_tokens(
+            token_id, user_id, client_id, expires_at, family_id
+          ) values (
+            @token_id, @user_id, @client_id, @expires_at,
+            cast(@family_id as uuid)
+          )
+        '''),
+        parameters: {
+          'token_id': newAccessTokenId,
+          'user_id': userId,
+          'client_id': clientId,
+          'expires_at': accessExpiresAt,
+          'family_id': familyId,
+        },
+      );
+      await tx.execute(
+        Sql.named('''
+          insert into oidc_refresh_tokens(
+            token_id, user_id, client_id, expires_at, family_id, parent_token_id
+          ) values (
+            @token_id, @user_id, @client_id, @expires_at,
+            cast(@family_id as uuid), @parent_token_id
+          )
+        '''),
+        parameters: {
+          'token_id': newRefreshTokenId,
+          'user_id': userId,
+          'client_id': clientId,
+          'expires_at': refreshExpiresAt,
+          'family_id': familyId,
+          'parent_token_id': oldTokenId,
+        },
+      );
+      return RefreshRotationStatus.success;
+    });
+  }
+
+  Future<void> revokeTokenFamily(String familyId) async {
+    await _ensureSchema();
+    await _db.runTx((tx) async {
+      await tx.execute(
+        Sql.named('''
+          update oidc_refresh_tokens
+          set revoked_at = coalesce(revoked_at, now())
+          where family_id = cast(@family_id as uuid)
+        '''),
+        parameters: {'family_id': familyId},
+      );
+      await tx.execute(
+        Sql.named('''
+          update oidc_access_tokens
+          set revoked_at = coalesce(revoked_at, now())
+          where family_id = cast(@family_id as uuid)
+        '''),
+        parameters: {'family_id': familyId},
+      );
+    });
   }
 
   Future<bool> isRefreshTokenActive(String tokenId) async {
@@ -423,10 +643,7 @@ class OidcRepository {
         and token_id <> @preserved_token_id
         and revoked_at is null
       ''',
-      params: {
-        'user_id': userId,
-        'preserved_token_id': preservedTokenId,
-      },
+      params: {'user_id': userId, 'preserved_token_id': preservedTokenId},
     );
   }
 

@@ -9,7 +9,8 @@ Future<Response> onRequest(RequestContext context) async {
     return errorResponse('method_not_allowed', 'Use POST.', statusCode: 405);
   }
 
-  final payload = await tryParseJsonModel(
+  final payload =
+      await tryParseJsonModel(
         context.request,
         WebAuthnOptionsRequest.fromJson,
       ) ??
@@ -17,9 +18,9 @@ Future<Response> onRequest(RequestContext context) async {
 
   final origin = context.request.headers['origin'] ?? '';
   final options = await context.read<AuthService>().beginWebAuthnAuthentication(
-        email: payload.email,
-        origin: origin,
-      );
+    email: payload.email,
+    origin: origin,
+  );
   if (options == null) {
     return errorResponse('not_configured', '当前账户未配置通行密钥。', statusCode: 404);
   }

@@ -24,7 +24,9 @@ Future<Response> onRequest(RequestContext context) async {
 
   final user = context.read<AuthenticatedUser>();
   final authService = context.read<AuthService>();
-  final bypassCaptcha = await authService.shouldBypassBootstrapCaptchaForUser(user.id);
+  final bypassCaptcha = await authService.shouldBypassBootstrapCaptchaForUser(
+    user.id,
+  );
   if (!bypassCaptcha && captchaToken.trim().isEmpty) {
     return errorResponse('invalid_request', '请先完成人机验证。');
   }
@@ -34,7 +36,10 @@ Future<Response> onRequest(RequestContext context) async {
     config: context.read<AppConfig>(),
   );
   if (!bypassCaptcha) {
-    final captchaOk = await authService.verifyCaptcha(captchaToken.trim(), ip: requestIp);
+    final captchaOk = await authService.verifyCaptcha(
+      captchaToken.trim(),
+      ip: requestIp,
+    );
     if (!captchaOk) {
       return errorResponse('captcha_failed', '人机验证未通过，请重试。', statusCode: 400);
     }

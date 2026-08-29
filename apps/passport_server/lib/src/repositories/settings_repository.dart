@@ -1,11 +1,13 @@
 import 'dart:convert';
 
 import '../db/database.dart';
+import '../security/settings_cipher.dart';
 
 class SettingsRepository {
-  SettingsRepository(this._db);
+  SettingsRepository(this._db, this._cipher);
 
   final Database _db;
+  final SettingsCipher _cipher;
 
   Future<Map<String, dynamic>> getJson(String key) async {
     final result = await _db.execute(
@@ -15,10 +17,11 @@ class SettingsRepository {
     if (result.isEmpty) {
       return {};
     }
-    return _toMap(result.first[0]);
+    return _cipher.decryptEnvelopes(_toMap(result.first[0]));
   }
 
   Future<void> upsertJson(String key, Map<String, dynamic> value) async {
+    final protectedValue = await _cipher.encryptSensitiveFields(value);
     await _db.execute(
       '''
       insert into system_settings(key, value, updated_at)
@@ -26,11 +29,28 @@ class SettingsRepository {
       on conflict (key)
       do update set value = @value::jsonb, updated_at = now()
       ''',
-      params: {
-        'key': key,
-        'value': jsonEncode(value),
-      },
+      params: {'key': key, 'value': jsonEncode(protectedValue)},
     );
+  }
+
+  Future<int> migratePlaintextSecrets() async {
+    var migrated = 0;
+    for (final key in const ['smtp', 'security']) {
+      final result = await _db.execute(
+        'select value from system_settings where key = @key',
+        params: {'key': key},
+      );
+      if (result.isEmpty) {
+        continue;
+      }
+      final raw = _toMap(result.first[0]);
+      if (!_cipher.containsPlaintextSensitiveField(raw)) {
+        continue;
+      }
+      await upsertJson(key, raw);
+      migrated++;
+    }
+    return migrated;
   }
 
   Future<Map<String, dynamic>> getLocalAdminBootstrap() {
@@ -53,9 +73,7 @@ class SettingsRepository {
         !hasLegacyLock;
   }
 
-  Future<void> closeBootstrapLogin({
-    required String boundEmail,
-  }) async {
+  Future<void> closeBootstrapLogin({required String boundEmail}) async {
     final current = await getLocalAdminBootstrap();
     await upsertJson('local_admin_bootstrap', {
       ...current,
@@ -67,13 +85,11 @@ class SettingsRepository {
   }
 
   Future<List<Map<String, dynamic>>> listEmailTemplates() async {
-    final result = await _db.execute(
-      '''
+    final result = await _db.execute('''
       select name, subject, html, text, updated_at
       from email_templates
       order by name asc
-      ''',
-    );
+      ''');
 
     return result
         .map(
@@ -124,12 +140,7 @@ class SettingsRepository {
       on conflict (name)
       do update set subject = @subject, html = @html, text = @text, updated_at = now()
       ''',
-      params: {
-        'name': name,
-        'subject': subject,
-        'html': html,
-        'text': text,
-      },
+      params: {'name': name, 'subject': subject, 'html': html, 'text': text},
     );
   }
 

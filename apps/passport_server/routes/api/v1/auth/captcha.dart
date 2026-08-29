@@ -18,12 +18,15 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final ok = await context.read<AuthService>().verifyCaptcha(
-        payload.captchaToken,
-        ip: clientIpFromRequest(context.request),
-      );
+    payload.captchaToken,
+    ip: clientIpFromRequest(context.request),
+  );
   if (!ok) {
-    return errorResponse('captcha_failed', 'Captcha verification failed.',
-        statusCode: 400);
+    return errorResponse(
+      'captcha_failed',
+      'Captcha verification failed.',
+      statusCode: 400,
+    );
   }
 
   return jsonResponse({'verified': true});

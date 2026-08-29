@@ -6,10 +6,11 @@ import 'package:uuid/uuid.dart';
 import '../lib/src/config/app_config.dart';
 import '../lib/src/db/database.dart';
 import '../lib/src/security/password_hasher.dart';
+import '../lib/src/security/password_policy.dart';
 
 Future<void> main() async {
   final email = Platform.environment['LOCAL_ADMIN_EMAIL']?.trim();
-  final password = Platform.environment['LOCAL_ADMIN_PASSWORD'];
+  final password = _secretFromEnvironment('LOCAL_ADMIN_PASSWORD');
   final nickname = Platform.environment['LOCAL_ADMIN_NICKNAME'] ?? 'ROSM Admin';
 
   if (email == null || email.isEmpty || password == null || password.isEmpty) {
@@ -24,6 +25,12 @@ Future<void> main() async {
     exitCode = 64;
     return;
   }
+  final passwordPolicy = PasswordPolicy().validate(password);
+  if (!passwordPolicy.ok) {
+    stderr.writeln('Bootstrap password rejected: ${passwordPolicy.message}');
+    exitCode = 64;
+    return;
+  }
 
   final config = AppConfig.fromEnv();
   final db = Database(config);
@@ -35,14 +42,12 @@ Future<void> main() async {
 
     await db.runTx((tx) async {
       final bootstrapFlag = await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           select (value->>'allow_create')::boolean
           from system_settings
           where key = 'local_admin_bootstrap'
           for update
-          ''',
-        ),
+          '''),
       );
 
       if (bootstrapFlag.isEmpty) {
@@ -63,8 +68,7 @@ Future<void> main() async {
       if (userCount > 0) {
         blockedReason = 'database already contains users';
         await tx.execute(
-          Sql.named(
-            '''
+          Sql.named('''
             update system_settings
             set value = jsonb_build_object(
               'allow_create', false,
@@ -74,29 +78,25 @@ Future<void> main() async {
             ),
                 updated_at = now()
             where key = 'local_admin_bootstrap'
-            ''',
-          ),
+            '''),
           parameters: {'locked_reason': blockedReason},
         );
         return null;
       }
 
       final existing = await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           select id
           from users
           where lower(email) = lower(@email)
           limit 1
-          ''',
-        ),
+          '''),
         parameters: {'email': email},
       );
       if (existing.isNotEmpty) {
         blockedReason = 'email already exists';
         await tx.execute(
-          Sql.named(
-            '''
+          Sql.named('''
             update system_settings
             set value = jsonb_build_object(
               'allow_create', false,
@@ -106,8 +106,7 @@ Future<void> main() async {
             ),
                 updated_at = now()
             where key = 'local_admin_bootstrap'
-            ''',
-          ),
+            '''),
           parameters: {'locked_reason': blockedReason},
         );
         return null;
@@ -116,12 +115,10 @@ Future<void> main() async {
       final userId = const Uuid().v4();
       final hash = await passwordHasher.hash(password);
       await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           insert into users(id, email, nickname, password_hash, is_email_verified)
           values (@id, lower(@email), @nickname, @password_hash, true)
-          ''',
-        ),
+          '''),
         parameters: {
           'id': userId,
           'email': email,
@@ -130,33 +127,22 @@ Future<void> main() async {
         },
       );
       await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           insert into user_roles(user_id, role)
           values (@user_id, @role)
-          ''',
-        ),
-        parameters: {
-          'user_id': userId,
-          'role': 'admin',
-        },
+          '''),
+        parameters: {'user_id': userId, 'role': 'admin'},
       );
       await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           insert into user_roles(user_id, role)
           values (@user_id, @role)
           on conflict do nothing
-          ''',
-        ),
-        parameters: {
-          'user_id': userId,
-          'role': 'user',
-        },
+          '''),
+        parameters: {'user_id': userId, 'role': 'user'},
       );
       await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
             update system_settings
             set value = jsonb_build_object(
               'allow_create', false,
@@ -166,8 +152,7 @@ Future<void> main() async {
             ),
               updated_at = now()
           where key = 'local_admin_bootstrap'
-          ''',
-        ),
+          '''),
         parameters: {'email': email},
       );
       created = true;
@@ -186,6 +171,18 @@ Future<void> main() async {
   } finally {
     await db.close();
   }
+}
+
+String? _secretFromEnvironment(String name) {
+  final filePath = Platform.environment['${name}_FILE']?.trim();
+  if (filePath != null && filePath.isNotEmpty) {
+    final file = File(filePath);
+    if (!file.existsSync()) {
+      return null;
+    }
+    return file.readAsStringSync().trim();
+  }
+  return Platform.environment[name];
 }
 
 bool _isReservedBootstrapEmail(String email) {

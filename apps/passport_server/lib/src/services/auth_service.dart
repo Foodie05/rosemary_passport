@@ -5,6 +5,7 @@ import '../repositories/oidc_repository.dart';
 import '../repositories/settings_repository.dart';
 import '../repositories/user_repository.dart';
 import '../security/password_hasher.dart';
+import '../security/password_policy.dart';
 import '../security/token_service.dart';
 import 'audit_service.dart';
 import 'authenticator_service.dart';
@@ -13,7 +14,6 @@ import 'email_code_service.dart';
 import 'phone_verification_service.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
-import 'token_validation_service.dart';
 import 'webauthn_service.dart';
 
 class AuthResult {
@@ -197,8 +197,8 @@ class AuthService {
   AuthService({
     required UserRepository userRepository,
     required PasswordHasher passwordHasher,
+    required PasswordPolicy passwordPolicy,
     required TokenService tokenService,
-    required TokenValidationService tokenValidationService,
     required EmailCodeService emailCodeService,
     required CaptchaService captchaService,
     required OidcRepository oidcRepository,
@@ -211,8 +211,8 @@ class AuthService {
     PhoneVerificationService? phoneVerificationService,
   }) : _users = userRepository,
        _passwordHasher = passwordHasher,
+       _passwordPolicy = passwordPolicy,
        _tokenService = tokenService,
-       _tokenValidation = tokenValidationService,
        _emailCodeService = emailCodeService,
        _captchaService = captchaService,
        _oidcRepository = oidcRepository,
@@ -226,8 +226,8 @@ class AuthService {
 
   final UserRepository _users;
   final PasswordHasher _passwordHasher;
+  final PasswordPolicy _passwordPolicy;
   final TokenService _tokenService;
-  final TokenValidationService _tokenValidation;
   final EmailCodeService _emailCodeService;
   final CaptchaService _captchaService;
   final OidcRepository _oidcRepository;
@@ -784,10 +784,14 @@ class AuthService {
 
     final user = await _users.findByEmail(email);
     if (user == null || user.roles.contains('admin')) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'account_not_found',
-        message: '该邮箱尚未注册。',
-        statusCode: 404,
+      await _startVerificationCodeCooldown(
+        email: email,
+        seconds: policy.loginCodeCooldownSeconds,
+        cooldownScope: _verificationCodeLoginCooldownScope,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      return const AdminLoginCodeAttempt.success(
+        message: '如果账号存在，验证码将发送到已绑定邮箱。',
       );
     }
     await _emailCodeService.issueLoginCode(
@@ -821,6 +825,13 @@ class AuthService {
     required String emailCode,
     String? requestIp,
   }) async {
+    final passwordPolicy = _passwordPolicy.validate(password);
+    if (!passwordPolicy.ok) {
+      return RegisterAttempt.failure(
+        code: 'password_policy_violation',
+        message: passwordPolicy.message!,
+      );
+    }
     final emailProviderPolicy = _policy == null
         ? const RegistrationEmailProviderPolicy(
             mode: SecurityPolicyService.blacklistMode,
@@ -942,6 +953,13 @@ class AuthService {
     required String verifyCode,
     String? requestIp,
   }) async {
+    final passwordPolicy = _passwordPolicy.validate(password);
+    if (!passwordPolicy.ok) {
+      return RegisterAttempt.failure(
+        code: 'password_policy_violation',
+        message: passwordPolicy.message!,
+      );
+    }
     final phoneService = _phoneVerification;
     if (phoneService == null) {
       return const RegisterAttempt.failure(
@@ -1093,6 +1111,13 @@ class AuthService {
       return const EmailActionAttempt.failure(
         code: 'invalid_request',
         message: 'new_password is required.',
+      );
+    }
+    final passwordPolicy = _passwordPolicy.validate(newPassword);
+    if (!passwordPolicy.ok) {
+      return EmailActionAttempt.failure(
+        code: 'password_policy_violation',
+        message: passwordPolicy.message!,
       );
     }
     final normalizedMethod = method.trim();
@@ -1455,10 +1480,9 @@ class AuthService {
     }
     final user = await _users.findByPhoneNumber(normalized);
     if (user == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'account_not_found',
-        message: '该手机号尚未注册。',
-        statusCode: 404,
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      return const AdminLoginCodeAttempt.success(
+        message: '如果账号存在，验证码将发送到已绑定手机号。',
       );
     }
     final attempt = await phoneService.sendCode(
@@ -1609,6 +1633,13 @@ class AuthService {
     }
 
     if (newPassword != null && newPassword.trim().isNotEmpty) {
+      final passwordPolicy = _passwordPolicy.validate(newPassword);
+      if (!passwordPolicy.ok) {
+        return AccountUpdateAttempt.failure(
+          code: 'password_policy_violation',
+          message: passwordPolicy.message!,
+        );
+      }
       final passwordHash = await _passwordHasher.hash(newPassword.trim());
       await _users.updatePasswordHash(
         userId: user.id,
@@ -2000,6 +2031,13 @@ class AuthService {
         message: 'new_password and email_code are required.',
       );
     }
+    final passwordPolicy = _passwordPolicy.validate(newPassword);
+    if (!passwordPolicy.ok) {
+      return EmailActionAttempt.failure(
+        code: 'password_policy_violation',
+        message: passwordPolicy.message!,
+      );
+    }
 
     final codeValid = await _emailCodeService.verifyPasswordResetCode(
       user.email,
@@ -2254,6 +2292,7 @@ class AuthService {
       email: user.email,
       origin: origin,
       userId: user.id,
+      requireUserVerification: user.roles.contains('admin'),
     );
   }
 
@@ -2314,6 +2353,7 @@ class AuthService {
       userId: email == null || email.trim().isEmpty ? null : user.id,
       email: email == null || email.trim().isEmpty ? null : user.email,
       response: response,
+      forceUserVerification: user.roles.contains('admin'),
     );
     if (!verified) {
       return const LoginAttempt.failure(
@@ -2388,8 +2428,9 @@ class AuthService {
       }
     }
 
-    final verified = await _tokenValidation.verifyActiveRefreshToken(
+    final verified = _tokenService.verify(
       refreshToken,
+      expectedType: 'refresh',
     );
     if (verified == null) {
       return null;
@@ -2414,36 +2455,54 @@ class AuthService {
         (refreshRecord['client_id'] as String?) != clientId) {
       return null;
     }
+    final familyId = refreshRecord['family_id'] as String?;
+    if (familyId == null || familyId.isEmpty) {
+      return null;
+    }
 
     final user = await _users.findById(userId);
     if (user == null) {
       return null;
     }
 
-    await _oidcRepository.revokeRefreshToken(tokenId);
-
+    final rememberSession = payload['remember'] == true;
+    final refreshTtl = clientId == 'first_party_web'
+        ? _tokenService.firstPartyRefreshTokenTtlSeconds(
+            rememberMe: rememberSession,
+          )
+        : _tokenService.refreshTokenTtlSeconds;
     final pair = _tokenService.issueTokenPair(
       user.toAuthenticatedUser(),
       clientId: clientId,
+      familyId: familyId,
+      refreshTokenTtlSeconds: refreshTtl,
+      rememberSession: rememberSession,
     );
-    await _oidcRepository.storeAccessToken(
-      tokenId: pair.accessTokenId,
+    final now = DateTime.now().toUtc();
+    final rotation = await _oidcRepository.rotateRefreshToken(
+      oldTokenId: tokenId,
+      newAccessTokenId: pair.accessTokenId,
+      newRefreshTokenId: pair.refreshTokenId,
+      familyId: pair.familyId,
       userId: user.id,
       clientId: clientId,
-      expiresAt: DateTime.now().toUtc().add(
+      accessExpiresAt: now.add(
         Duration(seconds: _tokenService.accessTokenTtlSeconds),
       ),
+      refreshExpiresAt: now.add(Duration(seconds: pair.refreshExpiresIn)),
     );
-    await _oidcRepository.storeRefreshToken(
-      tokenId: pair.refreshTokenId,
-      userId: user.id,
-      clientId: clientId,
-      expiresAt: DateTime.now().toUtc().add(
-        Duration(seconds: _tokenService.refreshTokenTtlSeconds),
-      ),
-    );
-
-    return pair;
+    if (rotation == RefreshRotationStatus.reused) {
+      await _audit.log(
+        action: 'session.refresh_reuse_detected',
+        actorId: user.id,
+        actorType: 'user',
+        resourceType: 'token_family',
+        resourceId: familyId,
+        metadata: {'client_id': clientId},
+        ip: requestIp,
+      );
+    }
+    return rotation == RefreshRotationStatus.success ? pair : null;
   }
 
   Future<LoginAttempt?> _enforceLoginGuards({
@@ -2652,32 +2711,28 @@ class AuthService {
                   .millisecondsSinceEpoch ~/
               1000
         : null;
-    final accessTokenTtlSeconds = _tokenService.firstPartyAccessTokenTtlSeconds(
-      rememberMe: rememberMe,
-    );
+    final refreshTokenTtlSeconds = _tokenService
+        .firstPartyRefreshTokenTtlSeconds(rememberMe: rememberMe);
     final tokens = _tokenService.issueTokenPair(
       user.toAuthenticatedUser(),
-      accessTokenTtlSeconds: accessTokenTtlSeconds,
+      refreshTokenTtlSeconds: refreshTokenTtlSeconds,
+      rememberSession: rememberMe,
       additionalAccessClaims: {
         if (bootstrapUntilEpochSeconds != null)
           'post_register_passkey_bootstrap_until': bootstrapUntilEpochSeconds,
       },
     );
-    await _oidcRepository.storeAccessToken(
-      tokenId: tokens.accessTokenId,
+    final now = DateTime.now().toUtc();
+    await _oidcRepository.storeTokenPair(
+      accessTokenId: tokens.accessTokenId,
+      refreshTokenId: tokens.refreshTokenId,
+      familyId: tokens.familyId,
       userId: user.id,
       clientId: 'first_party_web',
-      expiresAt: DateTime.now().toUtc().add(
-        Duration(seconds: accessTokenTtlSeconds),
+      accessExpiresAt: now.add(
+        Duration(seconds: _tokenService.accessTokenTtlSeconds),
       ),
-    );
-    await _oidcRepository.storeRefreshToken(
-      tokenId: tokens.refreshTokenId,
-      userId: user.id,
-      clientId: 'first_party_web',
-      expiresAt: DateTime.now().toUtc().add(
-        Duration(seconds: _tokenService.refreshTokenTtlSeconds),
-      ),
+      refreshExpiresAt: now.add(Duration(seconds: refreshTokenTtlSeconds)),
     );
     return AuthResult(
       user: user.toAuthenticatedUser(),
@@ -2686,17 +2741,44 @@ class AuthService {
     );
   }
 
-  Future<void> logoutFirstPartySession({String? accessToken}) async {
-    final token = accessToken?.trim() ?? '';
-    if (token.isEmpty) {
+  Future<void> logoutFirstPartySession({
+    String? accessToken,
+    String? refreshToken,
+    String? requestIp,
+  }) async {
+    final access = accessToken?.trim() ?? '';
+    final refresh = refreshToken?.trim() ?? '';
+    final accessVerified = access.isEmpty
+        ? null
+        : _tokenService.verify(access, expectedType: 'access');
+    final refreshVerified = refresh.isEmpty
+        ? null
+        : _tokenService.verify(refresh, expectedType: 'refresh');
+    final familyId =
+        refreshVerified?.payload['sid']?.toString() ??
+        accessVerified?.payload['sid']?.toString();
+    if (familyId != null && familyId.isNotEmpty) {
+      await _oidcRepository.revokeTokenFamily(familyId);
+      final userId =
+          refreshVerified?.payload['sub']?.toString() ??
+          accessVerified?.payload['sub']?.toString();
+      if (userId != null && userId.isNotEmpty) {
+        await _audit.log(
+          action: 'session.logout',
+          actorId: userId,
+          actorType: 'user',
+          resourceType: 'token_family',
+          resourceId: familyId,
+          metadata: const {},
+          ip: requestIp,
+        );
+      }
       return;
     }
-    final verified = await _tokenValidation.verifyActiveAccessToken(token);
-    final tokenId = verified?.payload['jti'] as String?;
-    if (tokenId == null) {
-      return;
+    final tokenId = accessVerified?.payload['jti'] as String?;
+    if (tokenId != null) {
+      await _oidcRepository.revokeAccessToken(tokenId);
     }
-    await _oidcRepository.revokeAccessToken(tokenId);
   }
 
   bool mustBindAdminEmail(UserRecord user) {

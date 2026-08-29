@@ -16,11 +16,20 @@ Future<Response> onRequest(RequestContext context) async {
   final method = (body['method'] ?? '').toString().trim();
   final code = (body['code'] ?? '').toString().trim();
   final newPassword = (body['new_password'] ?? '').toString();
-  if (account.isEmpty || method.isEmpty || code.isEmpty || newPassword.isEmpty) {
-    return errorResponse('invalid_request', 'account, method, code and new_password are required.');
+  if (account.isEmpty ||
+      method.isEmpty ||
+      code.isEmpty ||
+      newPassword.isEmpty) {
+    return errorResponse(
+      'invalid_request',
+      'account, method, code and new_password are required.',
+    );
   }
 
-  final requestIp = clientIpFromRequest(context.request, config: context.read<AppConfig>());
+  final requestIp = clientIpFromRequest(
+    context.request,
+    config: context.read<AppConfig>(),
+  );
   final result = await context.read<AuthService>().recoverPasswordWithCode(
     account: account,
     method: method,
@@ -29,7 +38,11 @@ Future<Response> onRequest(RequestContext context) async {
     requestIp: requestIp,
   );
   if (!result.ok) {
-    return errorResponse(result.code ?? 'invalid_request', result.message ?? '重置失败。', statusCode: result.statusCode);
+    return errorResponse(
+      result.code ?? 'invalid_request',
+      result.message ?? '重置失败。',
+      statusCode: result.statusCode,
+    );
   }
   return jsonResponse({'updated': true});
 }

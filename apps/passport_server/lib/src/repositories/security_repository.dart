@@ -32,10 +32,7 @@ class SecurityRepository {
       from security_throttles
       where scope = @scope and subject = @subject
       ''',
-      params: {
-        'scope': scope,
-        'subject': subject,
-      },
+      params: {'scope': scope, 'subject': subject},
     );
 
     if (result.isEmpty) {
@@ -59,34 +56,23 @@ class SecurityRepository {
   }) async {
     return _db.runTx((tx) async {
       final result = await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           select hits, window_started_at, blocked_until
           from security_throttles
           where scope = @scope and subject = @subject
           for update
-          ''',
-        ),
-        parameters: {
-          'scope': scope,
-          'subject': subject,
-        },
+          '''),
+        parameters: {'scope': scope, 'subject': subject},
       );
 
       final now = DateTime.now().toUtc();
       if (result.isEmpty) {
         await tx.execute(
-          Sql.named(
-            '''
+          Sql.named('''
             insert into security_throttles(scope, subject, hits, window_started_at, blocked_until, updated_at)
             values (@scope, @subject, 1, @now, null, @now)
-            ''',
-          ),
-          parameters: {
-            'scope': scope,
-            'subject': subject,
-            'now': now,
-          },
+            '''),
+          parameters: {'scope': scope, 'subject': subject, 'now': now},
         );
 
         return ThrottleState(hits: 1, windowStartedAt: now);
@@ -108,21 +94,15 @@ class SecurityRepository {
       final expiredWindow = windowStartedAt.add(window).isBefore(now);
       if (expiredWindow) {
         await tx.execute(
-          Sql.named(
-            '''
+          Sql.named('''
             update security_throttles
             set hits = 1,
                 window_started_at = @now,
                 blocked_until = null,
                 updated_at = @now
             where scope = @scope and subject = @subject
-            ''',
-          ),
-          parameters: {
-            'scope': scope,
-            'subject': subject,
-            'now': now,
-          },
+            '''),
+          parameters: {'scope': scope, 'subject': subject, 'now': now},
         );
 
         return ThrottleState(hits: 1, windowStartedAt: now);
@@ -132,15 +112,13 @@ class SecurityRepository {
       final nextBlockedUntil = nextHits > limit ? now.add(blockDuration) : null;
 
       await tx.execute(
-        Sql.named(
-          '''
+        Sql.named('''
           update security_throttles
           set hits = @hits,
               blocked_until = @blocked_until,
               updated_at = @now
           where scope = @scope and subject = @subject
-          ''',
-        ),
+          '''),
         parameters: {
           'scope': scope,
           'subject': subject,
@@ -164,10 +142,7 @@ class SecurityRepository {
   }) async {
     await _db.execute(
       'delete from security_throttles where scope = @scope and subject = @subject',
-      params: {
-        'scope': scope,
-        'subject': subject,
-      },
+      params: {'scope': scope, 'subject': subject},
     );
   }
 

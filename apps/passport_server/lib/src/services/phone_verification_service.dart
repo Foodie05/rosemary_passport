@@ -7,6 +7,7 @@ import '../config/app_config.dart';
 import '../repositories/settings_repository.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
+import 'helper_client.dart';
 
 class PhoneVerificationAttempt {
   const PhoneVerificationAttempt.success({required this.retryAfterSeconds})
@@ -54,15 +55,18 @@ class PhoneVerificationService {
     SettingsRepository? settingsRepository,
     SecurityService? securityService,
     SecurityPolicyService? securityPolicyService,
+    HelperClient? helperClient,
   }) : _config = config,
        _settingsRepository = settingsRepository,
        _security = securityService,
-       _policy = securityPolicyService;
+       _policy = securityPolicyService,
+       _helperClient = helperClient;
 
   final AppConfig _config;
   final SettingsRepository? _settingsRepository;
   final SecurityService? _security;
   final SecurityPolicyService? _policy;
+  final HelperClient? _helperClient;
   final _uuid = const Uuid();
 
   static const _sendPhoneScope = 'verification-code:phone:send:phone';
@@ -73,14 +77,19 @@ class PhoneVerificationService {
   static const _verifyIpScope = 'verification-code:phone:verify:ip';
 
   Future<Map<String, String>> _resolveProviderSettings() async {
-    final fromDb = await _settingsRepository?.getJson('security') ??
+    final fromDb =
+        await _settingsRepository?.getJson('security') ??
         const <String, dynamic>{};
     String readDb(String key, String fallback) {
       final value = (fromDb[key] ?? '').toString().trim();
       return value.isNotEmpty ? value : fallback;
     }
+
     return {
-      'accessKeyId': readDb('phone_sms_access_key_id', _config.aliyunAccessKeyId),
+      'accessKeyId': readDb(
+        'phone_sms_access_key_id',
+        _config.aliyunAccessKeyId,
+      ),
       'accessKeySecret': readDb(
         'phone_sms_access_key_secret',
         _config.aliyunAccessKeySecret,
@@ -90,8 +99,14 @@ class PhoneVerificationService {
         'phone_sms_template_code',
         _config.aliyunSmsTemplateCode,
       ),
-      'schemeName': readDb('phone_sms_scheme_name', _config.aliyunSmsSchemeName),
-      'countryCode': readDb('phone_sms_country_code', _config.aliyunSmsCountryCode),
+      'schemeName': readDb(
+        'phone_sms_scheme_name',
+        _config.aliyunSmsSchemeName,
+      ),
+      'countryCode': readDb(
+        'phone_sms_country_code',
+        _config.aliyunSmsCountryCode,
+      ),
     };
   }
 
@@ -374,6 +389,10 @@ class PhoneVerificationService {
     String scriptName,
     Map<String, dynamic> payload,
   ) async {
+    final helperClient = _helperClient;
+    if (helperClient != null && helperClient.enabled) {
+      return helperClient.execute(scriptName, payload);
+    }
     final process = await Process.start('node', [
       'scripts/$scriptName',
     ], workingDirectory: Directory.current.path);

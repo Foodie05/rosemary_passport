@@ -16,9 +16,9 @@ Future<Response> onRequest(RequestContext context) async {
 
   final user = context.read<AuthenticatedUser>();
   final verified = await context.read<AuthService>().verifyWebAuthnRegistration(
-        userId: user.id,
-        response: Map<String, dynamic>.from(body['response'] as Map),
-      );
+    userId: user.id,
+    response: Map<String, dynamic>.from(body['response'] as Map),
+  );
 
   if (!verified) {
     return errorResponse('verification_failed', '通行密钥注册失败。', statusCode: 401);

@@ -33,7 +33,7 @@ const options = await generateRegistrationOptions({
   attestationType: 'none',
   authenticatorSelection: {
     residentKey: 'preferred',
-    userVerification: 'preferred',
+    userVerification: 'required',
   },
   excludeCredentials: (input.excludeCredentials || input.excludeCredentialIDs || [])
     .map(credentialDescriptor),

@@ -17,18 +17,19 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final body = await tryParseJsonObject(context.request);
+  final body = await tryParseJsonOrFormObject(context.request);
   if (body == null) {
     return oidcErrorResponse(
       context,
       code: 'invalid_request',
-      message: 'Request body must be a JSON object.',
+      message: 'Request body must be JSON or form encoded.',
       statusCode: 400,
       title: '这个应用暂时无法完成登录',
       description: '应用发来的令牌请求格式不正确，ROSM 无法继续处理。',
     );
   }
   final grantType = body['grant_type']?.toString();
+  final clientCredentials = oauthClientCredentials(context.request, body);
   final requestIp = clientIpFromRequest(
     context.request,
     config: context.read<AppConfig>(),
@@ -46,8 +47,8 @@ Future<Response> onRequest(RequestContext context) async {
 
   if (grantType == 'authorization_code') {
     final code = body['code']?.toString();
-    final clientId = body['client_id']?.toString();
-    final clientSecret = body['client_secret']?.toString();
+    final clientId = clientCredentials['client_id'];
+    final clientSecret = clientCredentials['client_secret'];
     final redirectUri = body['redirect_uri']?.toString();
     final codeVerifier = body['code_verifier']?.toString();
 
@@ -85,8 +86,8 @@ Future<Response> onRequest(RequestContext context) async {
 
   if (grantType == 'refresh_token') {
     final refreshToken = body['refresh_token']?.toString();
-    final clientId = body['client_id']?.toString();
-    final clientSecret = body['client_secret']?.toString();
+    final clientId = clientCredentials['client_id'];
+    final clientSecret = clientCredentials['client_secret'];
     if (refreshToken == null || clientId == null) {
       return oidcErrorResponse(
         context,

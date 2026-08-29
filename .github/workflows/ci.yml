@@ -1,0 +1,167 @@
+name: security-and-quality
+
+on:
+  pull_request:
+  push:
+    branches: [master, main, codex/sla-hardening]
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.10-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rosm_passport_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rosm_passport_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/passport_server/package-lock.json
+      - name: Initialize PostgreSQL snapshot
+        env:
+          PGPASSWORD: postgres
+        run: psql -h 127.0.0.1 -U postgres -d rosm_passport_test -v ON_ERROR_STOP=1 -f ops/postgres/init/001_init.sql
+      - name: Install Dart dependencies
+        working-directory: apps/passport_server
+        run: dart pub get
+      - name: Audit helper dependencies
+        working-directory: apps/passport_server
+        run: npm ci && npm audit --audit-level=high
+      - name: Validate helper programs
+        working-directory: apps/passport_server
+        run: |
+          node --check scripts/helper-server.mjs
+          node --check scripts/helper-health.mjs
+      - name: Format gate
+        working-directory: apps/passport_server
+        run: dart format --output=none --set-exit-if-changed lib bin routes test tool
+      - name: Static analysis
+        working-directory: apps/passport_server
+        run: dart analyze --fatal-infos
+      - name: Unit and PostgreSQL integration tests
+        working-directory: apps/passport_server
+        env:
+          RUN_POSTGRES_TESTS: "true"
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_USER: postgres
+          TEST_DB_PASSWORD: postgres
+          TEST_DB_NAME: rosm_passport_test
+        run: dart test --reporter=expanded --coverage-path=coverage/lcov.info --branch-coverage
+      - name: Coverage gate
+        working-directory: apps/passport_server
+        run: dart run tool/check_coverage.dart coverage/lcov.info
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-coverage
+          path: apps/passport_server/coverage/lcov.info
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - working-directory: web
+        run: npm ci
+      - working-directory: web
+        run: npm audit --audit-level=high
+      - working-directory: web
+        run: npm run build
+
+  flutter:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - working-directory: packages/rosm_passport_flutter
+        run: flutter pub get
+      - working-directory: packages/rosm_passport_flutter
+        run: dart format --output=none --set-exit-if-changed lib test
+      - working-directory: packages/rosm_passport_flutter
+        run: flutter analyze
+      - working-directory: packages/rosm_passport_flutter
+        run: flutter test
+
+  supply-chain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Build release and containers
+        run: |
+          dart pub global activate dart_frog_cli
+          export PATH="$PATH:$HOME/.pub-cache/bin"
+          ./scripts/build_linux_x64.sh
+          cd .local/release/auth_cruty_cn_release
+          POSTGRES_IMAGE=postgres:16.10-bookworm \
+          NODE_IMAGE=node:20-bookworm-slim \
+            docker compose --env-file runtime.env.example build
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: rosm-passport-postgres:current
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: rosm-passport-helper:current
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: auth_cruty_cn_release-passport_server:latest
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json

@@ -11,7 +11,10 @@ Future<Response> onRequest(RequestContext context) async {
 
   final body = await tryParseJsonObject(context.request);
   if (body == null) {
-    return errorResponse('invalid_request', 'Request body must be a JSON object.');
+    return errorResponse(
+      'invalid_request',
+      'Request body must be a JSON object.',
+    );
   }
 
   final currentPassword = body['current_password']?.toString() ?? '';
@@ -28,11 +31,11 @@ Future<Response> onRequest(RequestContext context) async {
 
   final user = context.read<AuthenticatedUser>();
   final result = await context.read<AuthService>().verifyAuthenticatorSetup(
-        userId: user.id,
-        currentPassword: currentPassword,
-        secret: secret,
-        code: code,
-      );
+    userId: user.id,
+    currentPassword: currentPassword,
+    secret: secret,
+    code: code,
+  );
 
   if (!result.ok) {
     return errorResponse(

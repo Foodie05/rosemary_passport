@@ -1,48 +1,51 @@
-# auth.cruty.cn Deployment
+# Rosemary Passport 单机生产部署
 
-这个目录是生产部署模板。
+本模板用于单机 `SLA-ready` 部署：PostgreSQL、Dart API 和内部身份辅助服务由
+Docker Compose 管理，Apache 只代理 `127.0.0.1:8091` 并托管原子切换的前端版本目录。
+它不等价于已经具备多节点 99.9% SLA。
 
-- 后端容器通过 `127.0.0.1:8091` 暴露，仅供服务器本机反向代理访问
-- 前端不会容器化，打包后的静态文件位于 `frontend/dist/`，可直接交给 Apache 托管到 `https://auth.cruty.cn`
-- 发布包会在前端目录内附带 `.htaccess`，将所有 SPA 路由回退到 `index.html`
-- `LOCAL_ADMIN_EMAIL` / `LOCAL_ADMIN_PASSWORD` / `LOCAL_ADMIN_NICKNAME` 用于首次引导管理员
-- `LOCAL_ADMIN_EMAIL` 必须使用保留域名 `@rosm.local`，例如 `bootstrap-admin@rosm.local`
-- 首次管理员登录后，需要在账号页绑定正式邮箱；绑定成功后，应用会永久关闭 bootstrap 登录，这组配置之后自然失效
+## 首次部署
 
-部署时把打包脚本生成的 release 目录上传到服务器：
+1. 将 `runtime.env.example` 复制到 `/etc/rosm-passport/runtime.env`，只填写非秘密配置。
+   `POSTGRES_IMAGE` 和 `NODE_IMAGE` 必须包含已经核验的 `@sha256:` digest。
+2. 运行 `sudo ./provision_secrets.sh /etc/rosm-passport/secrets [legacy.env]`。旧环境文件只用于一次性迁移，随后应移出发布目录并安全销毁。
+3. 填写 S3 凭据，确保所有秘密文件和目录分别保持 `0400`、`0700`。
+4. 为备份桶启用版本控制；对象存储支持时启用 Object Lock/不可变保留策略。部署预检会拒绝未启用版本控制的桶。
+5. 执行：
 
-- 用 Apache 指向 `frontend/dist/` 作为 `auth.cruty.cn` 的站点根目录
-- 用 Apache 反向代理 `apiauth.cruty.cn` 到 `http://127.0.0.1:8091`
-- 首次部署可在 release 目录中直接启动后端和数据库：
+   ```bash
+   ./deploy.sh /srv/rosm-passport/current /var/www/auth.cruty.cn \
+     /etc/rosm-passport/runtime.env /etc/rosm-passport/secrets
+   ```
 
-```bash
-docker compose up -d --build
-```
+发布流程固定为预检、加密逻辑与物理备份、构建、兼容迁移、启动、readiness、流量恢复。
+前端通过版本目录和软链接原子切换。失败时回滚应用文件；数据库迁移只做 expand，旧应用仍可读取。
 
-- 后续更新建议上传新的发布包并在解压后的目录执行：
+## 健康检查与秘密轮换
 
-```bash
-./deploy.sh /absolute/path/to/current-release /absolute/path/to/apache-web-root
-```
+- 存活：`GET /health/live`
+- 就绪：`GET /health/ready`（数据库、迁移版本和 helper 都必须正常）
+- JWT 轮换：生成新的 `<kid>.private.pem` / `<kid>.public.pem`，先加入 keyring，再修改
+  `JWT_ACTIVE_KID`。至少保留上一把公钥至所有旧令牌过期后再移除。
+- 数据密钥轮换：加入新的 `<kid>.key` 并修改 `DATA_ENCRYPTION_ACTIVE_KID`；旧密钥必须保留，直到完成受控重加密和抽样解密验证。
 
-- 例如：
+## 备份、审计与恢复
 
-```bash
-./deploy.sh /www/wwwroot/rosemary_passport /www/wwwroot/auth.cruty.cn
-```
+- `archive_timeout=300s`，WAL 加密后连续写入 `s3://BUCKET/wal/`。
+- `backup_to_s3.sh` 创建可逐表恢复的加密逻辑备份。
+- `physical_backup_to_s3.sh` 创建含起始 WAL 的加密物理基线，用于 PITR。
+- `archive_audit_to_s3.sh` 导出哈希链审计日志，以 Ed25519 签名并上传 S3。建议每小时执行。
+- `restore_from_s3.sh` 只恢复到新的数据库名，必须用 `ROSM_RESTORE_CONFIRM` 明确确认，不会覆盖当前数据库。
 
-- `deploy.sh` 会自动备份当前版本、保留线上 `.env`、同步新文件、覆盖发布 Apache 前端静态文件并重建容器
-- Apache 前端目录本身就是最终站点目录，`deploy.sh` 会直接覆盖这个目录
-- 如果不提供 Apache 前端目录，脚本会直接报错退出，避免出现“后端已更新但前端还是旧版”的错配
+PITR 演练必须在隔离主机进行：下载 `physical/latest.json` 指向的基线并校验 SHA-256，
+解密到空的 PostgreSQL 数据目录；配置 `restore_command` 从 `wal/` 下载并解密 WAL，设置
+`recovery_target_time` 后创建 `recovery.signal`。恢复启动后执行一致性核对与应用冒烟测试。
+每月至少演练一次并记录：最后已归档 WAL 时间、目标恢复时间、服务恢复时间。只有实测
+`RPO <= 5 分钟` 且 `RTO <= 30 分钟` 才能通过发布门禁。
 
-本地也提供了一键远程部署脚本：
+## 运维门禁
 
-```bash
-./scripts/deploy_auth_cruty_cn.sh
-```
-
-如果需要自定义目标，可以传参：
-
-```bash
-./scripts/deploy_auth_cruty_cn.sh root@cruty.cn /www/wwwroot/auth /www/wwwroot/auth/auth_cruty_cn_release /www/wwwroot/auth.cruty.cn
-```
+- 每次发布前执行 CI 的格式、静态分析、单元/集成测试、依赖审计、secret scan、Trivy 和 SBOM。
+- 使用 `ops/load/sla_capacity.js` 完成 50 RPS/30 分钟、100 RPS/5 分钟和 500 会话测试。
+- 生产发布后进行 14 天观察：不得出现崩溃循环、迁移失败、备份失败或 high/critical 可达漏洞。
+- 计划维护窗口不得超过 15 分钟。正式 99.9% SLA 仍需第二应用节点、数据库 HA、负载均衡和外部 SLO 计量。

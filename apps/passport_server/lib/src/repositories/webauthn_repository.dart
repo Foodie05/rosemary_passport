@@ -10,6 +10,8 @@ class WebAuthnCredentialRecord {
     required this.transports,
     required this.deviceType,
     required this.backedUp,
+    required this.uvRequired,
+    required this.uvGraceExpiresAt,
     required this.createdAt,
   });
 
@@ -20,6 +22,8 @@ class WebAuthnCredentialRecord {
   final List<String> transports;
   final String? deviceType;
   final bool backedUp;
+  final bool uvRequired;
+  final DateTime? uvGraceExpiresAt;
   final DateTime createdAt;
 }
 
@@ -49,7 +53,8 @@ class WebAuthnRepository {
   ) async {
     final result = await _db.execute(
       '''
-      select user_id, credential_id, public_key, counter, transports, device_type, backed_up, created_at
+      select user_id, credential_id, public_key, counter, transports, device_type, backed_up, created_at,
+             uv_required, uv_grace_expires_at
       from user_webauthn_credentials
       where user_id = @user_id
       order by created_at desc
@@ -70,6 +75,8 @@ class WebAuthnRepository {
             deviceType: row[5] as String?,
             backedUp: row[6] as bool? ?? false,
             createdAt: row[7] as DateTime,
+            uvRequired: row[8] as bool? ?? false,
+            uvGraceExpiresAt: row[9] as DateTime?,
           ),
         )
         .toList();
@@ -78,7 +85,8 @@ class WebAuthnRepository {
   Future<WebAuthnCredentialRecord?> findCredential(String credentialId) async {
     final result = await _db.execute(
       '''
-      select user_id, credential_id, public_key, counter, transports, device_type, backed_up, created_at
+      select user_id, credential_id, public_key, counter, transports, device_type, backed_up, created_at,
+             uv_required, uv_grace_expires_at
       from user_webauthn_credentials
       where credential_id = @credential_id
       limit 1
@@ -102,6 +110,8 @@ class WebAuthnRepository {
       deviceType: row[5] as String?,
       backedUp: row[6] as bool? ?? false,
       createdAt: row[7] as DateTime,
+      uvRequired: row[8] as bool? ?? false,
+      uvGraceExpiresAt: row[9] as DateTime?,
     );
   }
 
@@ -133,7 +143,8 @@ class WebAuthnRepository {
     await _db.execute(
       '''
       insert into user_webauthn_credentials(
-        user_id, credential_id, public_key, counter, transports, device_type, backed_up
+        user_id, credential_id, public_key, counter, transports, device_type, backed_up,
+        uv_verified_at, uv_required, uv_grace_expires_at
       )
       values (
         cast(@user_id as uuid),
@@ -142,7 +153,10 @@ class WebAuthnRepository {
         cast(@counter as bigint),
         cast(@transports as text[]),
         cast(@device_type as text),
-        cast(@backed_up as boolean)
+        cast(@backed_up as boolean),
+        now(),
+        true,
+        null
       )
       on conflict (credential_id) do update
       set public_key = excluded.public_key,
@@ -150,6 +164,9 @@ class WebAuthnRepository {
           transports = excluded.transports,
           device_type = excluded.device_type,
           backed_up = excluded.backed_up
+          ,uv_verified_at = now()
+          ,uv_required = true
+          ,uv_grace_expires_at = null
       ''',
       params: {
         'user_id': userId,
@@ -173,10 +190,18 @@ class WebAuthnRepository {
       set counter = @counter
       where credential_id = @credential_id
       ''',
-      params: {
-        'credential_id': credentialId,
-        'counter': counter,
-      },
+      params: {'credential_id': credentialId, 'counter': counter},
+    );
+  }
+
+  Future<void> markUserVerified(String credentialId) async {
+    await _db.execute(
+      '''
+      update user_webauthn_credentials
+      set uv_verified_at = now(), uv_required = true, uv_grace_expires_at = null
+      where credential_id = @credential_id
+      ''',
+      params: {'credential_id': credentialId},
     );
   }
 
@@ -189,10 +214,7 @@ class WebAuthnRepository {
       delete from user_webauthn_credentials
       where user_id = @user_id and credential_id = @credential_id
       ''',
-      params: {
-        'user_id': userId,
-        'credential_id': credentialId,
-      },
+      params: {'user_id': userId, 'credential_id': credentialId},
     );
   }
 
@@ -238,7 +260,10 @@ class WebAuthnRepository {
     required String purpose,
   }) async {
     late final Result result;
-    if (userId != null && userId.trim().isNotEmpty && email != null && email.trim().isNotEmpty) {
+    if (userId != null &&
+        userId.trim().isNotEmpty &&
+        email != null &&
+        email.trim().isNotEmpty) {
       result = await _db.execute(
         '''
         select id, challenge, rp_id, origin, expires_at
@@ -249,11 +274,7 @@ class WebAuthnRepository {
         order by created_at desc
         limit 1
         ''',
-        params: {
-          'purpose': purpose,
-          'user_id': userId,
-          'email': email,
-        },
+        params: {'purpose': purpose, 'user_id': userId, 'email': email},
       );
     } else if (userId != null && userId.trim().isNotEmpty) {
       result = await _db.execute(
@@ -265,10 +286,7 @@ class WebAuthnRepository {
         order by created_at desc
         limit 1
         ''',
-        params: {
-          'purpose': purpose,
-          'user_id': userId,
-        },
+        params: {'purpose': purpose, 'user_id': userId},
       );
     } else if (email != null && email.trim().isNotEmpty) {
       result = await _db.execute(
@@ -280,10 +298,7 @@ class WebAuthnRepository {
         order by created_at desc
         limit 1
         ''',
-        params: {
-          'purpose': purpose,
-          'email': email,
-        },
+        params: {'purpose': purpose, 'email': email},
       );
     } else {
       result = await _db.execute(
@@ -294,9 +309,7 @@ class WebAuthnRepository {
         order by created_at desc
         limit 1
         ''',
-        params: {
-          'purpose': purpose,
-        },
+        params: {'purpose': purpose},
       );
     }
 

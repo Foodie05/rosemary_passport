@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'config/app_config.dart';
 import 'db/database.dart';
+import 'db/migration_runner.dart';
 import 'repositories/email_code_repository.dart';
 import 'repositories/oidc_repository.dart';
 import 'repositories/security_repository.dart';
@@ -9,6 +8,8 @@ import 'repositories/settings_repository.dart';
 import 'repositories/user_repository.dart';
 import 'repositories/webauthn_repository.dart';
 import 'security/password_hasher.dart';
+import 'security/password_policy.dart';
+import 'security/settings_cipher.dart';
 import 'security/token_service.dart';
 import 'services/audit_service.dart';
 import 'services/admin_settings_service.dart';
@@ -17,6 +18,7 @@ import 'services/auth_service.dart';
 import 'services/captcha_service.dart';
 import 'services/email_code_service.dart';
 import 'services/email_service.dart';
+import 'services/helper_client.dart';
 import 'services/oidc_admin_service.dart';
 import 'services/oidc_service.dart';
 import 'services/phone_verification_service.dart';
@@ -27,22 +29,25 @@ import 'services/webauthn_service.dart';
 
 class AppServices {
   AppServices._(this.config) : _database = Database(config) {
-    userRepository = UserRepository(_database, config);
-    unawaited(userRepository.migratePlaintextAuthenticatorSecrets());
+    final settingsCipher = SettingsCipher(config);
+    userRepository = UserRepository(_database, config, settingsCipher);
     emailCodeRepository = EmailCodeRepository(_database);
     oidcRepository = OidcRepository(_database);
     securityRepository = SecurityRepository(_database);
-    settingsRepository = SettingsRepository(_database);
+    settingsRepository = SettingsRepository(_database, settingsCipher);
     webAuthnRepository = WebAuthnRepository(_database);
+    migrationRunner = MigrationRunner(_database);
 
     passwordHasher = PasswordHasher(config);
+    passwordPolicy = PasswordPolicy();
+    helperClient = HelperClient(config);
     tokenService = TokenService(config);
     tokenValidationService = TokenValidationService(
       tokenService,
       oidcRepository,
     );
     authenticatorService = AuthenticatorService();
-    captchaService = CaptchaService(config, settingsRepository);
+    captchaService = CaptchaService(config, settingsRepository, helperClient);
     emailService = EmailService(config, settingsRepository);
     securityPolicyService = SecurityPolicyService(settingsRepository);
     emailCodeService = EmailCodeService(
@@ -56,12 +61,14 @@ class AppServices {
     webAuthnService = WebAuthnService(
       config: config,
       repository: webAuthnRepository,
+      helperClient: helperClient,
     );
     phoneVerificationService = PhoneVerificationService(
       config: config,
       settingsRepository: settingsRepository,
       securityService: securityService,
       securityPolicyService: securityPolicyService,
+      helperClient: helperClient,
     );
     adminSettingsService = AdminSettingsService(
       settingsRepository,
@@ -73,8 +80,8 @@ class AppServices {
     authService = AuthService(
       userRepository: userRepository,
       passwordHasher: passwordHasher,
+      passwordPolicy: passwordPolicy,
       tokenService: tokenService,
-      tokenValidationService: tokenValidationService,
       emailCodeService: emailCodeService,
       captchaService: captchaService,
       oidcRepository: oidcRepository,
@@ -103,6 +110,24 @@ class AppServices {
 
   final AppConfig config;
   final Database _database;
+  late final MigrationRunner migrationRunner;
+
+  Future<Map<String, dynamic>> readiness() async {
+    final checks = <String, bool>{};
+    try {
+      await _database.execute('select 1');
+      checks['database'] = true;
+    } catch (_) {
+      checks['database'] = false;
+    }
+    checks['migrations'] = await migrationRunner.isCurrent();
+    checks['helper'] = await webAuthnService.healthCheck();
+    return {
+      'ready': checks.values.every((value) => value),
+      'checks': checks,
+      'migration_version': migrationRunner.latestVersion,
+    };
+  }
 
   late final UserRepository userRepository;
   late final EmailCodeRepository emailCodeRepository;
@@ -112,6 +137,8 @@ class AppServices {
   late final WebAuthnRepository webAuthnRepository;
 
   late final PasswordHasher passwordHasher;
+  late final PasswordPolicy passwordPolicy;
+  late final HelperClient helperClient;
   late final TokenService tokenService;
   late final TokenValidationService tokenValidationService;
   late final AuthenticatorService authenticatorService;

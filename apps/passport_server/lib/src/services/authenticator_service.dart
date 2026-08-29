@@ -11,15 +11,13 @@ class AuthenticatorService {
   static const _base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
   String generateSecret() {
-    final bytes =
-        Uint8List.fromList(List<int>.generate(20, (_) => _random.nextInt(256)));
+    final bytes = Uint8List.fromList(
+      List<int>.generate(20, (_) => _random.nextInt(256)),
+    );
     return _base32Encode(bytes);
   }
 
-  String buildOtpAuthUri({
-    required String email,
-    required String secret,
-  }) {
+  String buildOtpAuthUri({required String email, required String secret}) {
     final label = Uri.encodeComponent('$_issuer:$email');
     final issuer = Uri.encodeComponent(_issuer);
     return 'otpauth://totp/$label?secret=$secret&issuer=$issuer&algorithm=SHA1&digits=6&period=30';
@@ -49,10 +47,14 @@ class AuthenticatorService {
 
   String _generateTotp(Uint8List secret, int counter) {
     final counterBytes = ByteData(8)..setInt64(0, counter);
-    final digest = Hmac(sha1, secret).convert(counterBytes.buffer.asUint8List());
+    final digest = Hmac(
+      sha1,
+      secret,
+    ).convert(counterBytes.buffer.asUint8List());
     final bytes = digest.bytes;
     final offset = bytes.last & 0x0f;
-    final binary = ((bytes[offset] & 0x7f) << 24) |
+    final binary =
+        ((bytes[offset] & 0x7f) << 24) |
         ((bytes[offset + 1] & 0xff) << 16) |
         ((bytes[offset + 2] & 0xff) << 8) |
         (bytes[offset + 3] & 0xff);

@@ -1,6 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import '../../../../../lib/src/models/authenticated_user.dart';
 import '../../../../../lib/src/services/admin_settings_service.dart';
+import '../../../../../lib/src/services/audit_service.dart';
 import '../../../../../lib/src/utils/http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
@@ -24,6 +26,16 @@ Future<Response> onRequest(RequestContext context) async {
     } on FormatException catch (error) {
       return errorResponse('invalid_request', error.message);
     }
+    final actor = context.read<AuthenticatedUser>();
+    await context.read<AuditService>().log(
+      action: 'admin.system_settings.update',
+      actorId: actor.id,
+      actorType: 'admin',
+      resourceType: 'system_settings',
+      resourceId: 'global',
+      metadata: {'sections': body.keys.toList()..sort()},
+      ip: context.request.headers['x-forwarded-for'],
+    );
     return jsonResponse({'updated': true});
   }
 

@@ -38,19 +38,34 @@ Response authJsonResponse(
   int statusCode = 200,
   String? accessToken,
   int? accessTokenMaxAgeSeconds,
+  String? refreshToken,
+  int? refreshTokenMaxAgeSeconds,
 }) {
   final config = context.read<AppConfig>();
   return jsonResponse(
     data,
     statusCode: statusCode,
     headers: {
-      if (accessToken != null && accessToken.isNotEmpty)
-        'set-cookie': buildAccessTokenCookie(
-          accessToken,
-          config: config,
-          maxAgeSeconds: accessTokenMaxAgeSeconds ??
-              context.read<TokenService>().accessTokenTtlSeconds,
-        ),
+      if ((accessToken != null && accessToken.isNotEmpty) ||
+          (refreshToken != null && refreshToken.isNotEmpty))
+        'set-cookie': <String>[
+          if (accessToken != null && accessToken.isNotEmpty)
+            buildAccessTokenCookie(
+              accessToken,
+              config: config,
+              maxAgeSeconds:
+                  accessTokenMaxAgeSeconds ??
+                  context.read<TokenService>().accessTokenTtlSeconds,
+            ),
+          if (refreshToken != null && refreshToken.isNotEmpty)
+            buildRefreshTokenCookie(
+              refreshToken,
+              config: config,
+              maxAgeSeconds:
+                  refreshTokenMaxAgeSeconds ??
+                  context.read<TokenService>().refreshTokenTtlSeconds,
+            ),
+        ],
     },
   );
 }

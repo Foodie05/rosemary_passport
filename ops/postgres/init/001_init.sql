@@ -99,6 +99,7 @@ create table if not exists oidc_access_tokens (
   token_id text primary key,
   user_id uuid not null references users(id) on delete cascade,
   client_id text not null references oidc_clients(client_id),
+  family_id uuid,
   expires_at timestamptz not null,
   revoked_at timestamptz,
   created_at timestamptz not null default now()
@@ -108,6 +109,11 @@ create table if not exists oidc_refresh_tokens (
   token_id text primary key,
   user_id uuid not null references users(id) on delete cascade,
   client_id text not null references oidc_clients(client_id),
+  family_id uuid,
+  parent_token_id text,
+  replaced_by_token_id text,
+  consumed_at timestamptz,
+  reuse_detected_at timestamptz,
   expires_at timestamptz not null,
   revoked_at timestamptz,
   created_at timestamptz not null default now()
@@ -239,6 +245,9 @@ create table if not exists user_webauthn_credentials (
   transports text[] not null default '{}'::text[],
   device_type text,
   backed_up boolean not null default false,
+  uv_verified_at timestamptz,
+  uv_required boolean not null default false,
+  uv_grace_expires_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_webauthn_credentials_user on user_webauthn_credentials(user_id);

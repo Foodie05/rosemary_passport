@@ -16,6 +16,8 @@ class TokenPair {
     required this.tokenType,
     required this.accessTokenId,
     required this.refreshTokenId,
+    required this.familyId,
+    required this.refreshExpiresIn,
     this.idToken,
   });
 
@@ -25,6 +27,8 @@ class TokenPair {
   final String tokenType;
   final String accessTokenId;
   final String refreshTokenId;
+  final String familyId;
+  final int refreshExpiresIn;
   final String? idToken;
 
   Map<String, dynamic> toJson() => {
@@ -45,24 +49,23 @@ class VerifiedToken {
 class TokenService {
   TokenService(this._config)
     : _privateKey = RSAPrivateKey(
-        _config.jwtPrivateKeyPem.replaceAll(r'\\n', '\n'),
+        _config.jwtActivePrivateKeyPem.replaceAll(r'\\n', '\n'),
       ),
-      _publicKey = RSAPublicKey(
-        _config.jwtPublicKeyPem.replaceAll(r'\\n', '\n'),
+      _publicKeys = _config.jwtPublicKeysPem.map(
+        (kid, pem) => MapEntry(kid, RSAPublicKey(pem.replaceAll(r'\\n', '\n'))),
       );
 
   final AppConfig _config;
   final RSAPrivateKey _privateKey;
-  final RSAPublicKey _publicKey;
+  final Map<String, RSAPublicKey> _publicKeys;
   final _uuid = const Uuid();
 
   int get accessTokenTtlSeconds => _config.accessTokenTtlSeconds;
   int get refreshTokenTtlSeconds => _config.refreshTokenTtlSeconds;
 
-  int firstPartyAccessTokenTtlSeconds({required bool rememberMe}) =>
-      rememberMe
-          ? _config.firstPartyRememberedAccessTokenTtlSeconds
-          : _config.firstPartyAccessTokenTtlSeconds;
+  int firstPartyRefreshTokenTtlSeconds({required bool rememberMe}) => rememberMe
+      ? _config.firstPartyRememberedRefreshTokenTtlSeconds
+      : _config.firstPartyRefreshTokenTtlSeconds;
 
   TokenPair issueTokenPair(
     AuthenticatedUser user, {
@@ -70,12 +73,16 @@ class TokenService {
     String clientId = 'first_party_web',
     String? nonce,
     Map<String, dynamic> additionalAccessClaims = const {},
-    int? accessTokenTtlSeconds,
+    int? refreshTokenTtlSeconds,
+    String? familyId,
+    bool rememberSession = false,
   }) {
-    final resolvedAccessTokenTtlSeconds =
-        accessTokenTtlSeconds ?? _config.accessTokenTtlSeconds;
+    final resolvedAccessTokenTtlSeconds = _config.accessTokenTtlSeconds;
     final accessJti = _uuid.v4();
     final refreshJti = _uuid.v4();
+    final resolvedFamilyId = familyId ?? _uuid.v4();
+    final resolvedRefreshTokenTtlSeconds =
+        refreshTokenTtlSeconds ?? _config.refreshTokenTtlSeconds;
 
     final accessClaims = <String, dynamic>{
       'sub': user.id,
@@ -83,6 +90,7 @@ class TokenService {
       'client_id': clientId,
       'jti': accessJti,
       'typ': 'access',
+      'sid': resolvedFamilyId,
       'sig2': _secondFactorDigest(subject: user.id, jti: accessJti),
       ...additionalAccessClaims,
     };
@@ -92,6 +100,8 @@ class TokenService {
       'client_id': clientId,
       'jti': refreshJti,
       'typ': 'refresh',
+      'sid': resolvedFamilyId,
+      'remember': rememberSession,
       'sig2': _secondFactorDigest(subject: user.id, jti: refreshJti),
     };
 
@@ -100,7 +110,7 @@ class TokenService {
           accessClaims,
           issuer: _config.jwtIssuer,
           audience: Audience([_config.jwtAudience]),
-          header: const {'kid': 'rosm-signing-v1'},
+          header: {'kid': _config.jwtActiveKid},
         ).sign(
           _privateKey,
           algorithm: JWTAlgorithm.RS256,
@@ -112,11 +122,11 @@ class TokenService {
           refreshClaims,
           issuer: _config.jwtIssuer,
           audience: Audience([_config.jwtAudience]),
-          header: const {'kid': 'rosm-signing-v1'},
+          header: {'kid': _config.jwtActiveKid},
         ).sign(
           _privateKey,
           algorithm: JWTAlgorithm.RS256,
-          expiresIn: Duration(seconds: _config.refreshTokenTtlSeconds),
+          expiresIn: Duration(seconds: resolvedRefreshTokenTtlSeconds),
         );
 
     String? idToken;
@@ -142,7 +152,7 @@ class TokenService {
             issuer: _config.serverBaseUrl,
             subject: user.id,
             audience: Audience([clientId]),
-            header: const {'kid': 'rosm-signing-v1'},
+            header: {'kid': _config.jwtActiveKid},
           ).sign(
             _privateKey,
             algorithm: JWTAlgorithm.RS256,
@@ -157,15 +167,27 @@ class TokenService {
       tokenType: 'Bearer',
       accessTokenId: accessJti,
       refreshTokenId: refreshJti,
+      familyId: resolvedFamilyId,
+      refreshExpiresIn: resolvedRefreshTokenTtlSeconds,
       idToken: idToken,
     );
   }
 
   VerifiedToken? verify(String token, {String expectedType = 'access'}) {
     try {
+      final decoded = JWT.decode(token);
+      final header = decoded.header;
+      if (header?['alg'] != 'RS256') {
+        return null;
+      }
+      final kid = header?['kid']?.toString() ?? '';
+      final publicKey = _publicKeys[kid];
+      if (publicKey == null) {
+        return null;
+      }
       final jwt = JWT.verify(
         token,
-        _publicKey,
+        publicKey,
         audience: Audience.one(_config.jwtAudience),
         issuer: _config.jwtIssuer,
       );
@@ -192,18 +214,16 @@ class TokenService {
   }
 
   Map<String, dynamic> jwkSet() {
-    final jwk = JsonWebKey.fromPem(
-      _config.jwtPublicKeyPem.replaceAll(r'\\n', '\n'),
-    );
     return {
-      'keys': [
-        {
+      'keys': _config.jwtPublicKeysPem.entries.map((entry) {
+        final jwk = JsonWebKey.fromPem(entry.value.replaceAll(r'\\n', '\n'));
+        return {
           ...jwk.toJson(),
-          'kid': 'rosm-signing-v1',
+          'kid': entry.key,
           'use': 'sig',
           'alg': 'RS256',
-        },
-      ],
+        };
+      }).toList(),
     };
   }
 

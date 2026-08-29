@@ -13,8 +13,9 @@ class PasswordHasher {
   final _secure = Random.secure();
 
   Future<String> hash(String password) async {
-    final salt =
-        Uint8List.fromList(List<int>.generate(16, (_) => _secure.nextInt(256)));
+    final salt = Uint8List.fromList(
+      List<int>.generate(16, (_) => _secure.nextInt(256)),
+    );
     final parameters = Argon2Parameters(
       Argon2Parameters.ARGON2_id,
       salt,
@@ -26,7 +27,11 @@ class PasswordHasher {
     final generator = Argon2BytesGenerator()..init(parameters);
     final output = Uint8List(32);
     generator.generateBytes(
-        parameters.converter.convert(password), output, 0, output.length);
+      parameters.converter.convert(password),
+      output,
+      0,
+      output.length,
+    );
 
     final saltB64 = base64Url.encode(salt).replaceAll('=', '');
     final hashB64 = base64Url.encode(output).replaceAll('=', '');
@@ -57,7 +62,11 @@ class PasswordHasher {
       final generator = Argon2BytesGenerator()..init(parameters);
       final actual = Uint8List(expected.length);
       generator.generateBytes(
-          parameters.converter.convert(password), actual, 0, actual.length);
+        parameters.converter.convert(password),
+        actual,
+        0,
+        actual.length,
+      );
       return _timingSafeEquals(actual, expected);
     } catch (_) {
       return false;

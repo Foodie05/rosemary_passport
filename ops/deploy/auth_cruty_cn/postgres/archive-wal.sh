@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+wal_path="${1:?wal path required}"
+wal_name="${2:?wal name required}"
+secret_dir="${PG_BACKUP_SECRETS_DIR:-/tmp/pg-backup-secrets}"
+
+export AWS_ACCESS_KEY_ID="$(<"$secret_dir/s3_access_key_id")"
+export AWS_SECRET_ACCESS_KEY="$(<"$secret_dir/s3_secret_access_key")"
+export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
+
+openssl enc -aes-256-cbc -pbkdf2 -salt \
+  -pass file:"$secret_dir/backup_encryption_key" \
+  -in "$wal_path" |
+  aws --endpoint-url "$S3_ENDPOINT" s3 cp - \
+    "s3://$S3_BUCKET/wal/$wal_name.enc" --only-show-errors

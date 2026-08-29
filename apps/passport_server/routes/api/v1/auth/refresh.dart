@@ -16,15 +16,25 @@ Future<Response> onRequest(RequestContext context) async {
     context.request,
     RefreshRequest.fromJson,
   );
-  final refreshToken =
-      payload?.refreshToken.trim() ??
-      readCookieValue(
-        context.request.headers['cookie'],
-        'rosm_refresh_token',
-      ) ??
-      '';
+  final config = context.read<AppConfig>();
+  final legacyBodyToken = payload?.refreshToken.trim() ?? '';
+  final cookieToken = readRefreshTokenCookie(
+    context.request.headers['cookie'],
+    config,
+  );
+  final refreshToken = legacyBodyToken.isNotEmpty
+      ? legacyBodyToken
+      : cookieToken ?? '';
   if (refreshToken.isEmpty) {
     return errorResponse('invalid_request', 'refresh_token is required.');
+  }
+  if (legacyBodyToken.isEmpty &&
+      !hasTrustedBrowserOrigin(context.request, config)) {
+    return errorResponse(
+      'invalid_origin',
+      'Request origin is not allowed.',
+      statusCode: 403,
+    );
   }
 
   final requestIp = clientIpFromRequest(
@@ -51,7 +61,25 @@ Future<Response> onRequest(RequestContext context) async {
     return response;
   }
 
-  return authJsonResponse(context, const {
-    'refreshed': true,
-  }, accessToken: pair.accessToken);
+  final response = authJsonResponse(
+    context,
+    const {'refreshed': true},
+    accessToken: pair.accessToken,
+    accessTokenMaxAgeSeconds: pair.expiresIn,
+    refreshToken: pair.refreshToken,
+    refreshTokenMaxAgeSeconds: pair.refreshExpiresIn,
+  );
+  if (legacyBodyToken.isEmpty) {
+    return response;
+  }
+  return response.copyWith(
+    headers: {
+      'deprecation': 'true',
+      'sunset': DateTime.now()
+          .toUtc()
+          .add(const Duration(days: 14))
+          .toIso8601String(),
+      'link': '</api/v1/auth/refresh>; rel="successor-version"',
+    },
+  );
 }

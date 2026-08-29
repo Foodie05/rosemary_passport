@@ -1,5 +1,7 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import '../../../../../../../lib/src/models/authenticated_user.dart';
+import '../../../../../../../lib/src/services/audit_service.dart';
 import '../../../../../../../lib/src/services/oidc_admin_service.dart';
 import '../../../../../../../lib/src/utils/http.dart';
 
@@ -11,6 +13,16 @@ Future<Response> onRequest(RequestContext context, String id) async {
     if (!deleted) {
       return errorResponse('not_found', 'client not found.', statusCode: 404);
     }
+    final actor = context.read<AuthenticatedUser>();
+    await context.read<AuditService>().log(
+      action: 'admin.oidc_client.delete',
+      actorId: actor.id,
+      actorType: 'admin',
+      resourceType: 'oidc_client',
+      resourceId: id.trim(),
+      metadata: const {},
+      ip: context.request.headers['x-forwarded-for'],
+    );
     return jsonResponse({'deleted': true});
   }
 
@@ -63,6 +75,23 @@ Future<Response> onRequest(RequestContext context, String id) async {
       isActive: isActive,
       clientSecret: clientSecret,
       generateClientSecret: body['generate_client_secret'] == true,
+    );
+    final actor = context.read<AuthenticatedUser>();
+    await context.read<AuditService>().log(
+      action: 'admin.oidc_client.update',
+      actorId: actor.id,
+      actorType: 'admin',
+      resourceType: 'oidc_client',
+      resourceId: id.trim(),
+      metadata: {
+        'redirect_uris': redirectUris,
+        'scopes': scopes,
+        'grant_types': grantTypes,
+        'is_confidential': isConfidential,
+        'is_active': isActive,
+        'secret_rotated': result.generatedClientSecret != null,
+      },
+      ip: context.request.headers['x-forwarded-for'],
     );
     return jsonResponse({
       'updated': true,

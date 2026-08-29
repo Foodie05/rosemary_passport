@@ -12,7 +12,11 @@ Future<Response> onRequest(RequestContext context, String id) async {
 
   final actor = context.read<AuthenticatedUser>();
   if (actor.id == id) {
-    return errorResponse('forbidden', 'cannot delete current admin user.', statusCode: 403);
+    return errorResponse(
+      'forbidden',
+      'cannot delete current admin user.',
+      statusCode: 403,
+    );
   }
 
   final repository = context.read<UserRepository>();
@@ -24,18 +28,18 @@ Future<Response> onRequest(RequestContext context, String id) async {
   await repository.deleteUser(userId: id);
 
   await context.read<AuditService>().log(
-        action: 'admin.user.delete',
-        actorId: actor.id,
-        actorType: 'admin',
-        resourceType: 'user',
-        resourceId: id,
-        metadata: {
-          'email': existing.email,
-          'nickname': existing.nickname,
-          'roles': existing.roles,
-        },
-        ip: context.request.headers['x-forwarded-for'],
-      );
+    action: 'admin.user.delete',
+    actorId: actor.id,
+    actorType: 'admin',
+    resourceType: 'user',
+    resourceId: id,
+    metadata: {
+      'email': existing.email,
+      'nickname': existing.nickname,
+      'roles': existing.roles,
+    },
+    ip: context.request.headers['x-forwarded-for'],
+  );
 
   return jsonResponse({'deleted': true});
 }

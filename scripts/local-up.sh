@@ -109,9 +109,11 @@ JWT_AUDIENCE=rosm-apps
 JWT_PRIVATE_KEY_PEM_B64=$private_b64
 JWT_PUBLIC_KEY_PEM_B64=$public_b64
 JWT_BINDING_KEY=$binding_key
+EMAIL_CODE_HMAC_KEY=$binding_key
+DATA_ENCRYPTION_KEY=$binding_key
 ACCESS_TOKEN_TTL_SECONDS=900
-FIRST_PARTY_ACCESS_TOKEN_TTL_SECONDS=43200
-FIRST_PARTY_REMEMBERED_ACCESS_TOKEN_TTL_SECONDS=259200
+FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS=43200
+FIRST_PARTY_REMEMBERED_REFRESH_TOKEN_TTL_SECONDS=2592000
 REFRESH_TOKEN_TTL_SECONDS=2592000
 ARGON2_MEMORY_KB=8192
 ARGON2_ITERATIONS=2
@@ -197,6 +199,9 @@ docker compose exec -T -e PGOPTIONS='-c client_min_messages=warning' postgres \
 
 log "安装后端依赖..."
 (cd "$SERVER_DIR" && dart pub get >/dev/null)
+
+log "执行向后兼容数据库迁移..."
+(cd "$SERVER_DIR" && dart run bin/migrate.dart >/dev/null)
 
 log "安装前端依赖..."
 (cd "$ROOT_DIR/web" && npm install >/dev/null)

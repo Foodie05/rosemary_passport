@@ -368,7 +368,7 @@ export function AdminServiceConfig({
                 <input className="input-field" autoComplete="off" value={systemForm.aliyun_captcha_scene_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_scene_id: event.target.value }))} />
               </ConfigField>
               <ConfigField label="AccessKey ID" hint="填写 RAM 用户的 AccessKey ID。">
-                <input className="input-field" autoComplete="off" value={systemForm.aliyun_captcha_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_id: event.target.value }))} />
+                <input className="input-field" autoComplete="off" placeholder={systemForm.aliyun_captcha_access_key_id_configured ? '已配置，留空则保持不变' : 'RAM AccessKey ID'} value={systemForm.aliyun_captcha_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_id: event.target.value }))} />
               </ConfigField>
               <ConfigField label="AccessKey Secret" hint="AccessKey 创建时仅展示一次；只保存在服务端，不会下发到客户端。">
                 <input type="password" className="input-field" autoComplete="new-password" placeholder={systemForm.aliyun_captcha_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.aliyun_captcha_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_secret: event.target.value }))} />
@@ -389,10 +389,10 @@ export function AdminServiceConfig({
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ConfigField label="AccessKey ID">
-                <input className="input-field" value={systemForm.phone_sms_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_id: event.target.value }))} />
+                <input className="input-field" placeholder={systemForm.phone_sms_access_key_id_configured ? '已配置，留空则保持不变' : 'RAM AccessKey ID'} value={systemForm.phone_sms_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_id: event.target.value }))} />
               </ConfigField>
               <ConfigField label="AccessKey Secret">
-                <input type="password" className="input-field" value={systemForm.phone_sms_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_secret: event.target.value }))} />
+                <input type="password" className="input-field" placeholder={systemForm.phone_sms_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.phone_sms_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_secret: event.target.value }))} />
               </ConfigField>
               <ConfigField label="短信签名 SignName">
                 <input className="input-field" value={systemForm.phone_sms_sign_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_sign_name: event.target.value }))} />

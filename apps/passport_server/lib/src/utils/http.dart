@@ -7,13 +7,31 @@ import '../config/app_config.dart';
 Response jsonResponse(
   Object data, {
   int statusCode = 200,
-  Map<String, String>? headers,
+  Map<String, Object>? headers,
 }) {
   return Response(
     statusCode: statusCode,
     body: jsonEncode(data),
     headers: {'content-type': 'application/json; charset=utf-8', ...?headers},
   );
+}
+
+bool hasTrustedBrowserOrigin(Request request, AppConfig config) {
+  final origin = request.headers['origin']?.trim();
+  if (origin == null || origin.isEmpty) {
+    return false;
+  }
+  String? normalized(String value) {
+    try {
+      return Uri.parse(value).origin;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  return origin == normalized(config.webBaseUrl) ||
+      origin == normalized(config.serverBaseUrl) ||
+      config.corsAllowedOrigins.contains(origin);
 }
 
 Response errorResponse(String code, String message, {int statusCode = 400}) {
@@ -40,6 +58,48 @@ Future<Map<String, dynamic>?> tryParseJsonObject(Request request) async {
   } on Error {
     return null;
   }
+}
+
+Future<Map<String, dynamic>?> tryParseJsonOrFormObject(Request request) async {
+  final contentType = request.headers['content-type']?.toLowerCase() ?? '';
+  if (contentType.startsWith('application/x-www-form-urlencoded')) {
+    try {
+      final form = await request.formData();
+      return Map<String, dynamic>.from(form.fields);
+    } on FormatException {
+      return null;
+    }
+  }
+  return tryParseJsonObject(request);
+}
+
+Map<String, String?> oauthClientCredentials(
+  Request request,
+  Map<String, dynamic> body,
+) {
+  String? basicClientId;
+  String? basicClientSecret;
+  final authorization = request.headers['authorization'] ?? '';
+  if (authorization.startsWith('Basic ')) {
+    try {
+      final decoded = utf8.decode(
+        base64.decode(base64.normalize(authorization.substring(6).trim())),
+      );
+      final separator = decoded.indexOf(':');
+      if (separator >= 0) {
+        basicClientId = Uri.decodeComponent(decoded.substring(0, separator));
+        basicClientSecret = Uri.decodeComponent(
+          decoded.substring(separator + 1),
+        );
+      }
+    } catch (_) {
+      // Invalid Basic authentication is handled as missing credentials.
+    }
+  }
+  return {
+    'client_id': basicClientId ?? body['client_id']?.toString(),
+    'client_secret': basicClientSecret ?? body['client_secret']?.toString(),
+  };
 }
 
 Future<T?> tryParseJsonModel<T>(

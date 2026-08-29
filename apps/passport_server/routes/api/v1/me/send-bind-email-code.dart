@@ -25,16 +25,10 @@ Future<Response> onRequest(RequestContext context) async {
     user.id,
   );
   if (email.trim().isEmpty || currentPassword.trim().isEmpty) {
-    return errorResponse(
-      'invalid_request',
-      '请输入新邮箱和当前密码。',
-    );
+    return errorResponse('invalid_request', '请输入新邮箱和当前密码。');
   }
   if (!bypassCaptcha && captchaToken.trim().isEmpty) {
-    return errorResponse(
-      'invalid_request',
-      '请先完成人机验证。',
-    );
+    return errorResponse('invalid_request', '请先完成人机验证。');
   }
 
   final requestIp = clientIpFromRequest(
@@ -47,19 +41,18 @@ Future<Response> onRequest(RequestContext context) async {
       ip: requestIp,
     );
     if (!captchaOk) {
-      return errorResponse('captcha_failed', '人机验证未通过，请重试。',
-          statusCode: 400);
+      return errorResponse('captcha_failed', '人机验证未通过，请重试。', statusCode: 400);
     }
   }
 
   late final result;
   try {
     result = await authService.sendBindEmailCode(
-          userId: user.id,
-          newEmail: email,
-          currentPassword: currentPassword,
-          requestIp: requestIp,
-        );
+      userId: user.id,
+      newEmail: email,
+      currentPassword: currentPassword,
+      requestIp: requestIp,
+    );
   } on EmailDeliveryException {
     return errorResponse(
       'temporary_issue',
@@ -67,11 +60,7 @@ Future<Response> onRequest(RequestContext context) async {
       statusCode: 503,
     );
   } catch (_) {
-    return errorResponse(
-      'temporary_issue',
-      '验证码发送失败，请稍后重试。',
-      statusCode: 503,
-    );
+    return errorResponse('temporary_issue', '验证码发送失败，请稍后重试。', statusCode: 503);
   }
 
   if (!result.ok) {
@@ -82,9 +71,9 @@ Future<Response> onRequest(RequestContext context) async {
     );
     if (result.statusCode == 429) {
       final retryAfter = await authService.bindEmailCodeRetryAfter(
-            email: email,
-            requestIp: requestIp,
-          );
+        email: email,
+        requestIp: requestIp,
+      );
       response = response.copyWith(
         headers: {'retry-after': '${retryAfter ?? 60}'},
       );
@@ -95,7 +84,7 @@ Future<Response> onRequest(RequestContext context) async {
   return jsonResponse({
     'sent': true,
     'retry_after': await authService.bindEmailCodeCooldownRetryAfter(
-          email: email,
-        ),
+      email: email,
+    ),
   });
 }
