@@ -44,8 +44,8 @@
 
 对应实现：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/.well-known/openid-configuration.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/.well-known/openid-configuration.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart)
+- [apps/passport_server/routes/.well-known/openid-configuration.dart](../apps/passport_server/routes/.well-known/openid-configuration.dart)
+- [apps/passport_server/lib/src/services/oidc_service.dart](../apps/passport_server/lib/src/services/oidc_service.dart)
 
 ### 2.2 授权码模式
 
@@ -68,9 +68,9 @@
 
 对应实现：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/authorize.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/authorize.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/token.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/token.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/repositories/oidc_repository.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/repositories/oidc_repository.dart)
+- [apps/passport_server/routes/oidc/authorize.dart](../apps/passport_server/routes/oidc/authorize.dart)
+- [apps/passport_server/routes/oidc/token.dart](../apps/passport_server/routes/oidc/token.dart)
+- [apps/passport_server/lib/src/repositories/oidc_repository.dart](../apps/passport_server/lib/src/repositories/oidc_repository.dart)
 
 ### 2.3 JWT 与 JWKS
 
@@ -85,8 +85,8 @@
 
 对应实现：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/jwks.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/jwks.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/security/token_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/security/token_service.dart)
+- [apps/passport_server/routes/oidc/jwks.dart](../apps/passport_server/routes/oidc/jwks.dart)
+- [apps/passport_server/lib/src/security/token_service.dart](../apps/passport_server/lib/src/security/token_service.dart)
 
 ### 2.4 UserInfo
 
@@ -107,8 +107,8 @@
 
 对应实现：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/userinfo.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/userinfo.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart)
+- [apps/passport_server/routes/oidc/userinfo.dart](../apps/passport_server/routes/oidc/userinfo.dart)
+- [apps/passport_server/lib/src/services/oidc_service.dart](../apps/passport_server/lib/src/services/oidc_service.dart)
 
 ### 2.5 Introspect 与 Revoke
 
@@ -126,9 +126,9 @@
 
 对应实现：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/introspect.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/introspect.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/revoke.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/revoke.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart)
+- [apps/passport_server/routes/oidc/introspect.dart](../apps/passport_server/routes/oidc/introspect.dart)
+- [apps/passport_server/routes/oidc/revoke.dart](../apps/passport_server/routes/oidc/revoke.dart)
+- [apps/passport_server/lib/src/services/oidc_service.dart](../apps/passport_server/lib/src/services/oidc_service.dart)
 
 ## 3. 目前不符合或偏离标准的地方
 
@@ -156,8 +156,8 @@
 
 证据：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/security/token_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/security/token_service.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/services/oidc_service.dart)
+- [apps/passport_server/lib/src/security/token_service.dart](../apps/passport_server/lib/src/security/token_service.dart)
+- [apps/passport_server/lib/src/services/oidc_service.dart](../apps/passport_server/lib/src/services/oidc_service.dart)
 
 ### 3.2 `/oidc/authorize` 已显式校验 `response_type=code`
 
@@ -198,9 +198,9 @@ Discovery 声明：
 
 对应路由：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/token.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/token.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/introspect.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/introspect.dart)
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/revoke.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/routes/oidc/revoke.dart)
+- [apps/passport_server/routes/oidc/token.dart](../apps/passport_server/routes/oidc/token.dart)
+- [apps/passport_server/routes/oidc/introspect.dart](../apps/passport_server/routes/oidc/introspect.dart)
+- [apps/passport_server/routes/oidc/revoke.dart](../apps/passport_server/routes/oidc/revoke.dart)
 
 ### 3.5 不支持 `client_secret_basic`
 
@@ -259,7 +259,7 @@ JWT 中 `iss` 来自：
 
 对应配置：
 
-- [/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/config/app_config.dart](/Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server/lib/src/config/app_config.dart)
+- [apps/passport_server/lib/src/config/app_config.dart](../apps/passport_server/lib/src/config/app_config.dart)
 
 ## 4. 规范符合性判断
 

@@ -1,97 +1,76 @@
-# ROSM通行证
+# Rosemary Passport
 
-ROSM通行证是一个面向多应用接入的安全单点登录系统，后端基于 `dart_frog`，支持标准 OIDC 端点，并包含用户中心与管理后台前端。
+Rosemary Passport 是面向多应用接入的身份与单点登录服务。服务端基于 Dart Frog 和 PostgreSQL，包含标准 OIDC、WebAuthn/Passkey、用户中心、管理后台及 Flutter 接入包。
 
-## 核心能力
+## 安全与兼容能力
 
-- 安全密码存储：`Argon2id`
-- 安全传输：默认要求 HTTPS，附加 HSTS/CSP/NoSniff 等响应头
-- 双Key JWT：`RS256` 签名 + 二次 `HMAC-SHA256` 绑定校验（`sig2`）
-- OIDC 端点：
-  - `/.well-known/openid-configuration`
-  - `/oidc/authorize`
-  - `/oidc/token`
-  - `/oidc/userinfo`
-  - `/oidc/jwks`
-  - `/oidc/introspect`
-  - `/oidc/revoke`
-- 注册链路：邮箱 + 邮箱验证码，验证码发送前强制 `captcha`
-- 手机号验证码：支持阿里云号码认证短信发送与校验接口（可选启用）
-- 后台能力：用户管理、角色管理、审计日志
-- OIDC 客户端密钥：服务端安全随机生成、仅保存 Argon2id 哈希，并在 HTTPS 管理页一次性展示和复制
+- 密码使用 Argon2id，新增或修改密码执行 12-128 字符及泄露密码策略；历史密码仍可登录。
+- Access Token 固定为 15 分钟；Refresh Token 使用 family、单次轮换、重放检测和整族撤销。
+- 第一方刷新使用 `HttpOnly`、`Secure`、`SameSite` Cookie，并校验可信 Origin。
+- JWT 使用带 `kid` 的多密钥环；JWKS 可同时发布当前与上一把公钥。
+- WebAuthn 管理员及新凭据强制用户验证，普通用户迁移期由数据库字段控制。
+- OIDC 支持 Authorization Code、PKCE、表单编码 Token/撤销/内省及 JSON 兼容。
+- 敏感系统设置使用版本化 AES-256-GCM 信封加密，并兼容历史明文行的受控回填。
+- 数据库迁移具有版本、校验和、事务和 PostgreSQL advisory lock；采用 expand/backfill/validate，禁止本周期破坏旧列。
+- 生产容器非 root、只读根文件系统、最小权限并提供 `/health/live` 与 `/health/ready`。
 
-## 目录结构
+代码通过仓库卫生、服务端测试、Web、Flutter、供应链和 CodeQL 六项默认分支门禁。绿色 CI 只证明代码候选满足工程门禁；正式生产 SLA 仍必须完成容量、PITR 和稳定观察验收。
 
-- `apps/passport_server`: Dart Frog 服务端
-- `ops/postgres/init/001_init.sql`: PostgreSQL 初始化脚本
-- `web`: 统一前端（登录/注册/用户中心/管理后台）
+## 仓库结构
 
-## 快速启动
+- `apps/passport_server/`：Dart Frog 服务端、迁移器和 Node helper。
+- `web/`：React/Vite 第一方 Web 应用。
+- `packages/rosm_passport_flutter/`：Flutter 接入包。
+- `ops/postgres/`：兼容初始化快照。
+- `ops/deploy/auth_cruty_cn/`：生产部署、备份、WAL、PITR 与观察脚本。
+- `ops/load/`：50 RPS、100 RPS 突发和 500 并发会话容量门禁。
 
-### 一键本地运行（推荐）
+## 本地开发
+
+macOS 开发环境可运行：
 
 ```bash
-cd /Users/tianyue/Documents/Projects/rosemary_passport
 ./run_local.sh
 ```
 
-`run_local.sh` 会先清理占用端口，再自动打开两个终端窗口前台运行：
-- 后端：`dart_frog dev`（便于热更新与观察日志）
-- 前端：`python3 -m http.server 5173`
+脚本启动本地 PostgreSQL、执行兼容迁移，并分别启动后端与 Web。仅首次创建的本地管理员凭据保存在 `.local/admin_credentials.env`；`.local/` 权限为 `0700`，凭据和本地 `.env` 权限为 `0600`，密码不会回显到终端。
 
-首次运行会自动创建本地管理员并输出到日志与控制台：
-
-- 账号凭证文件：[.local/admin_credentials.env](/Users/tianyue/Documents/Projects/rosemary_passport/.local/admin_credentials.env)
-- 启动日志文件：[.local/bootstrap.log](/Users/tianyue/Documents/Projects/rosemary_passport/.local/bootstrap.log)
-
-停止：
+停止本地服务：
 
 ```bash
 ./stop_local.sh
 ```
 
-### 手动启动
+本地 `.env` 只用于开发且被 Git 忽略。生产环境禁止复制该文件，必须使用 `/etc/rosm-passport/runtime.env` 的非秘密配置和 `/etc/rosm-passport/secrets/` 下的 root-only `*_FILE` 密钥。
 
-1. 准备 PostgreSQL（建议开启 TLS）。
-2. 执行数据库初始化脚本 `ops/postgres/init/001_init.sql`。
-3. 复制 `apps/passport_server/.env.example` 为 `.env` 并填充真实密钥。
-4. 进入服务目录并启动：
+## 质量门禁
+
+提交前至少运行：
 
 ```bash
-cd /Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server
-dart pub get
-dart run dart_frog_cli:dart_frog build
-PORT=8080 dart run bin/server.dart
+./scripts/check_repo_hygiene.sh
+./scripts/check_commit_messages.sh master HEAD
+(cd web && npm ci && npm audit --audit-level=high && npm test && npm run build)
+(cd packages/rosm_passport_flutter && flutter pub get && flutter analyze && flutter test)
+(cd apps/passport_server && dart pub get && dart analyze && dart test)
 ```
 
-5. 前端在 `web/` 目录，默认调用 `http://localhost:8080`，可用任意静态文件服务打开 `index.html`。
+完整 CI 还执行 PostgreSQL 集成测试、覆盖率门禁、gitleaks、SBOM、Trivy 文件系统/容器扫描和 CodeQL `security-extended`。
 
-### 阿里云验证码 2.0 配置
+## 生产部署
 
-推荐在 Rosemary 管理页面的“服务配置”中填写 Prefix、场景 ID 与 AccessKey，并使用“验证阿里云验证码”完成一次真实连通测试。也可以通过环境变量提供默认配置：
+不要直接在生产主机运行开发脚本或手工执行初始化 SQL。按照 `ops/deploy/auth_cruty_cn/README.md` 完成：
 
-```env
-ALIYUN_CAPTCHA_PREFIX=你的身份标
-ALIYUN_CAPTCHA_SCENE_ID=你的场景ID
-ALIYUN_CAPTCHA_ACCESS_KEY_ID=你的AccessKeyID
-ALIYUN_CAPTCHA_ACCESS_KEY_SECRET=你的AccessKeySecret
-```
+1. 主机容量和磁盘预检。
+2. S3 版本控制/Object Lock 能力检查及加密备份确认。
+3. 不可变镜像构建和维护模式切换。
+4. 向后兼容迁移、readiness 与冒烟测试。
+5. 独立 PITR 演练、容量门禁及 14 天签名观察。
 
-验证码专用 AccessKey 未配置时会复用短信服务或通用阿里云 AccessKey。前端构建可使用 `VITE_ALIYUN_CAPTCHA_PREFIX` 和 `VITE_ALIYUN_CAPTCHA_SCENE_ID` 作为公开配置兜底。
+单机完成这些门禁后只能标记为 `SLA-ready`；99.9% SLA 还需要第二应用节点、PostgreSQL 高可用、负载均衡和外部 SLI/SLO 计量。
 
-## 必做的生产安全项
+## 安全报告
 
-- 使用受信任证书，禁止明文 HTTP。
-- 将 `JWT_PRIVATE_KEY_PEM` 和 `JWT_BINDING_KEY` 存储在密钥管理系统。
-- 将 `EmailService` 替换为成熟邮件服务商 SDK（SES/Postmark/Mailgun）。
-- 对 `auth`、`oidc/token`、`oidc/introspect` 增加限流与风控策略。
-- 定期轮换签名密钥并发布新 `kid`。
+发现漏洞时请遵循 [SECURITY.md](SECURITY.md)，使用 GitHub 私有漏洞报告，不要在公开 Issue 中披露利用细节、凭据或个人数据。
 
-## 开源安全组件复用
-
-- `dart_frog` / `dart_frog_auth`
-- `argon2`
-- `dart_jsonwebtoken`
-- `jose`
-- `postgres`
-- `http`
+贡献、数据库兼容和提交规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
