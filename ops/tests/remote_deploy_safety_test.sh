@@ -47,6 +47,8 @@ grep -q 'every secret file mode must be 0400' "$deploy_script"
 grep -q 'release archive contains a forbidden environment or secrets path' "$deploy_script"
 grep -q 'mktemp -d' "$deploy_script"
 grep -q -- '--no-same-owner' "$deploy_script"
+grep -q 'valid RFC 3339 UTC timestamp' \
+  "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 
 compose_file="$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
 runtime_example="$repo_root/ops/deploy/auth_cruty_cn/runtime.env.example"

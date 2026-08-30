@@ -41,7 +41,7 @@ trap cleanup EXIT
 [[ "$FRONTEND_TARGET_DIR" = /* ]] || die "frontend directory must be absolute"
 
 for command in docker tar rsync curl mkdir ln mv grep readlink aws openssl \
-  sha256sum pg_restore sed tail awk df; do require_cmd "$command"; done
+  sha256sum pg_restore sed tail awk df date; do require_cmd "$command"; done
 docker compose version >/dev/null 2>&1 || die "docker compose is unavailable"
 
 TARGET_DIR="${TARGET_DIR%/}"
@@ -84,8 +84,11 @@ done
 if grep -Eq 'REPLACE_WITH_VERIFIED_DIGEST|^[[:space:]]*(POSTGRES_IMAGE|NODE_IMAGE)=[^@]*$' "$RUNTIME_ENV_FILE"; then
   die "runtime images must use verified sha256 digests"
 fi
-if grep -q 'LEGACY_JSON_REFRESH_SUNSET_AT=REPLACE_' "$RUNTIME_ENV_FILE"; then
-  die "legacy JSON refresh sunset must be a fixed UTC timestamp"
+legacy_json_sunset="$(sed -n 's/^LEGACY_JSON_REFRESH_SUNSET_AT=//p' \
+  "$RUNTIME_ENV_FILE" | tail -n 1)"
+if [[ ! "$legacy_json_sunset" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || \
+  ! date -u -d "$legacy_json_sunset" '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
+  die "legacy JSON refresh sunset must be a valid RFC 3339 UTC timestamp"
 fi
 
 info "validating off-host storage protection"
