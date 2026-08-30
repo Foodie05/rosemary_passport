@@ -112,6 +112,16 @@ class AppServices {
   final Database _database;
   late final MigrationRunner migrationRunner;
 
+  Future<void> start() async {
+    await _database.warmUp();
+    await migrationRunner.migrate();
+  }
+
+  Future<void> close() async {
+    helperClient.close();
+    await _database.close();
+  }
+
   Future<Map<String, dynamic>> readiness() async {
     final checks = <String, bool>{};
     try {

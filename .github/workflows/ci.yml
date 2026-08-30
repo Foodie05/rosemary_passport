@@ -74,6 +74,9 @@ jobs:
       - name: Format gate
         working-directory: apps/passport_server
         run: dart format --output=none --set-exit-if-changed lib bin routes test tool
+      - name: Build production route bundle
+        working-directory: apps/passport_server
+        run: dart run dart_frog_cli:dart_frog build
       - name: Static analysis
         working-directory: apps/passport_server
         run: dart analyze --fatal-infos

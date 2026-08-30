@@ -61,7 +61,7 @@ cd /Users/tianyue/Documents/Projects/rosemary_passport
 cd /Users/tianyue/Documents/Projects/rosemary_passport/apps/passport_server
 dart pub get
 dart run dart_frog_cli:dart_frog build
-PORT=8080 dart run build/bin/server.dart
+PORT=8080 dart run bin/server.dart
 ```
 
 5. 前端在 `web/` 目录，默认调用 `http://localhost:8080`，可用任意静态文件服务打开 `index.html`。

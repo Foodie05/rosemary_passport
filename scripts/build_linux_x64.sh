@@ -69,7 +69,7 @@ echo "[build_linux_x64] building passport server routes"
     --target-os linux \
     --target-arch x64 \
     -Ddart.vm.product=true \
-    build/bin/server.dart \
+    bin/server.dart \
     -o "$RELEASE_DIR/backend/bin/passport_server"
   dart compile exe \
     --target-os linux \
