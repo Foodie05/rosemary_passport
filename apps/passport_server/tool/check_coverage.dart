@@ -27,9 +27,27 @@ void main(List<String> arguments) {
     } else if (line.startsWith('LH:')) {
       current.linesHit = int.parse(line.substring(3));
     } else if (line.startsWith('BRF:')) {
-      current.branchesFound = int.parse(line.substring(4));
+      if (!current.hasBranchRecords) {
+        current.branchesFound = int.parse(line.substring(4));
+      }
     } else if (line.startsWith('BRH:')) {
-      current.branchesHit = int.parse(line.substring(4));
+      if (!current.hasBranchRecords) {
+        current.branchesHit = int.parse(line.substring(4));
+      }
+    } else if (line.startsWith('BRDA:')) {
+      // Dart's LCOV formatter emits individual branch records without the
+      // optional BRF/BRH summary lines used by some native toolchains.
+      if (!current.hasBranchRecords) {
+        current.branchesFound = 0;
+        current.branchesHit = 0;
+        current.hasBranchRecords = true;
+      }
+      current.branchesFound++;
+      final taken = line.split(',').last;
+      final count = int.tryParse(taken);
+      if (count != null && count > 0) {
+        current.branchesHit++;
+      }
     } else if (line == 'end_of_record' && source != null) {
       records[source] = current;
       source = null;
@@ -89,6 +107,7 @@ class _Coverage {
   int linesHit = 0;
   int branchesFound = 0;
   int branchesHit = 0;
+  bool hasBranchRecords = false;
 
   double get linePercent => linesFound == 0 ? 0 : linesHit * 100 / linesFound;
   double get branchPercent =>

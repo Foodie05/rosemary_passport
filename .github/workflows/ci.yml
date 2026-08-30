@@ -88,7 +88,11 @@ jobs:
           TEST_DB_USER: postgres
           TEST_DB_PASSWORD: postgres
           TEST_DB_NAME: rosm_passport_test
-        run: dart test --reporter=expanded --coverage-path=coverage/lcov.info --branch-coverage
+        run: >-
+          dart --branch-coverage run test
+          --reporter=expanded
+          --coverage-path=coverage/lcov.info
+          --branch-coverage
       - name: Coverage gate
         working-directory: apps/passport_server
         run: dart run tool/check_coverage.dart coverage/lcov.info

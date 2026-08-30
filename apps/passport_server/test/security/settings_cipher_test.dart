@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:rosm_passport_server/src/config/app_config.dart';
@@ -70,4 +71,74 @@ void main() {
       await directory.delete(recursive: true);
     }
   });
+
+  test('encrypts standalone strings and rejects malformed envelopes', () async {
+    final cipher = SettingsCipher(
+      AppConfig.forTesting({
+        'DATA_ENCRYPTION_ACTIVE_KID': 'test-v1',
+        'DATA_ENCRYPTION_KEY': base64Encode(List<int>.generate(32, (i) => i)),
+      }),
+    );
+    final encrypted = await cipher.encryptString('standalone-secret');
+    expect(encrypted, startsWith('a256gcm:'));
+    expect(await cipher.decryptString(encrypted), 'standalone-secret');
+    await expectLater(
+      cipher.decryptString('plaintext'),
+      throwsA(isA<FormatException>()),
+    );
+    final invalidShape = base64UrlEncode(utf8.encode(jsonEncode(['invalid'])));
+    await expectLater(
+      cipher.decryptString('a256gcm:$invalidShape'),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test(
+    'preserves empty values and rejects unknown or tampered envelopes',
+    () async {
+      final cipher = SettingsCipher(
+        AppConfig.forTesting({
+          'DATA_ENCRYPTION_ACTIVE_KID': 'test-v1',
+          'DATA_ENCRYPTION_KEY':
+              'test-key-material-with-more-than-32-characters',
+        }),
+      );
+      final encrypted = await cipher.encryptSensitiveFields({
+        'password': '',
+        'phone_sms_access_key_secret': 'sms-secret',
+        'count': 3,
+      });
+      expect(encrypted['password'], '');
+      expect(encrypted['count'], 3);
+      final envelope = Map<String, dynamic>.from(
+        encrypted['phone_sms_access_key_secret'] as Map,
+      );
+      final inner = Map<String, dynamic>.from(envelope['_enc'] as Map);
+
+      final unsupported = Map<String, dynamic>.from(inner)..['v'] = 2;
+      await expectLater(
+        cipher.decryptEnvelopes({
+          'password': {'_enc': unsupported},
+        }),
+        throwsA(isA<FormatException>()),
+      );
+
+      final unknownKey = Map<String, dynamic>.from(inner)..['kid'] = 'missing';
+      await expectLater(
+        cipher.decryptEnvelopes({
+          'password': {'_enc': unknownKey},
+        }),
+        throwsA(isA<StateError>()),
+      );
+
+      final tampered = Map<String, dynamic>.from(inner)
+        ..['ciphertext'] = base64UrlEncode(utf8.encode('tampered'));
+      await expectLater(
+        cipher.decryptEnvelopes({
+          'password': {'_enc': tampered},
+        }),
+        throwsA(anything),
+      );
+    },
+  );
 }

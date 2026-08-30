@@ -112,6 +112,40 @@ void main() {
         expect(migrated.single[1], 'legacy-refresh-token');
         expect(migrated.single[2].toString(), userId);
         expect(await runner.isCurrent(), isTrue);
+
+        final migration = MigrationRunner.migrations.single;
+        expect(migration.checksum, hasLength(64));
+        await database.execute(
+          '''
+          update schema_migrations set checksum = 'corrupted'
+          where version = @version
+          ''',
+          params: {'version': migration.version},
+        );
+        expect(await runner.isCurrent(), isFalse);
+        await expectLater(runner.migrate(), throwsA(isA<StateError>()));
+        await database.execute(
+          '''
+          update schema_migrations set checksum = @checksum
+          where version = @version
+          ''',
+          params: {
+            'version': migration.version,
+            'checksum': migration.checksum,
+          },
+        );
+        expect(await runner.isCurrent(), isTrue);
+
+        await database.execute(
+          'alter table schema_migrations rename to schema_migrations_hidden',
+        );
+        try {
+          expect(await runner.isCurrent(), isFalse);
+        } finally {
+          await database.execute(
+            'alter table schema_migrations_hidden rename to schema_migrations',
+          );
+        }
       } finally {
         await database.close();
         await keyDirectory.delete(recursive: true);
