@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AdminLayout, UserLayout } from './components/Layouts';
 import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
 import { useTheme } from './theme';
 import { getUserErrorMessage, getUserMessage } from './lib/errors';
+import { normalizeInternalRedirect } from './lib/redirects';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
@@ -114,13 +115,13 @@ function AppRoutes({
 }) {
   const location = useLocation();
   const loginNext = location.pathname === '/login'
-    ? new URLSearchParams(location.search).get('next')?.trim() || ''
+    ? normalizeInternalRedirect(new URLSearchParams(location.search).get('next'))
     : '';
   const registerNext = location.pathname === '/register'
-    ? new URLSearchParams(location.search).get('next')?.trim() || ''
+    ? normalizeInternalRedirect(new URLSearchParams(location.search).get('next'))
     : '';
   const forgotNext = location.pathname === '/forgot-password'
-    ? new URLSearchParams(location.search).get('next')?.trim() || ''
+    ? normalizeInternalRedirect(new URLSearchParams(location.search).get('next'))
     : '';
 
   return (
@@ -287,20 +288,11 @@ function AppRoutes({
 }
 
 function PostLoginRedirect({ target, fallback }) {
-  useEffect(() => {
-    if (!target) {
-      return;
-    }
-    window.location.replace(target);
-  }, [target]);
-
-  if (target) {
-    return null;
-  }
-  return <Navigate to={fallback} replace />;
+  return <Navigate to={normalizeInternalRedirect(target) || fallback} replace />;
 }
 
 function App() {
+  const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
   const normalizeProvider = useCallback((value) => {
     const trimmed = `${value || ''}`.trim().toLowerCase();
@@ -448,7 +440,7 @@ function App() {
         return;
       }
       const params = new URLSearchParams(window.location.search);
-      const next = (params.get('next') || '').trim();
+      const next = normalizeInternalRedirect(params.get('next'));
       if (next) {
         setPendingAuthRedirect(next);
       }
@@ -1164,7 +1156,7 @@ function App() {
       void Promise.allSettled([loadSystemConfig(), loadOidcClients()]);
     }
     if (!deferRedirect && pendingAuthRedirect && payload.post_register_passkey_bootstrap !== true) {
-      window.location.replace(pendingAuthRedirect);
+      navigate(pendingAuthRedirect, { replace: true });
       return;
     }
     showToast('登录成功', 'success');
@@ -1234,7 +1226,7 @@ function App() {
       });
       setPostRegisterPasskeyPromptOpen(false);
       if (pendingAuthRedirect) {
-        window.location.replace(pendingAuthRedirect);
+        navigate(pendingAuthRedirect, { replace: true });
         return;
       }
       showToast('系统通行密钥已连接，后续可更快捷登录。', 'success');
@@ -1855,7 +1847,6 @@ function App() {
         aria-hidden="true"
         style={{ position: 'fixed', left: '-9999px', top: 0, width: 1, height: 1, opacity: 0 }}
       />
-      <BrowserRouter>
       {toast && (
         <div className={`fixed right-5 top-5 z-50 rounded-2xl px-4 py-3 text-sm font-medium shadow-lg ${toast.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-sage-900 text-white'}`}>
           {toast.message}
@@ -1906,7 +1897,7 @@ function App() {
             if (postRegisterPasskeyPending) {
               setPostRegisterPasskeyPromptOpen(true);
             } else if (pendingAuthRedirect) {
-              window.location.replace(pendingAuthRedirect);
+              navigate(pendingAuthRedirect, { replace: true });
             }
             showToast(bindingPhone ? '手机号绑定成功' : '邮箱绑定成功', 'success');
           }}
@@ -1916,7 +1907,7 @@ function App() {
             if (postRegisterPasskeyPending) {
               setPostRegisterPasskeyPromptOpen(true);
             } else if (pendingAuthRedirect) {
-              window.location.replace(pendingAuthRedirect);
+              navigate(pendingAuthRedirect, { replace: true });
             }
           }}
         />
@@ -1930,7 +1921,7 @@ function App() {
             setPostRegisterPasskeyError('');
             setPostRegisterPasskeyPromptOpen(false);
             if (pendingAuthRedirect) {
-              window.location.replace(pendingAuthRedirect);
+              navigate(pendingAuthRedirect, { replace: true });
               return;
             }
           }}
@@ -2024,7 +2015,6 @@ function App() {
           removeRegistrationProvider={removeRegistrationProvider}
           isAdmin={isAdmin}
         />
-      </BrowserRouter>
     </>
   );
 }
