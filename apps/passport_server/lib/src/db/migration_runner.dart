@@ -63,6 +63,43 @@ class MigrationRunner {
         on audit_logs(entry_hash)
         where entry_hash is not null;
     '''),
+    DatabaseMigration('20260830_001_oidc_schema_managed', '''
+      alter table oidc_clients
+        add column if not exists display_name text;
+      alter table oidc_clients
+        add column if not exists is_official boolean not null default false;
+      alter table oidc_auth_codes
+        add column if not exists nonce text;
+      create index if not exists idx_oidc_auth_codes_user
+        on oidc_auth_codes(user_id);
+
+      insert into oidc_clients(
+        client_id,
+        display_name,
+        is_official,
+        client_secret_hash,
+        redirect_uris,
+        scopes,
+        grant_types,
+        is_confidential,
+        is_active
+      ) values (
+        'first_party_web',
+        'ROSM Pass',
+        true,
+        null,
+        array['http://localhost:5173/callback']::text[],
+        array['openid', 'profile', 'email', 'phone']::text[],
+        array['authorization_code', 'refresh_token']::text[],
+        false,
+        true
+      ) on conflict (client_id) do nothing;
+
+      update oidc_clients
+      set display_name = coalesce(display_name, 'ROSM Pass'),
+          is_official = true
+      where client_id = 'first_party_web';
+    '''),
   ];
 
   final Database _database;
@@ -91,11 +128,16 @@ class MigrationRunner {
 
   Future<bool> isCurrent() async {
     try {
-      final result = await _database.execute(
-        'select checksum from schema_migrations where version = @version',
-        params: {'version': latestVersion},
-      );
-      return result.isNotEmpty && result.first[0] == migrations.last.checksum;
+      for (final migration in migrations) {
+        final result = await _database.execute(
+          'select checksum from schema_migrations where version = @version',
+          params: {'version': migration.version},
+        );
+        if (result.isEmpty || result.first[0] != migration.checksum) {
+          return false;
+        }
+      }
+      return true;
     } catch (_) {
       return false;
     }

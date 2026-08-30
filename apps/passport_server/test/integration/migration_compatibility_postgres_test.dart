@@ -111,9 +111,18 @@ void main() {
         expect(migrated.single[0], isNotNull);
         expect(migrated.single[1], 'legacy-refresh-token');
         expect(migrated.single[2].toString(), userId);
+        final firstPartyClient = await database.execute('''
+          select display_name, is_official, is_confidential
+          from oidc_clients where client_id = 'first_party_web'
+        ''');
+        expect(firstPartyClient.single[0], 'ROSM Pass');
+        expect(firstPartyClient.single[1], isTrue);
+        expect(firstPartyClient.single[2], isFalse);
         expect(await runner.isCurrent(), isTrue);
 
-        final migration = MigrationRunner.migrations.single;
+        // Corrupt the oldest checksum while leaving the latest row intact, so
+        // readiness proves that it validates the complete migration chain.
+        final migration = MigrationRunner.migrations.first;
         expect(migration.checksum, hasLength(64));
         await database.execute(
           '''

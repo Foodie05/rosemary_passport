@@ -7,131 +7,8 @@ class OidcRepository {
   OidcRepository(this._db);
 
   final Database _db;
-  Future<void>? _schemaReady;
-
-  Future<void> _ensureSchema() {
-    return _schemaReady ??= _createSchemaIfNeeded();
-  }
-
-  Future<void> _createSchemaIfNeeded() async {
-    await _db.execute('''
-      create table if not exists oidc_clients (
-        client_id text primary key,
-        display_name text,
-        is_official boolean not null default false,
-        client_secret_hash text,
-        redirect_uris text[] not null,
-        scopes text[] not null default array['openid', 'profile', 'email', 'phone']::text[],
-        grant_types text[] not null default array['authorization_code', 'refresh_token']::text[],
-        is_confidential boolean not null default true,
-        is_active boolean not null default true,
-        created_at timestamptz not null default now()
-      )
-      ''');
-    await _db.execute(
-      'alter table oidc_clients add column if not exists display_name text',
-    );
-    await _db.execute(
-      'alter table oidc_clients add column if not exists is_official boolean not null default false',
-    );
-    await _db.execute('''
-      create table if not exists oidc_auth_codes (
-        code text primary key,
-        client_id text not null references oidc_clients(client_id),
-        user_id uuid not null references users(id) on delete cascade,
-        redirect_uri text not null,
-        scopes text[] not null,
-        nonce text,
-        code_challenge text,
-        code_challenge_method text,
-        expires_at timestamptz not null,
-        used_at timestamptz,
-        created_at timestamptz not null default now()
-      )
-      ''');
-    await _db.execute(
-      'alter table oidc_auth_codes add column if not exists nonce text',
-    );
-    await _db.execute('''
-      create index if not exists idx_oidc_auth_codes_user
-      on oidc_auth_codes(user_id)
-      ''');
-    await _db.execute('''
-      create table if not exists oidc_access_tokens (
-        token_id text primary key,
-        user_id uuid not null references users(id) on delete cascade,
-        client_id text not null references oidc_clients(client_id),
-        family_id uuid,
-        expires_at timestamptz not null,
-        revoked_at timestamptz,
-        created_at timestamptz not null default now()
-      )
-      ''');
-    await _db.execute('''
-      create table if not exists oidc_refresh_tokens (
-        token_id text primary key,
-        user_id uuid not null references users(id) on delete cascade,
-        client_id text not null references oidc_clients(client_id),
-        family_id uuid,
-        parent_token_id text,
-        replaced_by_token_id text,
-        consumed_at timestamptz,
-        reuse_detected_at timestamptz,
-        expires_at timestamptz not null,
-        revoked_at timestamptz,
-        created_at timestamptz not null default now()
-      )
-      ''');
-    await _db.execute(
-      'alter table oidc_access_tokens add column if not exists family_id uuid',
-    );
-    await _db.execute(
-      'alter table oidc_refresh_tokens add column if not exists family_id uuid',
-    );
-    await _db.execute(
-      'alter table oidc_refresh_tokens add column if not exists parent_token_id text',
-    );
-    await _db.execute(
-      'alter table oidc_refresh_tokens add column if not exists replaced_by_token_id text',
-    );
-    await _db.execute(
-      'alter table oidc_refresh_tokens add column if not exists consumed_at timestamptz',
-    );
-    await _db.execute(
-      'alter table oidc_refresh_tokens add column if not exists reuse_detected_at timestamptz',
-    );
-    await _db.execute(
-      'update oidc_refresh_tokens set family_id = gen_random_uuid() where family_id is null',
-    );
-    await _db.execute('''
-      insert into oidc_clients(
-        client_id,
-        display_name,
-        is_official,
-        client_secret_hash,
-        redirect_uris,
-        scopes,
-        grant_types,
-        is_confidential,
-        is_active
-      )
-      values (
-        'first_party_web',
-        'ROSM Pass',
-        true,
-        null,
-        array['http://localhost:5173/callback']::text[],
-        array['openid', 'profile', 'email', 'phone']::text[],
-        array['authorization_code', 'refresh_token']::text[],
-        false,
-        true
-      )
-      on conflict (client_id) do nothing
-      ''');
-  }
 
   Future<Map<String, dynamic>?> findClient(String clientId) async {
-    await _ensureSchema();
     final result = await _db.execute(
       '''
       select client_id, client_secret_hash, redirect_uris, scopes, grant_types, is_confidential, display_name, is_official
@@ -159,7 +36,6 @@ class OidcRepository {
   }
 
   Future<List<Map<String, dynamic>>> listClients() async {
-    await _ensureSchema();
     final result = await _db.execute('''
       select client_id, display_name, is_official, redirect_uris, scopes, grant_types, is_confidential, is_active, client_secret_hash, created_at
       from oidc_clients
@@ -185,7 +61,6 @@ class OidcRepository {
   }
 
   Future<Map<String, dynamic>?> findRefreshToken(String tokenId) async {
-    await _ensureSchema();
     final result = await _db.execute(
       '''
       select token_id, user_id, client_id, expires_at, revoked_at,
@@ -214,7 +89,6 @@ class OidcRepository {
   }
 
   Future<Map<String, dynamic>?> findAccessToken(String tokenId) async {
-    await _ensureSchema();
     final result = await _db.execute(
       '''
       select token_id, user_id, client_id, expires_at, revoked_at
@@ -249,7 +123,6 @@ class OidcRepository {
     required String? codeChallengeMethod,
     required DateTime expiresAt,
   }) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       insert into oidc_auth_codes(code, client_id, user_id, redirect_uri, scopes, nonce, code_challenge, code_challenge_method, expires_at)
@@ -270,7 +143,6 @@ class OidcRepository {
   }
 
   Future<Map<String, dynamic>?> consumeAuthCode(String code) async {
-    await _ensureSchema();
     return _db.runTx((tx) async {
       final result = await tx.execute(
         Sql.named('''
@@ -319,7 +191,6 @@ class OidcRepository {
     required DateTime expiresAt,
     String? familyId,
   }) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       insert into oidc_access_tokens(token_id, user_id, client_id, expires_at, family_id)
@@ -336,7 +207,6 @@ class OidcRepository {
   }
 
   Future<bool> isAccessTokenActive(String tokenId) async {
-    await _ensureSchema();
     final result = await _db.execute(
       '''
       select revoked_at, expires_at
@@ -364,7 +234,6 @@ class OidcRepository {
     String? familyId,
     String? parentTokenId,
   }) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       insert into oidc_refresh_tokens(
@@ -395,7 +264,6 @@ class OidcRepository {
     required DateTime accessExpiresAt,
     required DateTime refreshExpiresAt,
   }) async {
-    await _ensureSchema();
     await _db.runTx((tx) async {
       await tx.execute(
         Sql.named('''
@@ -444,7 +312,6 @@ class OidcRepository {
     required DateTime accessExpiresAt,
     required DateTime refreshExpiresAt,
   }) async {
-    await _ensureSchema();
     return _db.runTx((tx) async {
       final result = await tx.execute(
         Sql.named('''
@@ -541,7 +408,6 @@ class OidcRepository {
   }
 
   Future<void> revokeTokenFamily(String familyId) async {
-    await _ensureSchema();
     await _db.runTx((tx) async {
       await tx.execute(
         Sql.named('''
@@ -563,7 +429,6 @@ class OidcRepository {
   }
 
   Future<bool> isRefreshTokenActive(String tokenId) async {
-    await _ensureSchema();
     final result = await _db.execute(
       '''
       select revoked_at, expires_at
@@ -584,7 +449,6 @@ class OidcRepository {
   }
 
   Future<void> revokeRefreshToken(String tokenId) async {
-    await _ensureSchema();
     await _db.execute(
       'update oidc_refresh_tokens set revoked_at = now() where token_id = @token_id and revoked_at is null',
       params: {'token_id': tokenId},
@@ -592,7 +456,6 @@ class OidcRepository {
   }
 
   Future<void> revokeRefreshTokensForUser(String userId) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       update oidc_refresh_tokens
@@ -605,7 +468,6 @@ class OidcRepository {
   }
 
   Future<void> revokeAccessToken(String tokenId) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       update oidc_access_tokens
@@ -618,7 +480,6 @@ class OidcRepository {
   }
 
   Future<void> revokeAccessTokensForUser(String userId) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       update oidc_access_tokens
@@ -634,7 +495,6 @@ class OidcRepository {
     String userId,
     String preservedTokenId,
   ) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       update oidc_access_tokens
@@ -658,7 +518,6 @@ class OidcRepository {
     required bool isActive,
     String? clientSecretHash,
   }) async {
-    await _ensureSchema();
     await _db.execute(
       '''
       insert into oidc_clients(
@@ -711,7 +570,6 @@ class OidcRepository {
   }
 
   Future<void> deleteClient(String clientId) async {
-    await _ensureSchema();
     await _db.runTx((tx) async {
       await tx.execute(
         Sql.named(

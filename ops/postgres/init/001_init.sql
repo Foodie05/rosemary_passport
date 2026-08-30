@@ -70,6 +70,8 @@ create index if not exists idx_email_code_lookup on email_verification_codes(ema
 
 create table if not exists oidc_clients (
   client_id text primary key,
+  display_name text,
+  is_official boolean not null default false,
   client_secret_hash text,
   redirect_uris text[] not null,
   scopes text[] not null default array['openid', 'profile', 'email', 'phone']::text[],
@@ -218,6 +220,8 @@ on conflict (name) do nothing;
 
 insert into oidc_clients(
   client_id,
+  display_name,
+  is_official,
   client_secret_hash,
   redirect_uris,
   scopes,
@@ -227,6 +231,8 @@ insert into oidc_clients(
 )
 values (
   'first_party_web',
+  'ROSM Pass',
+  true,
   null,
   array['http://localhost:5173/callback']::text[],
   array['openid', 'profile', 'email', 'phone']::text[],
