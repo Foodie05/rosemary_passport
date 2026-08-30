@@ -2,11 +2,13 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { timingSafeEqual } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const port = Number.parseInt(process.env.HELPER_PORT || '8092', 10);
 const maxConcurrency = Number.parseInt(process.env.HELPER_MAX_CONCURRENCY || '8', 10);
 const timeoutMs = Number.parseInt(process.env.HELPER_EXEC_TIMEOUT_MS || '2800', 10);
 const sharedKey = readFileSync(process.env.HELPER_SHARED_KEY_FILE, 'utf8').trim();
+const appDir = process.env.HELPER_APP_DIR || fileURLToPath(new URL('..', import.meta.url));
 const allowedScripts = new Set([
   'webauthn-register-options.mjs',
   'webauthn-verify-registration.mjs',
@@ -46,7 +48,7 @@ const readBody = async (request) => {
 
 const execute = (script, payload) => new Promise((resolve, reject) => {
   const child = spawn(process.execPath, [`scripts/${script}`], {
-    cwd: '/app',
+    cwd: appDir,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const stdout = [];
