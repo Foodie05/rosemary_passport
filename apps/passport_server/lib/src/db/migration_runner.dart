@@ -127,6 +127,20 @@ class MigrationRunner {
       create unique index if not exists idx_audit_chain_position
         on audit_logs(chain_position);
     '''),
+    DatabaseMigration('20260830_003_rollback_compatibility_defaults', '''
+      update oidc_refresh_tokens
+      set family_id = gen_random_uuid()
+      where family_id is null;
+      alter table oidc_refresh_tokens
+        alter column family_id set default gen_random_uuid();
+
+      update user_webauthn_credentials
+      set uv_grace_expires_at = now() + interval '14 days'
+      where uv_required = false and uv_grace_expires_at is null;
+      alter table user_webauthn_credentials
+        alter column uv_grace_expires_at
+        set default (now() + interval '14 days');
+    '''),
   ];
 
   final Database _database;

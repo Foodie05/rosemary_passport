@@ -35,8 +35,21 @@ void main() {
         'DATA_ENCRYPTION_KEYS_DIR': keyDirectory.path,
       });
       final database = Database(config);
+      final runner = MigrationRunner(database);
       const userId = 'fd11dbf0-7048-4790-b576-8c5a69bab010';
       try {
+        await runner.migrate();
+        final compatibilityMigration = MigrationRunner.migrations.last;
+        await database.execute(
+          'delete from schema_migrations where version = @version',
+          params: {'version': compatibilityMigration.version},
+        );
+        await database.execute(
+          'alter table oidc_refresh_tokens alter column family_id drop default',
+        );
+        await database.execute(
+          'alter table user_webauthn_credentials alter column uv_grace_expires_at drop default',
+        );
         await database.execute(
           '''
           insert into users(id, email, nickname, password_hash)
@@ -79,7 +92,6 @@ void main() {
           'select count(*) from oidc_refresh_tokens',
         );
 
-        final runner = MigrationRunner(database);
         await runner.migrate();
         await runner.migrate();
         final users = UserRepository(database, config, SettingsCipher(config));
