@@ -16,7 +16,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Validate repository hygiene
-        run: ./scripts/check_repo_hygiene.sh
+        run: |
+          ./scripts/check_repo_hygiene.sh
+          ./scripts/check_commit_messages_test.sh
       - name: Validate commit messages
         env:
           BASE_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -25,6 +27,7 @@ jobs:
       - name: Verify backup restore integrity controls
         run: |
           ./ops/tests/restore_integrity_test.sh
+          ./ops/tests/s3_storage_preflight_test.sh
           ./ops/tests/pitr_drill_safety_test.sh
           ./ops/tests/sla_observation_test.sh
       - name: Validate pull request title

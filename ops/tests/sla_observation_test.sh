@@ -12,6 +12,7 @@ cat >"$test_dir/runtime.env" <<'EOF'
 S3_ENDPOINT=https://object-store.invalid
 S3_BUCKET=sla-test
 S3_REGION=auto
+S3_REQUIRE_OBJECT_LOCK=false
 EOF
 printf 'test-access' >"$test_dir/secrets/s3_access_key_id"
 printf 'test-secret' >"$test_dir/secrets/s3_secret_access_key"
@@ -41,6 +42,7 @@ cat >"$test_dir/bin/aws" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 case " $* " in
+  *' s3api get-bucket-versioning '*) printf 'Enabled\n' ;;
   *' s3api head-object '*) date -u '+%Y-%m-%dT%H:%M:%SZ' ;;
   *' s3api list-objects-v2 '*)
     now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"

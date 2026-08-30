@@ -11,6 +11,7 @@ cat >"$test_dir/runtime.env" <<'EOF'
 S3_ENDPOINT=https://object-store.invalid
 S3_BUCKET=pitr-test
 S3_REGION=auto
+S3_REQUIRE_OBJECT_LOCK=false
 POSTGRES_USER=postgres
 POSTGRES_DB=rosm_passport
 EOF
@@ -54,6 +55,7 @@ cat >"$test_dir/bin/aws" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 case " $* " in
+  *' s3api get-bucket-versioning '*) printf 'Enabled\n' ;;
   *' s3api head-object '*) exit 0 ;;
   *' s3 cp '*'physical/latest.json'*)
     destination="${*: -2:1}"

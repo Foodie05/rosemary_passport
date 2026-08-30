@@ -17,12 +17,7 @@ POSTGRES_DB="$(read_env POSTGRES_DB)"
 export AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
 export AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
-versioning="$(aws --endpoint-url "$S3_ENDPOINT" s3api get-bucket-versioning \
-  --bucket "$S3_BUCKET" --query Status --output text)"
-[[ "$versioning" == "Enabled" ]] || {
-  echo "S3 bucket versioning must be enabled" >&2
-  exit 78
-}
+"$(dirname "${BASH_SOURCE[0]}")/check_s3_storage.sh" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
 
 archive="$TMP_DIR/audit-$TIMESTAMP.jsonl"
 (

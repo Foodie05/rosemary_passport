@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 release_dir="${1:?release directory required}"
 runtime_env_file="${2:?runtime env required}"
 secrets_dir="${3:?secrets directory required}"
@@ -54,6 +55,7 @@ docker image inspect "$pitr_image" >/dev/null 2>&1 || die "PITR image is unavail
 export AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
 export AWS_SECRET_ACCESS_KEY="$(<"$secrets_dir/s3_secret_access_key")"
 export AWS_DEFAULT_REGION="${s3_region:-auto}"
+"$script_dir/check_s3_storage.sh" "$runtime_env_file" "$secrets_dir"
 compose() { (cd "$release_dir" && docker compose --env-file "$runtime_env_file" "$@"); }
 source_sql() {
   compose exec -T postgres psql -U "$postgres_user" -d "$postgres_db" \
