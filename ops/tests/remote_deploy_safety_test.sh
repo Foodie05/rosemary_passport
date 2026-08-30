@@ -48,4 +48,15 @@ grep -q 'release archive contains a forbidden environment or secrets path' "$dep
 grep -q 'mktemp -d' "$deploy_script"
 grep -q -- '--no-same-owner' "$deploy_script"
 
+compose_file="$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
+runtime_example="$repo_root/ops/deploy/auth_cruty_cn/runtime.env.example"
+for setting in ALIYUN_ACCESS_KEY_ID_FILE ALIYUN_ACCESS_KEY_SECRET_FILE \
+  ALIYUN_SMS_SIGN_NAME ALIYUN_SMS_TEMPLATE_CODE WEBAUTHN_ANDROID_ORIGINS; do
+  grep -q "$setting" "$compose_file"
+done
+for setting in ALIYUN_SMS_SIGN_NAME ALIYUN_SMS_TEMPLATE_CODE \
+  WEBAUTHN_ANDROID_ORIGINS; do
+  grep -q "^$setting=" "$runtime_example"
+done
+
 echo 'Remote deployment safety tests passed.'

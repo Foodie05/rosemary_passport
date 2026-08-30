@@ -78,6 +78,10 @@ write_secret "$SECRETS_DIR/aliyun_captcha_access_key_id" \
   "$(legacy_first ALIYUN_CAPTCHA_ACCESS_KEY_ID ALIYUN_ACCESS_KEY_ID || true)"
 write_secret "$SECRETS_DIR/aliyun_captcha_access_key_secret" \
   "$(legacy_first ALIYUN_CAPTCHA_ACCESS_KEY_SECRET ALIYUN_ACCESS_KEY_SECRET || true)"
+write_secret "$SECRETS_DIR/aliyun_access_key_id" \
+  "$(legacy_value ALIYUN_ACCESS_KEY_ID || true)"
+write_secret "$SECRETS_DIR/aliyun_access_key_secret" \
+  "$(legacy_value ALIYUN_ACCESS_KEY_SECRET || true)"
 write_secret "$SECRETS_DIR/local_admin_password" \
   "$(legacy_or_random LOCAL_ADMIN_PASSWORD 24)"
 write_secret "$SECRETS_DIR/backup_encryption_key" "$(random_secret 48)"

@@ -34,6 +34,8 @@ output="$($provisioner "$secrets_dir" "$legacy_env")"
 [[ "$(<"$secrets_dir/db_password")" == fixture-db-password ]]
 [[ "$(<"$secrets_dir/aliyun_captcha_access_key_id")" == fixture-legacy-aliyun-id ]]
 [[ "$(<"$secrets_dir/aliyun_captcha_access_key_secret")" == fixture-legacy-aliyun-secret ]]
+[[ "$(<"$secrets_dir/aliyun_access_key_id")" == fixture-legacy-aliyun-id ]]
+[[ "$(<"$secrets_dir/aliyun_access_key_secret")" == fixture-legacy-aliyun-secret ]]
 [[ "$(<"$secrets_dir/data_keys/data-v1.key")" == fixture-data-key ]]
 [[ ! -s "$secrets_dir/s3_access_key_id" && ! -s "$secrets_dir/s3_secret_access_key" ]]
 [[ "$(file_mode "$secrets_dir")" == 700 ]]

@@ -65,7 +65,8 @@ TMP_DIR="$(mktemp -d)"
 required_secret_files=(
   db_password jwt_binding_key email_code_hmac_key smtp_password
   local_admin_password aliyun_captcha_access_key_id
-  aliyun_captcha_access_key_secret backup_encryption_key
+  aliyun_captcha_access_key_secret aliyun_access_key_id
+  aliyun_access_key_secret backup_encryption_key
   s3_access_key_id s3_secret_access_key helper_shared_key
 )
 for secret_file in "${required_secret_files[@]}"; do
