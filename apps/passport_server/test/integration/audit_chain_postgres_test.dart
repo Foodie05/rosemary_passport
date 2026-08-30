@@ -10,6 +10,64 @@ void main() {
   final enabled = Platform.environment['RUN_POSTGRES_TESTS'] == 'true';
 
   test(
+    'backfills legacy audit rows without changing their business fields',
+    () async {
+      final config = AppConfig.forTesting({
+        'DB_HOST': Platform.environment['TEST_DB_HOST'] ?? '127.0.0.1',
+        'DB_PORT': Platform.environment['TEST_DB_PORT'] ?? '5432',
+        'DB_USER': Platform.environment['TEST_DB_USER'] ?? 'postgres',
+        'DB_PASSWORD': Platform.environment['TEST_DB_PASSWORD'] ?? 'postgres',
+        'DB_NAME': Platform.environment['TEST_DB_NAME'] ?? 'rosm_passport_test',
+        'DB_SSL_MODE': 'disable',
+        'DB_POOL_MIN_CONNECTIONS': '1',
+        'DB_POOL_MAX_CONNECTIONS': '2',
+      });
+      final database = Database(config);
+      final audit = AuditService(database);
+      const action = 'test.audit_chain.legacy_backfill';
+      try {
+        await MigrationRunner(database).migrate();
+        await audit.backfillLegacyHashes();
+        await database.execute(
+          '''
+          insert into audit_logs(
+            action, actor_id, actor_type, resource_type, resource_id,
+            metadata, ip_address
+          ) values (
+            @action, 'legacy-actor', 'legacy', 'legacy-record',
+            'legacy-id', '{"preserved":true}'::jsonb, '192.0.2.20'
+          )
+          ''',
+          params: {'action': action},
+        );
+
+        expect(await audit.backfillLegacyHashes(), 1);
+        final row = await database.execute(
+          '''
+          select actor_id, metadata, previous_hash, entry_hash
+          from audit_logs where action = @action
+          ''',
+          params: {'action': action},
+        );
+        expect(row.single[0], 'legacy-actor');
+        expect((row.single[1] as Map)['preserved'], true);
+        expect(row.single[3]?.toString(), hasLength(64));
+        expect(await audit.verifyChain(), greaterThanOrEqualTo(1));
+      } finally {
+        try {
+          await database.execute(
+            'delete from audit_logs where action = @action',
+            params: {'action': action},
+          );
+        } finally {
+          await database.close();
+        }
+      }
+    },
+    skip: enabled ? false : 'Set RUN_POSTGRES_TESTS=true for PostgreSQL tests.',
+  );
+
+  test(
     'recomputes persisted audit hashes and rejects metadata tampering',
     () async {
       final config = AppConfig.forTesting({
@@ -60,6 +118,7 @@ void main() {
           params: {'action': action},
         );
         await expectLater(audit.verifyChain(), throwsStateError);
+        await expectLater(audit.backfillLegacyHashes(), throwsStateError);
       } finally {
         try {
           await database.execute(

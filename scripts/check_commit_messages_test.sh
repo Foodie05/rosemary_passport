@@ -9,6 +9,8 @@ trap 'rm -rf "$test_dir"' EXIT
 git -C "$test_dir" init -q
 git -C "$test_dir" config user.name 'Commit Gate Test'
 git -C "$test_dir" config user.email 'commit-gate@example.invalid'
+git -C "$test_dir" config gc.auto 0
+git -C "$test_dir" config maintenance.auto false
 touch "$test_dir/fixture"
 git -C "$test_dir" add fixture
 git -C "$test_dir" commit -qm 'chore: initialize fixture'

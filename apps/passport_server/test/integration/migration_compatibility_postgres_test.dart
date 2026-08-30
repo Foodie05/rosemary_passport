@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:rosm_passport_server/src/config/app_config.dart';
 import 'package:rosm_passport_server/src/db/database.dart';
 import 'package:rosm_passport_server/src/db/migration_runner.dart';
+import 'package:rosm_passport_server/src/repositories/settings_repository.dart';
 import 'package:rosm_passport_server/src/repositories/user_repository.dart';
 import 'package:rosm_passport_server/src/security/settings_cipher.dart';
 import 'package:test/test.dart';
@@ -35,8 +37,12 @@ void main() {
     final database = Database(config);
     final runner = MigrationRunner(database);
     const userId = 'fd11dbf0-7048-4790-b576-8c5a69bab010';
+    List<List<dynamic>>? originalSmtp;
     try {
       await runner.migrate();
+      originalSmtp = (await database.execute(
+        "select value from system_settings where key = 'smtp'",
+      )).map((row) => row.toList()).toList();
       final compatibilityMigration = MigrationRunner.migrations.firstWhere(
         (migration) =>
             migration.version == '20260830_003_rollback_compatibility_defaults',
@@ -86,6 +92,15 @@ void main() {
         ''',
         params: {'user_id': userId},
       );
+      await database.execute('''
+        insert into system_settings(key, value, updated_at)
+        values (
+          'smtp',
+          '{"host":"smtp.legacy.invalid","password":"LEGACY-SMTP-SECRET"}'::jsonb,
+          now()
+        )
+        on conflict (key) do update set value = excluded.value, updated_at = now()
+      ''');
       final usersBefore = await database.execute('select count(*) from users');
       final tokensBefore = await database.execute(
         'select count(*) from oidc_refresh_tokens',
@@ -108,6 +123,20 @@ void main() {
         params: {'id': userId},
       );
       expect(authenticatorEnvelope.single[0], startsWith('a256gcm:'));
+
+      final settings = SettingsRepository(database, SettingsCipher(config));
+      expect(await settings.migratePlaintextSecrets(), 1);
+      expect(await settings.getJson('smtp'), {
+        'host': 'smtp.legacy.invalid',
+        'password': 'LEGACY-SMTP-SECRET',
+      });
+      final smtpEnvelope = await database.execute(
+        "select value from system_settings where key = 'smtp'",
+      );
+      expect(
+        jsonEncode(smtpEnvelope.single[0]),
+        isNot(contains('LEGACY-SMTP-SECRET')),
+      );
 
       final usersAfter = await database.execute('select count(*) from users');
       final tokensAfter = await database.execute(
@@ -164,6 +193,15 @@ void main() {
         );
       }
     } finally {
+      if (originalSmtp != null && originalSmtp.isNotEmpty) {
+        await database.execute(
+          '''
+          update system_settings set value = @value::jsonb, updated_at = now()
+          where key = 'smtp'
+          ''',
+          params: {'value': jsonEncode(originalSmtp.single.single)},
+        );
+      }
       await database.close();
       await keyDirectory.delete(recursive: true);
     }
