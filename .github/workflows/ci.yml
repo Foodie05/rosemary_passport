@@ -2,6 +2,7 @@ name: security-and-quality
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, edited]
   push:
     branches: [master, main, codex/sla-hardening]
 
