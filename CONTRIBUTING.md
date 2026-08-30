@@ -28,6 +28,7 @@ test(migrations): preserve legacy authenticator secrets
 
 ```bash
 ./scripts/check_repo_hygiene.sh
+./scripts/check_commit_messages.sh master HEAD
 (cd apps/passport_server && dart format --output=none --set-exit-if-changed lib bin routes test tool && dart run dart_frog_cli:dart_frog build && dart analyze && dart test)
 (cd web && npm ci && npm audit --audit-level=high && npm run build)
 (cd packages/rosm_passport_flutter && flutter pub get && dart format --output=none --set-exit-if-changed lib test && flutter analyze && flutter test)

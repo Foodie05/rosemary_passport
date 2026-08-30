@@ -22,6 +22,7 @@ required_executables=(
   run_local.sh
   stop_local.sh
   scripts/build_linux_x64.sh
+  scripts/check_commit_messages.sh
   scripts/check_repo_hygiene.sh
   scripts/deploy_auth_cruty_cn.sh
   scripts/local-down.sh
