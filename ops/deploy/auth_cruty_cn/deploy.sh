@@ -84,10 +84,15 @@ done
 if grep -Eq 'REPLACE_WITH_VERIFIED_DIGEST|^[[:space:]]*(POSTGRES_IMAGE|NODE_IMAGE)=[^@]*$' "$RUNTIME_ENV_FILE"; then
   die "runtime images must use verified sha256 digests"
 fi
+legacy_json_sunset_count="$(grep -c '^LEGACY_JSON_REFRESH_SUNSET_AT=' \
+  "$RUNTIME_ENV_FILE" || true)"
+[[ "$legacy_json_sunset_count" -eq 1 ]] \
+  || die "runtime env must contain exactly one legacy JSON refresh sunset"
 legacy_json_sunset="$(sed -n 's/^LEGACY_JSON_REFRESH_SUNSET_AT=//p' \
-  "$RUNTIME_ENV_FILE" | tail -n 1)"
-if [[ ! "$legacy_json_sunset" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || \
-  ! date -u -d "$legacy_json_sunset" '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
+  "$RUNTIME_ENV_FILE")"
+if [[ "$legacy_json_sunset" != PENDING_FIRST_HARDENED_DEPLOYMENT_PLUS_14_DAYS ]] && \
+  { [[ ! "$legacy_json_sunset" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || \
+    ! date -u -d "$legacy_json_sunset" '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; }; then
   die "legacy JSON refresh sunset must be a valid RFC 3339 UTC timestamp"
 fi
 
@@ -134,6 +139,7 @@ chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
   "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/pitr_drill.sh" \
   "$TARGET_DIR/record_sla_observation.sh" \
   "$TARGET_DIR/evaluate_sla_observation.sh" \
+  "$TARGET_DIR/finalize_legacy_refresh_sunset.sh" \
   "$TARGET_DIR/install_systemd_units.sh" \
   "$TARGET_DIR/provision_secrets.sh" \
   "$TARGET_DIR/backend/entrypoint.sh"
@@ -163,6 +169,9 @@ if [[ -e "$FRONTEND_TARGET_DIR" ]]; then
   touch "$FRONTEND_TARGET_DIR/.maintenance"
   MAINTENANCE_ENABLED=true
 fi
+
+info "fixing the one-time legacy JSON refresh sunset"
+"$SOURCE_DIR/finalize_legacy_refresh_sunset.sh" "$RUNTIME_ENV_FILE"
 
 info "starting migrated backend"
 (
