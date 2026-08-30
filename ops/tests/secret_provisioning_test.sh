@@ -8,6 +8,14 @@ trap 'rm -rf "$test_dir"' EXIT
 legacy_env="$test_dir/legacy.env"
 secrets_dir="$test_dir/secrets"
 
+file_mode() {
+  if [[ "$(uname -s)" == Darwin ]]; then
+    stat -f '%Lp' "$1"
+  else
+    stat -c '%a' "$1"
+  fi
+}
+
 cat >"$legacy_env" <<'EOF'
 POSTGRES_PASSWORD=fixture-db-password
 JWT_BINDING_KEY=fixture-jwt-binding
@@ -28,9 +36,9 @@ output="$($provisioner "$secrets_dir" "$legacy_env")"
 [[ "$(<"$secrets_dir/aliyun_captcha_access_key_secret")" == fixture-legacy-aliyun-secret ]]
 [[ "$(<"$secrets_dir/data_keys/data-v1.key")" == fixture-data-key ]]
 [[ ! -s "$secrets_dir/s3_access_key_id" && ! -s "$secrets_dir/s3_secret_access_key" ]]
-[[ "$(stat -f '%Lp' "$secrets_dir" 2>/dev/null || stat -c '%a' "$secrets_dir")" == 700 ]]
+[[ "$(file_mode "$secrets_dir")" == 700 ]]
 while IFS= read -r secret_file; do
-  mode="$(stat -f '%Lp' "$secret_file" 2>/dev/null || stat -c '%a' "$secret_file")"
+  mode="$(file_mode "$secret_file")"
   [[ "$mode" == 400 ]]
 done < <(find "$secrets_dir" -type f -print)
 
