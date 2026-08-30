@@ -26,7 +26,57 @@ EOF
 }
 
 require_cmd() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
+file_uid() { stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1"; }
+restore_runtime_env() {
+  [[ -n "${RUNTIME_ENV_BACKUP:-}" && -f "$RUNTIME_ENV_BACKUP" ]] || return 0
+  runtime_restore_tmp="$(mktemp "$(dirname "$RUNTIME_ENV_FILE")/.runtime.env.rollback.XXXXXX")"
+  cp -p "$RUNTIME_ENV_BACKUP" "$runtime_restore_tmp"
+  mv -f "$runtime_restore_tmp" "$RUNTIME_ENV_FILE"
+  RUNTIME_ENV_BACKUP=""
+}
+restore_cutover() {
+  [[ "${CUTOVER_STARTED:-false}" == true ]] || return 0
+  error "restoring the pre-deployment application state"
+  if [[ -f "${BACKUP_ARCHIVE:-}" ]]; then
+    rollback_dir="$TMP_DIR/rollback"
+    rm -rf "$rollback_dir"
+    mkdir -p "$rollback_dir"
+    tar -C "$rollback_dir" -xzf "$BACKUP_ARCHIVE"
+    rsync -a --checksum --delete --exclude='.env' --exclude='data/' \
+      --exclude='.deploy_backups/' "$rollback_dir/" "$TARGET_DIR/"
+  fi
+  if [[ -n "${LEGACY_ENV_QUARANTINE_PATH:-}" ]]; then
+    "$SOURCE_DIR/legacy_env_transition.sh" restore \
+      "$TARGET_DIR" "$LEGACY_ENV_QUARANTINE_PATH"
+    LEGACY_ENV_QUARANTINE_PATH=""
+  fi
+  restore_runtime_env
+  if [[ "${NEW_STACK_STARTED:-false}" == true && -f "$TARGET_DIR/docker-compose.yml" ]]; then
+    rollback_env="$RUNTIME_ENV_FILE"
+    [[ ! -f "$TARGET_DIR/.env" ]] || rollback_env="$TARGET_DIR/.env"
+    rollback_tag="current"
+    if [[ -f "$TARGET_DIR/.release_tag" ]]; then
+      rollback_tag="$(<"$TARGET_DIR/.release_tag")"
+      if [[ ! "$rollback_tag" =~ ^release-[0-9]{8}-[0-9]{6}$ ]]; then
+        error "stored rollback release tag is invalid; refusing image replacement"
+        CUTOVER_STARTED=false
+        return 78
+      fi
+    fi
+    CUTOVER_STARTED=false
+    RELEASE_TAG="$rollback_tag" docker compose --project-name "$PROJECT_NAME" \
+      --project-directory "$TARGET_DIR" --env-file "$rollback_env" \
+      -f "$TARGET_DIR/docker-compose.yml" up -d --no-build --remove-orphans \
+      || true
+  fi
+  CUTOVER_STARTED=false
+}
 cleanup() {
+  if [[ "${DEPLOYMENT_SUCCEEDED:-false}" != true ]]; then
+    restore_cutover || true
+    restore_runtime_env || true
+  fi
   if [[ "${MAINTENANCE_ENABLED:-false}" == true && -e "$FRONTEND_TARGET_DIR/.maintenance" ]]; then
     unlink "$FRONTEND_TARGET_DIR/.maintenance" || true
   fi
@@ -41,7 +91,7 @@ trap cleanup EXIT
 [[ "$FRONTEND_TARGET_DIR" = /* ]] || die "frontend directory must be absolute"
 
 for command in docker tar rsync curl mkdir ln mv grep readlink aws openssl \
-  sha256sum pg_restore sed tail awk df date; do require_cmd "$command"; done
+  sha256sum pg_restore sed tail awk df date cp mktemp; do require_cmd "$command"; done
 docker compose version >/dev/null 2>&1 || die "docker compose is unavailable"
 
 TARGET_DIR="${TARGET_DIR%/}"
@@ -60,7 +110,21 @@ TMP_DIR="$(mktemp -d)"
 [[ -f "$SOURCE_DIR/frontend/dist/maintenance.html" ]] || die "release is missing maintenance page"
 [[ -f "$RUNTIME_ENV_FILE" ]] || die "runtime env is missing: $RUNTIME_ENV_FILE"
 [[ -d "$SECRETS_DIR" ]] || die "secrets directory is missing: $SECRETS_DIR"
-[[ ! -f "$TARGET_DIR/.env" ]] || die "legacy .env must be migrated outside the release directory first"
+if [[ -e "$TARGET_DIR/.env" ]]; then
+  [[ -f "$TARGET_DIR/.env" && ! -L "$TARGET_DIR/.env" ]] \
+    || die "legacy .env must be a regular non-symlink file"
+  [[ "$(file_uid "$TARGET_DIR/.env")" == 0 ]] \
+    || die "legacy .env must be owned by root"
+  [[ "$(file_mode "$TARGET_DIR/.env")" == 600 ]] \
+    || die "legacy .env mode must be 0600"
+fi
+if [[ -e "$TARGET_DIR/.release_tag" ]]; then
+  [[ -f "$TARGET_DIR/.release_tag" && ! -L "$TARGET_DIR/.release_tag" ]] \
+    || die "stored release tag must be a regular non-symlink file"
+  stored_release_tag="$(<"$TARGET_DIR/.release_tag")"
+  [[ "$stored_release_tag" =~ ^release-[0-9]{8}-[0-9]{6}$ ]] \
+    || die "stored release tag is invalid"
+fi
 
 required_secret_files=(
   db_password jwt_binding_key email_code_hmac_key smtp_password
@@ -101,7 +165,25 @@ info "validating host capacity"
 info "validating off-host storage protection"
 "$SOURCE_DIR/check_s3_storage.sh" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
 
-compose() { docker compose --env-file "$RUNTIME_ENV_FILE" "$@"; }
+PROJECT_NAME="$(basename "$TARGET_DIR")"
+[[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] \
+  || die "target directory name is not a safe Compose project"
+NEW_RELEASE_TAG="release-$TIMESTAMP"
+compose_source() {
+  RELEASE_TAG="$NEW_RELEASE_TAG" docker compose --project-name "$PROJECT_NAME" \
+    --project-directory "$SOURCE_DIR" --env-file "$RUNTIME_ENV_FILE" \
+    -f "$SOURCE_DIR/docker-compose.yml" "$@"
+}
+compose_target() {
+  RELEASE_TAG="$NEW_RELEASE_TAG" docker compose --project-name "$PROJECT_NAME" \
+    --project-directory "$TARGET_DIR" --env-file "$RUNTIME_ENV_FILE" \
+    -f "$TARGET_DIR/docker-compose.yml" "$@"
+}
+DEPLOYMENT_SUCCEEDED=false
+LEGACY_ENV_QUARANTINE_PATH=""
+CUTOVER_STARTED=false
+NEW_STACK_STARTED=false
+RUNTIME_ENV_BACKUP=""
 
 mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_RELEASES_DIR"
 "$SOURCE_DIR/check_disk_capacity.sh" "$TARGET_DIR" "$FRONTEND_RELEASES_DIR"
@@ -112,7 +194,7 @@ fi
 
 if [[ -f "$TARGET_DIR/docker-compose.yml" ]]; then
   info "creating credential-free code backup"
-  tar --exclude='./data/postgres' --exclude='./.deploy_backups' \
+  tar --exclude='./data' --exclude='./.deploy_backups' \
     --exclude='./.env' -C "$TARGET_DIR" -czf "$BACKUP_ARCHIVE" .
 fi
 if [[ -e "$FRONTEND_TARGET_DIR" ]]; then
@@ -127,28 +209,8 @@ else
   info "first deployment: no existing database backup is required"
 fi
 
-info "syncing credential-free release"
-tar --exclude='./.env' -C "$SOURCE_DIR" -cf - . | tar -C "$TARGET_DIR" -xf -
-chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
-  "$TARGET_DIR/physical_backup_to_s3.sh" \
-  "$TARGET_DIR/check_s3_storage.sh" \
-  "$TARGET_DIR/upload_s3_verified.sh" \
-  "$TARGET_DIR/check_host_capacity.sh" \
-  "$TARGET_DIR/check_disk_capacity.sh" \
-  "$TARGET_DIR/archive_audit_to_s3.sh" \
-  "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/pitr_drill.sh" \
-  "$TARGET_DIR/record_sla_observation.sh" \
-  "$TARGET_DIR/evaluate_sla_observation.sh" \
-  "$TARGET_DIR/finalize_legacy_refresh_sunset.sh" \
-  "$TARGET_DIR/install_systemd_units.sh" \
-  "$TARGET_DIR/provision_secrets.sh" \
-  "$TARGET_DIR/backend/entrypoint.sh"
-
-info "building containers before maintenance"
-(
-  cd "$TARGET_DIR"
-  compose build
-)
+info "building immutable release images before cutover"
+compose_source build
 
 info "staging frontend"
 mkdir -p "$FRONTEND_STAGE_DIR"
@@ -162,6 +224,36 @@ if [[ -d "$FRONTEND_TARGET_DIR" && ! -L "$FRONTEND_TARGET_DIR" ]]; then
   ln -s "$legacy_frontend" "$FRONTEND_TARGET_DIR"
 fi
 
+if [[ -e "$TARGET_DIR/.env" ]]; then
+  info "moving the migrated legacy environment to root-only rollback quarantine"
+  LEGACY_ENV_QUARANTINE_PATH="$(
+    "$SOURCE_DIR/legacy_env_transition.sh" quarantine "$TARGET_DIR" \
+      /etc/rosm-passport/legacy-env "$TIMESTAMP"
+  )"
+fi
+CUTOVER_STARTED=true
+
+info "syncing credential-free release"
+rsync -a --checksum --delete --exclude='.env' --exclude='data/' \
+  --exclude='.deploy_backups/' "$SOURCE_DIR/" "$TARGET_DIR/"
+printf '%s\n' "$NEW_RELEASE_TAG" >"$TARGET_DIR/.release_tag"
+chmod 0644 "$TARGET_DIR/.release_tag"
+chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
+  "$TARGET_DIR/physical_backup_to_s3.sh" \
+  "$TARGET_DIR/check_s3_storage.sh" \
+  "$TARGET_DIR/upload_s3_verified.sh" \
+  "$TARGET_DIR/check_host_capacity.sh" \
+  "$TARGET_DIR/check_disk_capacity.sh" \
+  "$TARGET_DIR/archive_audit_to_s3.sh" \
+  "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/pitr_drill.sh" \
+  "$TARGET_DIR/record_sla_observation.sh" \
+  "$TARGET_DIR/evaluate_sla_observation.sh" \
+  "$TARGET_DIR/finalize_legacy_refresh_sunset.sh" \
+  "$TARGET_DIR/legacy_env_transition.sh" \
+  "$TARGET_DIR/install_systemd_units.sh" \
+  "$TARGET_DIR/provision_secrets.sh" \
+  "$TARGET_DIR/backend/entrypoint.sh"
+
 MAINTENANCE_ENABLED=false
 if [[ -e "$FRONTEND_TARGET_DIR" ]]; then
   info "enabling maintenance mode"
@@ -171,13 +263,13 @@ if [[ -e "$FRONTEND_TARGET_DIR" ]]; then
 fi
 
 info "fixing the one-time legacy JSON refresh sunset"
+RUNTIME_ENV_BACKUP="$TMP_DIR/runtime.env.before-finalize"
+cp -p "$RUNTIME_ENV_FILE" "$RUNTIME_ENV_BACKUP"
 "$SOURCE_DIR/finalize_legacy_refresh_sunset.sh" "$RUNTIME_ENV_FILE"
 
 info "starting migrated backend"
-(
-  cd "$TARGET_DIR"
-  compose up -d --no-build
-)
+NEW_STACK_STARTED=true
+compose_target up -d --no-build
 
 ready=false
 for _ in {1..40}; do
@@ -189,14 +281,7 @@ for _ in {1..40}; do
 done
 
 if [[ "$ready" != true ]]; then
-  error "readiness failed; rolling back application files"
-  if [[ -f "$BACKUP_ARCHIVE" ]]; then
-    tar -C "$TARGET_DIR" -xzf "$BACKUP_ARCHIVE"
-    (
-      cd "$TARGET_DIR"
-      compose up -d --build || true
-    )
-  fi
+  error "readiness failed; rollback will restore the pre-deployment state"
   exit 1
 fi
 
@@ -207,7 +292,13 @@ if [[ "$MAINTENANCE_ENABLED" == true && -n "$previous_frontend" && -e "$previous
   unlink "$previous_frontend/.maintenance"
 fi
 MAINTENANCE_ENABLED=false
+DEPLOYMENT_SUCCEEDED=true
+CUTOVER_STARTED=false
+RUNTIME_ENV_BACKUP=""
 
 info "deployment completed and readiness passed"
 info "code backup: $BACKUP_ARCHIVE"
 info "frontend backup: $FRONTEND_BACKUP_ARCHIVE"
+if [[ -n "$LEGACY_ENV_QUARANTINE_PATH" ]]; then
+  info "legacy environment rollback copy: $LEGACY_ENV_QUARANTINE_PATH"
+fi

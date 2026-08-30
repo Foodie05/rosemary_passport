@@ -128,6 +128,7 @@ cp "$TEMPLATE_DIR/pitr_drill.sh" "$RELEASE_DIR/pitr_drill.sh"
 cp "$TEMPLATE_DIR/record_sla_observation.sh" "$RELEASE_DIR/record_sla_observation.sh"
 cp "$TEMPLATE_DIR/evaluate_sla_observation.sh" "$RELEASE_DIR/evaluate_sla_observation.sh"
 cp "$TEMPLATE_DIR/finalize_legacy_refresh_sunset.sh" "$RELEASE_DIR/finalize_legacy_refresh_sunset.sh"
+cp "$TEMPLATE_DIR/legacy_env_transition.sh" "$RELEASE_DIR/legacy_env_transition.sh"
 cp "$TEMPLATE_DIR/install_systemd_units.sh" "$RELEASE_DIR/install_systemd_units.sh"
 cp -R "$TEMPLATE_DIR/systemd" "$RELEASE_DIR/systemd"
 cp "$TEMPLATE_DIR/provision_secrets.sh" "$RELEASE_DIR/provision_secrets.sh"
@@ -151,6 +152,7 @@ chmod +x "$RELEASE_DIR/deploy.sh" "$RELEASE_DIR/backup_to_s3.sh" \
   "$RELEASE_DIR/record_sla_observation.sh" \
   "$RELEASE_DIR/evaluate_sla_observation.sh" \
   "$RELEASE_DIR/finalize_legacy_refresh_sunset.sh" \
+  "$RELEASE_DIR/legacy_env_transition.sh" \
   "$RELEASE_DIR/install_systemd_units.sh" \
   "$RELEASE_DIR/postgres/postgres-entrypoint.sh" \
   "$RELEASE_DIR/provision_secrets.sh" \

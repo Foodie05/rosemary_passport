@@ -51,6 +51,19 @@ grep -q 'valid RFC 3339 UTC timestamp' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 grep -q 'finalize_legacy_refresh_sunset.sh' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'legacy_env_transition.sh' \
+  "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q "rsync -a --checksum --delete" \
+  "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q "up -d --no-build --remove-orphans" \
+  "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'compose_source build' "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'NEW_RELEASE_TAG="release-\$TIMESTAMP"' \
+  "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'restore_cutover' "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+
+grep -q '^    image: rosm-passport-backend:' \
+  "$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
 
 compose_file="$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
 runtime_example="$repo_root/ops/deploy/auth_cruty_cn/runtime.env.example"

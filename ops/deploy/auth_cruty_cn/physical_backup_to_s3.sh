@@ -26,9 +26,29 @@ export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 base_path="$TMP_DIR/base.tar"
 encrypted_path="$TMP_DIR/base.tar.enc"
 object_key="physical/$TIMESTAMP/base.tar.enc"
+compose_env_file="$RUNTIME_ENV_FILE"
+if [[ -e "$TARGET_DIR/.env" ]]; then
+  [[ -f "$TARGET_DIR/.env" && ! -L "$TARGET_DIR/.env" ]] || {
+    echo "legacy .env must be a regular non-symlink file" >&2
+    exit 78
+  }
+  legacy_mode="$(stat -c '%a' "$TARGET_DIR/.env" 2>/dev/null || stat -f '%Lp' "$TARGET_DIR/.env")"
+  legacy_uid="$(stat -c '%u' "$TARGET_DIR/.env" 2>/dev/null || stat -f '%u' "$TARGET_DIR/.env")"
+  [[ "$legacy_mode" == 600 && "$legacy_uid" == "$(id -u)" ]] || {
+    echo "legacy .env must be mode 0600 and owned by the backup user" >&2
+    exit 78
+  }
+  compose_env_file="$TARGET_DIR/.env"
+fi
+project_name="$(basename "$TARGET_DIR")"
+[[ "$project_name" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || {
+  echo "target directory name is not a safe Compose project" >&2
+  exit 78
+}
 (
   cd "$TARGET_DIR"
-  docker compose --env-file "$RUNTIME_ENV_FILE" exec -T postgres \
+  docker compose --project-name "$project_name" --env-file "$compose_env_file" \
+    exec -T postgres \
     pg_basebackup -U "$POSTGRES_USER" -D - --format=tar --wal-method=fetch \
       --checkpoint=fast >"$base_path"
 )

@@ -51,6 +51,7 @@ services:
       dockerfile: Dockerfile.backend
       args:
         NODE_IMAGE: ${NODE_IMAGE}
+    image: rosm-passport-backend:${RELEASE_TAG:-current}
     restart: unless-stopped
     depends_on:
       postgres:

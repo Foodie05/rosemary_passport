@@ -41,6 +41,8 @@ jobs:
           ./ops/tests/s3_storage_preflight_test.sh
           ./ops/tests/s3_upload_integrity_test.sh
           ./ops/tests/legacy_refresh_sunset_test.sh
+          ./ops/tests/legacy_env_transition_test.sh
+          ./ops/tests/legacy_cutover_layout_test.sh
           ./ops/tests/pitr_drill_safety_test.sh
           ./ops/tests/sla_observation_test.sh
       - name: Validate pull request title
@@ -234,7 +236,7 @@ jobs:
           exit-code: "1"
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: auth_cruty_cn_release-passport_server:latest
+          image-ref: rosm-passport-backend:current
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
