@@ -1,11 +1,11 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:rosm_passport_server/src/config/app_config.dart';
 import 'package:rosm_passport_server/src/db/database.dart';
 import 'package:rosm_passport_server/src/db/migration_runner.dart';
-import 'package:rosm_passport_server/src/repositories/user_repository.dart';
 import 'package:rosm_passport_server/src/repositories/settings_repository.dart';
+import 'package:rosm_passport_server/src/repositories/user_repository.dart';
 import 'package:rosm_passport_server/src/security/settings_cipher.dart';
 import 'package:test/test.dart';
 
