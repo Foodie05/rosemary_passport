@@ -30,13 +30,20 @@ pnpm-debug.log*
 .packages
 .pub/
 .pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
 build/
 **/build/
 dist/
 **/dist/
 
+# Library package lockfiles are local resolver output. The server application
+# lockfile remains tracked for reproducible production builds.
+packages/rosm_passport_flutter/pubspec.lock
+
 # Local runtime/artifacts
 .local/
+output/
 tmp/
 *.tmp
 coverage/
