@@ -114,6 +114,7 @@ cp "$TEMPLATE_DIR/Dockerfile.helper" "$RELEASE_DIR/Dockerfile.helper"
 cp "$TEMPLATE_DIR/helper-entrypoint.sh" "$RELEASE_DIR/helper-entrypoint.sh"
 cp "$TEMPLATE_DIR/docker-compose.yml" "$RELEASE_DIR/docker-compose.yml"
 cp "$TEMPLATE_DIR/deploy.sh" "$RELEASE_DIR/deploy.sh"
+cp "$TEMPLATE_DIR/check_disk_capacity.sh" "$RELEASE_DIR/check_disk_capacity.sh"
 cp "$TEMPLATE_DIR/backup_to_s3.sh" "$RELEASE_DIR/backup_to_s3.sh"
 cp "$TEMPLATE_DIR/physical_backup_to_s3.sh" "$RELEASE_DIR/physical_backup_to_s3.sh"
 cp "$TEMPLATE_DIR/archive_audit_to_s3.sh" "$RELEASE_DIR/archive_audit_to_s3.sh"
@@ -127,6 +128,7 @@ cp "$ROOT_DIR/ops/postgres/init/001_init.sql" "$RELEASE_DIR/postgres/init/001_in
 
 mkdir -p "$RELEASE_ROOT"
 chmod +x "$RELEASE_DIR/deploy.sh" "$RELEASE_DIR/backup_to_s3.sh" \
+  "$RELEASE_DIR/check_disk_capacity.sh" \
   "$RELEASE_DIR/physical_backup_to_s3.sh" \
   "$RELEASE_DIR/archive_audit_to_s3.sh" \
   "$RELEASE_DIR/restore_from_s3.sh" "$RELEASE_DIR/postgres/archive-wal.sh" \
