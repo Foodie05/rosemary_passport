@@ -16,6 +16,7 @@ import 'captcha_service.dart';
 import 'credential_service.dart';
 import 'email_code_service.dart';
 import 'login_service.dart';
+import 'passkey_login_service.dart';
 import 'phone_verification_service.dart';
 import 'registration_service.dart';
 import 'security_policy_service.dart';
@@ -43,8 +44,6 @@ class AuthService {
        _passwordHasher = passwordHasher,
        _captchaService = captchaService,
        _settings = settingsRepository,
-       _audit = auditService,
-       _webAuthn = webAuthnService,
        _sessions = SessionService(
          userRepository: userRepository,
          tokenService: tokenService,
@@ -145,14 +144,25 @@ class AuthService {
          authenticatorService: authenticatorService,
          phoneVerificationService: phoneVerificationService,
          webAuthnService: webAuthnService,
+       ),
+       _passkeyLogin = PasskeyLoginService(
+         userRepository: userRepository,
+         sessionService: SessionService(
+           userRepository: userRepository,
+           tokenService: tokenService,
+           oidcRepository: oidcRepository,
+           auditService: auditService,
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         auditService: auditService,
+         webAuthnService: webAuthnService,
        );
 
   final UserRepository _users;
   final PasswordHasher _passwordHasher;
   final CaptchaService _captchaService;
   final SettingsRepository _settings;
-  final AuditService _audit;
-  final WebAuthnService? _webAuthn;
   final SessionService _sessions;
   final CredentialService _credentials;
   final AuthThrottleService _throttles;
@@ -160,6 +170,7 @@ class AuthService {
   final AccountManagementService _accountManagement;
   final RegistrationService _registration;
   final LoginService _login;
+  final PasskeyLoginService _passkeyLogin;
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
   static const _verificationCodeRegisterIpScope =
@@ -766,82 +777,13 @@ class AuthService {
     required Map<String, dynamic> response,
     String? requestIp,
     bool rememberMe = false,
-  }) async {
-    final webAuthn = _webAuthn;
-    if (webAuthn == null) {
-      return const LoginAttempt.failure(
-        code: 'login_failed',
-        message: '通行密钥登录失败。',
-        statusCode: 401,
-      );
-    }
-
-    UserRecord? user;
-    if (email != null && email.trim().isNotEmpty) {
-      user = await _users.findByEmail(email);
-      if (user == null) {
-        return const LoginAttempt.failure(
-          code: 'login_failed',
-          message: '通行密钥登录失败。',
-          statusCode: 401,
-        );
-      }
-    } else {
-      final credentialId = ((response['id'] ?? response['rawId']) ?? '')
-          .toString();
-      if (credentialId.isEmpty) {
-        return const LoginAttempt.failure(
-          code: 'login_failed',
-          message: '通行密钥登录失败。',
-          statusCode: 401,
-        );
-      }
-      final credential = await webAuthn.findCredential(credentialId);
-      if (credential == null) {
-        return const LoginAttempt.failure(
-          code: 'login_failed',
-          message: '通行密钥登录失败。',
-          statusCode: 401,
-        );
-      }
-      user = await _users.findById(credential.userId);
-      if (user == null) {
-        return const LoginAttempt.failure(
-          code: 'login_failed',
-          message: '通行密钥登录失败。',
-          statusCode: 401,
-        );
-      }
-    }
-
-    final verified = await webAuthn.verifyAuthentication(
-      userId: email == null || email.trim().isEmpty ? null : user.id,
-      email: email == null || email.trim().isEmpty ? null : user.email,
+  }) {
+    return _passkeyLogin.login(
+      email: email,
       response: response,
-      forceUserVerification: user.roles.contains('admin'),
-    );
-    if (!verified) {
-      return const LoginAttempt.failure(
-        code: 'login_failed',
-        message: '通行密钥登录失败。',
-        statusCode: 401,
-      );
-    }
-
-    final authResult = await _issueFirstPartyAuthResult(
-      user,
+      requestIp: requestIp,
       rememberMe: rememberMe,
     );
-    await _audit.log(
-      action: 'user.login.webauthn',
-      actorId: user.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: {'email': user.email, 'webauthn': true},
-      ip: requestIp,
-    );
-    return LoginAttempt.success(authResult);
   }
 
   Future<Map<String, bool>> getSecurityState({required String userId}) async {
@@ -861,18 +803,6 @@ class AuthService {
       refreshToken,
       clientId: clientId,
       requestIp: requestIp,
-    );
-  }
-
-  Future<AuthResult> _issueFirstPartyAuthResult(
-    UserRecord user, {
-    bool postRegistrationPasskeyBootstrap = false,
-    bool rememberMe = false,
-  }) async {
-    return _sessions.issueFirstPartyAuthResult(
-      user,
-      postRegistrationPasskeyBootstrap: postRegistrationPasskeyBootstrap,
-      rememberMe: rememberMe,
     );
   }
 
