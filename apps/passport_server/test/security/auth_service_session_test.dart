@@ -10,6 +10,9 @@ import 'package:rosm_passport_server/src/services/audit_service.dart';
 import 'package:rosm_passport_server/src/services/auth_service.dart';
 import 'package:rosm_passport_server/src/services/captcha_service.dart';
 import 'package:rosm_passport_server/src/services/email_code_service.dart';
+import 'package:rosm_passport_server/src/services/security_policy_service.dart';
+import 'package:rosm_passport_server/src/services/security_service.dart';
+import 'package:rosm_passport_server/src/services/session_service.dart';
 import 'package:rosm_passport_server/src/services/webauthn_service.dart';
 import 'package:test/test.dart';
 
@@ -30,6 +33,10 @@ class _MockSettings extends Mock implements SettingsRepository {}
 class _MockAudit extends Mock implements AuditService {}
 
 class _MockWebAuthn extends Mock implements WebAuthnService {}
+
+class _MockSecurity extends Mock implements SecurityService {}
+
+class _MockSecurityPolicy extends Mock implements SecurityPolicyService {}
 
 void main() {
   const user = UserRecord(
@@ -182,6 +189,55 @@ void main() {
         'has_authenticator': false,
         'has_phone': true,
       });
+    },
+  );
+
+  test(
+    'refresh enforces configured IP throttling before token validation',
+    () async {
+      final security = _MockSecurity();
+      final policy = _MockSecurityPolicy();
+      final sessions = SessionService(
+        userRepository: users,
+        tokenService: tokens,
+        oidcRepository: oidc,
+        auditService: audit,
+        securityService: security,
+        securityPolicyService: policy,
+      );
+      when(
+        () => policy.load(),
+      ).thenAnswer((_) async => SecurityPolicyService.defaultPolicy);
+      when(
+        () => security.enforce(
+          scope: any(named: 'scope'),
+          subject: any(named: 'subject'),
+          limit: any(named: 'limit'),
+          window: any(named: 'window'),
+          blockDuration: any(named: 'blockDuration'),
+        ),
+      ).thenAnswer((_) async => const ThrottleDecision(allowed: false));
+
+      expect(
+        await sessions.refreshForClient(
+          'token',
+          clientId: 'first_party_web',
+          requestIp: ' 192.0.2.1 ',
+        ),
+        isNull,
+      );
+      verify(
+        () => security.enforce(
+          scope: 'refresh:first_party_web:ip',
+          subject: '192.0.2.1',
+          limit: any(named: 'limit'),
+          window: any(named: 'window'),
+          blockDuration: any(named: 'blockDuration'),
+        ),
+      ).called(1);
+      verifyNever(
+        () => tokens.verify(any(), expectedType: any(named: 'expectedType')),
+      );
     },
   );
 
