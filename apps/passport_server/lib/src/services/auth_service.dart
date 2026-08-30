@@ -1,5 +1,3 @@
-import 'package:uuid/uuid.dart';
-
 export 'auth_attempts.dart';
 
 import '../repositories/oidc_repository.dart';
@@ -18,6 +16,7 @@ import 'captcha_service.dart';
 import 'credential_service.dart';
 import 'email_code_service.dart';
 import 'phone_verification_service.dart';
+import 'registration_service.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
 import 'session_service.dart';
@@ -41,12 +40,10 @@ class AuthService {
     PhoneVerificationService? phoneVerificationService,
   }) : _users = userRepository,
        _passwordHasher = passwordHasher,
-       _passwordPolicy = passwordPolicy,
        _emailCodeService = emailCodeService,
        _captchaService = captchaService,
        _settings = settingsRepository,
        _audit = auditService,
-       _policy = securityPolicyService,
        _authenticator = authenticatorService,
        _webAuthn = webAuthnService,
        _phoneVerification = phoneVerificationService,
@@ -107,16 +104,35 @@ class AuthService {
            securityPolicyService: securityPolicyService,
          ),
          phoneVerificationService: phoneVerificationService,
+       ),
+       _registration = RegistrationService(
+         userRepository: userRepository,
+         passwordHasher: passwordHasher,
+         passwordPolicy: passwordPolicy,
+         emailCodeService: emailCodeService,
+         throttleService: AuthThrottleService(
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         sessionService: SessionService(
+           userRepository: userRepository,
+           tokenService: tokenService,
+           oidcRepository: oidcRepository,
+           auditService: auditService,
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         auditService: auditService,
+         securityPolicyService: securityPolicyService,
+         phoneVerificationService: phoneVerificationService,
        );
 
   final UserRepository _users;
   final PasswordHasher _passwordHasher;
-  final PasswordPolicy _passwordPolicy;
   final EmailCodeService _emailCodeService;
   final CaptchaService _captchaService;
   final SettingsRepository _settings;
   final AuditService _audit;
-  final SecurityPolicyService? _policy;
   final AuthenticatorService? _authenticator;
   final WebAuthnService? _webAuthn;
   final PhoneVerificationService? _phoneVerification;
@@ -125,7 +141,7 @@ class AuthService {
   final AuthThrottleService _throttles;
   final AccountRecoveryService _accountRecovery;
   final AccountManagementService _accountManagement;
-  final _uuid = const Uuid();
+  final RegistrationService _registration;
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
   static const _verificationCodeRegisterIpScope =
@@ -187,42 +203,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = await _throttles.loadPolicy();
-    final emailProviderPolicy = _policy == null
-        ? const RegistrationEmailProviderPolicy(
-            mode: SecurityPolicyService.blacklistMode,
-            blacklist: <String>[],
-            whitelist: <String>[],
-          )
-        : await _policy.loadRegistrationEmailProviderPolicy();
-    if (!emailProviderPolicy.allows(email)) {
-      return AdminLoginCodeAttempt.failure(
-        code: 'registration_email_not_allowed',
-        message: '此邮箱不可用于注册',
-        statusCode: 403,
-      );
-    }
-    final limited = await _throttles.enforceVerificationCodeSendGuards(
-      email: email,
-      requestIp: requestIp,
-      policy: policy,
-      emailScope: _verificationCodeRegisterEmailScope,
-      ipScope: _verificationCodeRegisterIpScope,
-      cooldownScope: _verificationCodeRegisterCooldownScope,
-      emailLimit: policy.registerCodeEmailLimit,
-      ipLimit: policy.registerCodeIpLimit,
-    );
-    if (limited != null) {
-      return limited;
-    }
-
-    await _emailCodeService.issueRegisterCode(email);
-    await _throttles.startVerificationCodeCooldown(
-      email: email,
-      seconds: policy.registerCodeCooldownSeconds,
-      cooldownScope: _verificationCodeRegisterCooldownScope,
-    );
-    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+    return _registration.sendEmailCode(email: email, requestIp: requestIp);
   }
 
   Future<int?> loginRetryAfter({required String email, String? requestIp}) {
@@ -630,125 +611,23 @@ class AuthService {
     required String emailCode,
     String? requestIp,
   }) async {
-    final passwordPolicy = _passwordPolicy.validate(password);
-    if (!passwordPolicy.ok) {
-      return RegisterAttempt.failure(
-        code: 'password_policy_violation',
-        message: passwordPolicy.message!,
-      );
-    }
-    final emailProviderPolicy = _policy == null
-        ? const RegistrationEmailProviderPolicy(
-            mode: SecurityPolicyService.blacklistMode,
-            blacklist: <String>[],
-            whitelist: <String>[],
-          )
-        : await _policy.loadRegistrationEmailProviderPolicy();
-    if (!emailProviderPolicy.allows(email)) {
-      return RegisterAttempt.failure(
-        code: 'registration_email_not_allowed',
-        message: '此邮箱不可用于注册',
-        statusCode: 403,
-      );
-    }
-
-    final alreadyExists = await _users.findByEmail(email);
-    if (alreadyExists != null) {
-      return const RegisterAttempt.failure(
-        code: 'email_already_registered',
-        message: '该邮箱已注册。',
-        statusCode: 409,
-      );
-    }
-
-    final codeValid = await _emailCodeService.verifyRegisterCode(
-      email,
-      emailCode,
-    );
-    if (!codeValid) {
-      return const RegisterAttempt.failure(
-        code: 'invalid_email_code',
-        message: '注册码无效或已过期。',
-        statusCode: 400,
-      );
-    }
-
-    final userId = _uuid.v4();
-    final passwordHash = await _passwordHasher.hash(password);
-
-    await _users.createUser(
-      userId: userId,
+    return _registration.registerWithEmail(
       email: email,
       nickname: nickname,
-      passwordHash: passwordHash,
+      password: password,
+      emailCode: emailCode,
+      requestIp: requestIp,
     );
-
-    final userRecord = await _users.findById(userId);
-    if (userRecord == null) {
-      return const RegisterAttempt.failure(
-        code: 'register_failed',
-        message: '注册失败，请稍后重试。',
-        statusCode: 500,
-      );
-    }
-
-    final authResult = await _issueFirstPartyAuthResult(
-      userRecord,
-      postRegistrationPasskeyBootstrap: true,
-    );
-
-    await _audit.log(
-      action: 'user.register',
-      actorId: userRecord.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: userRecord.id,
-      metadata: {'email': userRecord.email},
-      ip: requestIp,
-    );
-
-    return RegisterAttempt.success(authResult);
   }
 
   Future<AdminLoginCodeAttempt> sendPhoneRegisterCode({
     required String phoneNumber,
     String? requestIp,
   }) async {
-    final phoneService = _phoneVerification;
-    if (phoneService == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'phone_verification_not_configured',
-        message: '手机号验证码服务尚未配置。',
-        statusCode: 503,
-      );
-    }
-    final normalized = phoneService.normalizePhone(phoneNumber);
-    if (normalized == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'invalid_phone_number',
-        message: '手机号格式不正确。',
-      );
-    }
-    final existing = await _users.findByPhoneNumber(normalized);
-    if (existing != null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'phone_already_registered',
-        message: '该手机号已注册。',
-        statusCode: 409,
-      );
-    }
-    final sent = await phoneService.sendCode(
-      phoneNumber: normalized,
-      requestIp: _subjectOrEmpty(requestIp),
+    return _registration.sendPhoneCode(
+      phoneNumber: phoneNumber,
+      requestIp: requestIp,
     );
-    if (!sent.ok) {
-      return AdminLoginCodeAttempt.failure(
-        code: sent.code ?? 'temporary_issue',
-        message: sent.message ?? '验证码发送失败，请稍后重试。',
-        statusCode: sent.statusCode,
-      );
-    }
-    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
   }
 
   Future<RegisterAttempt> registerWithPhoneCode({
@@ -758,73 +637,13 @@ class AuthService {
     required String verifyCode,
     String? requestIp,
   }) async {
-    final passwordPolicy = _passwordPolicy.validate(password);
-    if (!passwordPolicy.ok) {
-      return RegisterAttempt.failure(
-        code: 'password_policy_violation',
-        message: passwordPolicy.message!,
-      );
-    }
-    final phoneService = _phoneVerification;
-    if (phoneService == null) {
-      return const RegisterAttempt.failure(
-        code: 'phone_verification_not_configured',
-        message: '手机号验证码服务尚未配置。',
-        statusCode: 503,
-      );
-    }
-    final normalized = phoneService.normalizePhone(phoneNumber);
-    if (normalized == null) {
-      return const RegisterAttempt.failure(
-        code: 'invalid_phone_number',
-        message: '手机号格式不正确。',
-      );
-    }
-    final exists = await _users.findByPhoneNumber(normalized);
-    if (exists != null) {
-      return const RegisterAttempt.failure(
-        code: 'phone_already_registered',
-        message: '该手机号已注册。',
-        statusCode: 409,
-      );
-    }
-    final checked = await phoneService.verifyCode(
-      phoneNumber: normalized,
-      verifyCode: verifyCode,
-      requestIp: _subjectOrEmpty(requestIp),
-    );
-    if (!checked.ok) {
-      return RegisterAttempt.failure(
-        code: checked.code ?? 'invalid_verify_code',
-        message: checked.message ?? '验证码无效或已过期。',
-        statusCode: checked.statusCode,
-      );
-    }
-
-    final userId = _uuid.v4();
-    final pseudoEmail = 'phone_$normalized@phone.local';
-    final passwordHash = await _passwordHasher.hash(password);
-    await _users.createUser(
-      userId: userId,
-      email: pseudoEmail,
+    return _registration.registerWithPhone(
+      phoneNumber: phoneNumber,
       nickname: nickname,
-      passwordHash: passwordHash,
-      isEmailVerified: false,
+      password: password,
+      verifyCode: verifyCode,
+      requestIp: requestIp,
     );
-    await _users.updatePhoneNumber(userId: userId, phoneNumber: normalized);
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const RegisterAttempt.failure(
-        code: 'register_failed',
-        message: '注册失败，请稍后重试。',
-        statusCode: 500,
-      );
-    }
-    final authResult = await _issueFirstPartyAuthResult(
-      user,
-      postRegistrationPasskeyBootstrap: true,
-    );
-    return RegisterAttempt.success(authResult);
   }
 
   Future<EmailActionAttempt> sendAccountRecoveryCode({
