@@ -29,6 +29,8 @@ required_executables=(
   scripts/local-down.sh
   scripts/local-up.sh
   ops/deploy/auth_cruty_cn/deploy.sh
+  ops/deploy/auth_cruty_cn/check_disk_capacity.sh
+  ops/deploy/auth_cruty_cn/check_host_capacity.sh
   ops/deploy/auth_cruty_cn/check_s3_storage.sh
   ops/deploy/auth_cruty_cn/archive_audit_to_s3.sh
   ops/deploy/auth_cruty_cn/backup_to_s3.sh
@@ -45,6 +47,8 @@ required_executables=(
   ops/deploy/auth_cruty_cn/postgres/restore-wal.sh
   ops/deploy/auth_cruty_cn/postgres/postgres-entrypoint.sh
   ops/tests/restore_integrity_test.sh
+  ops/tests/disk_capacity_test.sh
+  ops/tests/host_capacity_test.sh
   ops/tests/remote_deploy_safety_test.sh
   ops/tests/secret_provisioning_test.sh
   ops/tests/fault_recovery_drill.sh
