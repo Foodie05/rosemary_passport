@@ -91,6 +91,8 @@ if [[ ! "$legacy_json_sunset" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[
   die "legacy JSON refresh sunset must be a valid RFC 3339 UTC timestamp"
 fi
 
+info "validating host capacity"
+"$SOURCE_DIR/check_host_capacity.sh"
 info "validating off-host storage protection"
 "$SOURCE_DIR/check_s3_storage.sh" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
 
@@ -125,6 +127,7 @@ tar --exclude='./.env' -C "$SOURCE_DIR" -cf - . | tar -C "$TARGET_DIR" -xf -
 chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
   "$TARGET_DIR/physical_backup_to_s3.sh" \
   "$TARGET_DIR/check_s3_storage.sh" \
+  "$TARGET_DIR/check_host_capacity.sh" \
   "$TARGET_DIR/check_disk_capacity.sh" \
   "$TARGET_DIR/archive_audit_to_s3.sh" \
   "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/pitr_drill.sh" \
