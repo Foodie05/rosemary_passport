@@ -27,6 +27,7 @@ pnpm-debug.log*
 
 # Dart / Flutter / build outputs
 .dart_tool/
+.dart_frog/
 .packages
 .pub/
 .pub-cache/

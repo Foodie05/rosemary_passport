@@ -27,7 +27,15 @@ required_executables=(
   scripts/local-down.sh
   scripts/local-up.sh
   ops/deploy/auth_cruty_cn/deploy.sh
+  ops/deploy/auth_cruty_cn/archive_audit_to_s3.sh
+  ops/deploy/auth_cruty_cn/backup_to_s3.sh
+  ops/deploy/auth_cruty_cn/backend-entrypoint.sh
+  ops/deploy/auth_cruty_cn/helper-entrypoint.sh
+  ops/deploy/auth_cruty_cn/physical_backup_to_s3.sh
   ops/deploy/auth_cruty_cn/provision_secrets.sh
+  ops/deploy/auth_cruty_cn/restore_from_s3.sh
+  ops/deploy/auth_cruty_cn/postgres/archive-wal.sh
+  ops/deploy/auth_cruty_cn/postgres/postgres-entrypoint.sh
 )
 for path in "${required_executables[@]}"; do
   mode="$(git ls-files --stage -- "$path" | awk '{print $1}')"
@@ -36,6 +44,10 @@ for path in "${required_executables[@]}"; do
     exit 1
   fi
 done
+
+while IFS= read -r path; do
+  bash -n "$path"
+done < <(git grep -l '^#!/usr/bin/env bash$' -- '*.sh')
 
 if git grep -Il -E -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}' -- . >/dev/null; then
   echo 'Repository hygiene failed: a private-key signature was found.' >&2
