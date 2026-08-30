@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER_DIR="$ROOT_DIR/apps/passport_server"
@@ -9,6 +10,7 @@ BOOTSTRAP_LOG="$LOCAL_DIR/bootstrap.log"
 ADMIN_CRED_FILE="$LOCAL_DIR/admin_credentials.env"
 
 mkdir -p "$LOCAL_DIR"
+chmod 0700 "$LOCAL_DIR"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -77,6 +79,7 @@ create_env_if_needed() {
       if [[ "$updated" -eq 1 ]]; then
         log "已补齐本地环境中的新增安全配置。"
       fi
+      chmod 0600 "$ENV_FILE"
       return
     fi
     if grep -q '^JWT_PRIVATE_KEY_PEM=' "$ENV_FILE" ||
@@ -84,6 +87,7 @@ create_env_if_needed() {
       echo "[local-up] 检测到旧版 PEM 环境变量，自动迁移为 base64 格式..."
       rm -f "$ENV_FILE"
     else
+      chmod 0600 "$ENV_FILE"
       return
     fi
   fi
@@ -131,6 +135,7 @@ SMTP_SECURE=false
 EMAIL_CODE_TTL_SECONDS=300
 OIDC_REQUIRE_PKCE=true
 ENVVARS
+  chmod 0600 "$ENV_FILE"
 
   rm -rf "$tmpdir"
   log "已生成本地环境文件: $ENV_FILE"
@@ -149,6 +154,7 @@ create_admin_credential_if_needed() {
       log "检测到损坏的管理员凭证文件（体积异常：${cred_size} bytes），将自动重建。"
       rm -f "$ADMIN_CRED_FILE"
     else
+      chmod 0600 "$ADMIN_CRED_FILE"
       return 0
     fi
   fi
@@ -162,6 +168,7 @@ create_admin_credential_if_needed() {
     printf 'LOCAL_ADMIN_PASSWORD=%q\n' "$admin_password"
     printf 'LOCAL_ADMIN_NICKNAME=%q\n' "$admin_nickname"
   } >"$ADMIN_CRED_FILE"
+  chmod 0600 "$ADMIN_CRED_FILE"
 }
 
 escape_for_osascript() {
@@ -234,11 +241,7 @@ if [[ "$admin_exists" == "0" && "$user_count" == "0" ]]; then
       dart run bin/seed_local_admin.dart
   ) | tee -a "$BOOTSTRAP_LOG"
 
-  echo ""
-  log "默认管理员账号（仅首次初始化时输出）"
-  echo "  email: $LOCAL_ADMIN_EMAIL"
-  echo "  password: $LOCAL_ADMIN_PASSWORD"
-  echo "  账号文件: $ADMIN_CRED_FILE"
+  log "本地管理员已创建；凭据仅保存于权限 0600 的文件: $ADMIN_CRED_FILE"
 elif [[ "$admin_exists" != "0" ]]; then
   log "检测到数据库中已有本地管理员，跳过自动创建。"
 else

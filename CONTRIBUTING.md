@@ -32,7 +32,7 @@ test(migrations): preserve legacy authenticator secrets
 ./ops/tests/remote_deploy_safety_test.sh
 ./ops/tests/secret_provisioning_test.sh
 (cd apps/passport_server && dart format --output=none --set-exit-if-changed lib bin routes test tool && dart run dart_frog_cli:dart_frog build && dart analyze && dart test)
-(cd web && npm ci && npm audit --audit-level=high && npm run build)
+(cd web && npm ci && npm audit --audit-level=high && npm test && npm run build)
 (cd packages/rosm_passport_flutter && flutter pub get && dart format --output=none --set-exit-if-changed lib test && flutter analyze && flutter test)
 ```
 

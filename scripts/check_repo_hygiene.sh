@@ -6,6 +6,32 @@ cd "$repo_root"
 
 git diff --check
 
+required_docs=(README.md CONTRIBUTING.md SECURITY.md)
+for path in "${required_docs[@]}"; do
+  if [[ ! -s "$path" ]] || ! git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+    echo "Repository hygiene failed: $path must be tracked and non-empty." >&2
+    exit 1
+  fi
+done
+
+if git grep -n -E -- '/Users/[^ /]+/|[A-Za-z]:\\\\Users\\\\' -- '*.md' >/dev/null; then
+  echo 'Repository hygiene failed: documentation contains a personal absolute path.' >&2
+  git grep -n -E -- '/Users/[^ /]+/|[A-Za-z]:\\\\Users\\\\' -- '*.md' >&2
+  exit 1
+fi
+
+if grep -Eq 'echo .*LOCAL_ADMIN_PASSWORD' scripts/local-up.sh; then
+  echo 'Repository hygiene failed: local bootstrap password must not be echoed.' >&2
+  exit 1
+fi
+if ! grep -qx 'umask 077' scripts/local-up.sh ||
+  ! grep -Fq 'chmod 0700 "$LOCAL_DIR"' scripts/local-up.sh ||
+  ! grep -Fq 'chmod 0600 "$ENV_FILE"' scripts/local-up.sh ||
+  ! grep -Fq 'chmod 0600 "$ADMIN_CRED_FILE"' scripts/local-up.sh; then
+  echo 'Repository hygiene failed: local secret files must retain private permissions.' >&2
+  exit 1
+fi
+
 forbidden_tracked='(^|/)(\.DS_Store|\.env|\.flutter-plugins|\.flutter-plugins-dependencies)($|/)|(^|/)output/'
 if git ls-files | grep -E "$forbidden_tracked" >/dev/null; then
   echo 'Repository hygiene failed: generated, environment, or output files are tracked.' >&2

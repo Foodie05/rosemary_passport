@@ -1,62 +1,52 @@
-# ROSM Passport Server
+# Rosemary Passport Server
 
-## 环境变量
+## 配置边界
 
-参考同目录 `.env.example`。
+`.env.example` 仅供本地开发。生产发布使用 `ops/deploy/auth_cruty_cn/runtime.env.example` 作为非秘密配置模板，并把所有秘密放入 root-only 文件，通过 `*_FILE` 读取；缺少生产密钥时服务必须 fail closed。
 
-关键项：
+关键配置包括：
 
-- `JWT_PRIVATE_KEY_PEM` / `JWT_PUBLIC_KEY_PEM`
-- `JWT_BINDING_KEY`（双Key中的第二把Key）
-- `ALIYUN_CAPTCHA_PREFIX`、`ALIYUN_CAPTCHA_SCENE_ID`
-- `ALIYUN_CAPTCHA_ACCESS_KEY_ID`、`ALIYUN_CAPTCHA_ACCESS_KEY_SECRET`（未配置时复用通用阿里云 AccessKey）
-- `DB_*`
+- JWT keyring：当前/上一把私钥、公钥和 `kid`，以及独立绑定密钥。
+- 数据加密 keyring：当前/上一把 AES-256-GCM 密钥和版本。
+- `DB_*`、连接池上下限、获取/语句/锁等待超时。
+- `SERVER_BASE_URL`、`WEB_BASE_URL`、可信 Origin 和代理边界。
+- SMTP、Captcha、短信及 helper 内部鉴权文件。
+- S3/WAL、审计签名和 Refresh JSON 兼容期配置。
 
-## 主要 API
+生产配置的完整文件名、权限和一次性旧环境迁移流程见 `ops/deploy/auth_cruty_cn/README.md`。
 
-- `POST /api/v1/auth/send-code`
-- `POST /api/v1/auth/send-phone-code`
-- `POST /api/v1/auth/verify-phone-code`
-- `POST /api/v1/auth/admin-login-code`
+## 生命周期
+
+生产二进制启动前运行版本化迁移器。迁移由 PostgreSQL advisory lock 串行化，校验和不一致或迁移失败会阻止服务启动；本发布周期只允许向后兼容的 expand/backfill/validate 变化。
+
+健康检查：
+
+- `GET /health/live`：进程存活，不访问依赖。
+- `GET /health/ready`：检查数据库、迁移版本和内部 helper。
+
+## 主要接口
+
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
 - `GET|PATCH /api/v1/me`
 - `GET /api/v1/admin/users`
 - `PATCH /api/v1/admin/users/:id/roles`
 - `GET /api/v1/admin/audits`
-- OIDC:
-  - `GET /.well-known/openid-configuration`
-  - `GET /oidc/authorize`
-  - `POST /oidc/token`
-  - `GET /oidc/userinfo`
-  - `GET /oidc/jwks`
-  - `POST /oidc/introspect`
-  - `POST /oidc/revoke`
+- OIDC：`/oidc/authorize`、`/oidc/token`、`/oidc/userinfo`、`/oidc/jwks`、`/oidc/introspect`、`/oidc/revoke`
 
-管理员创建机密 OIDC 客户端时，服务端会生成 256 位随机 `client_secret`，只在创建或轮换响应中返回一次，并设置 `Cache-Control: no-store`。数据库仅保存 Argon2id 哈希；生产环境的 `SERVER_BASE_URL` 与 `WEB_BASE_URL` 必须使用 HTTPS。
+机密 OIDC 客户端的 `client_secret` 由服务端生成，只在创建或轮换响应中返回一次，并使用 `Cache-Control: no-store`；数据库只保存 Argon2id 哈希。生产 `SERVER_BASE_URL` 与 `WEB_BASE_URL` 必须为 HTTPS。
 
-## 手机号验证码（阿里云号码认证）
+## 验证
 
-需配置以下环境变量后自动启用：
-
-- `ALIYUN_ACCESS_KEY_ID`
-- `ALIYUN_ACCESS_KEY_SECRET`
-- `ALIYUN_SMS_SIGN_NAME`
-- `ALIYUN_SMS_TEMPLATE_CODE`
-
-可选项：
-
-- `ALIYUN_SMS_SCHEME_NAME`
-- `ALIYUN_SMS_COUNTRY_CODE`（默认 `86`）
-- `ALIYUN_SMS_CODE_LENGTH`（默认 `6`）
-- `ALIYUN_SMS_VALID_TIME_SECONDS`（默认 `300`）
-- `ALIYUN_SMS_SEND_INTERVAL_SECONDS`（默认 `60`）
-- `ALIYUN_SMS_DUPLICATE_POLICY`（默认 `1`，覆盖旧验证码）
-
-接口：
-
-- `POST /api/v1/auth/send-phone-code`
-  - body: `{ "phone_number": "13800138000", "country_code": "86", "captcha_token": "..." }`
-- `POST /api/v1/auth/verify-phone-code`
-  - body: `{ "phone_number": "13800138000", "country_code": "86", "verify_code": "123456" }`
+```bash
+dart pub get
+dart format --output=none --set-exit-if-changed lib bin routes test tool
+dart run dart_frog_cli:dart_frog build
+dart analyze --fatal-infos
+dart --branch-coverage run test --concurrency=1 --coverage-path=coverage/lcov.info --branch-coverage
+dart run tool/check_coverage.dart coverage/lcov.info
+npm ci
+npm audit --audit-level=high
+```
