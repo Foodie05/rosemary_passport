@@ -231,7 +231,7 @@ class AuthService {
   Future<AdminLoginCodeAttempt> sendRegisterCode({
     required String email,
     String? requestIp,
-  }) async {
+  }) {
     return _registration.sendEmailCode(email: email, requestIp: requestIp);
   }
 
@@ -400,7 +400,7 @@ class AuthService {
     );
   }
 
-  Future<int?> refreshRetryAfter({String? requestIp}) async {
+  Future<int?> refreshRetryAfter({String? requestIp}) {
     return _throttles.refreshRetryAfter(requestIp: requestIp);
   }
 
@@ -408,7 +408,7 @@ class AuthService {
     required String email,
     required String password,
     String? requestIp,
-  }) async {
+  }) {
     return _login.sendPasswordEmailCode(
       email: email,
       password: password,
@@ -420,7 +420,7 @@ class AuthService {
     required String email,
     required String password,
     String? requestIp,
-  }) async {
+  }) {
     return _login.sendPasswordPhoneCode(
       email: email,
       password: password,
@@ -432,7 +432,7 @@ class AuthService {
     required String email,
     required String password,
     String? requestIp,
-  }) async {
+  }) {
     return _login.preparePasswordLogin(
       email: email,
       password: password,
@@ -443,7 +443,7 @@ class AuthService {
   Future<AdminLoginCodeAttempt> sendEmailLoginCode({
     required String email,
     String? requestIp,
-  }) async {
+  }) {
     return _login.sendEmailCode(email: email, requestIp: requestIp);
   }
 
@@ -465,7 +465,7 @@ class AuthService {
     required String password,
     required String emailCode,
     String? requestIp,
-  }) async {
+  }) {
     return _registration.registerWithEmail(
       email: email,
       nickname: nickname,
@@ -478,7 +478,7 @@ class AuthService {
   Future<AdminLoginCodeAttempt> sendPhoneRegisterCode({
     required String phoneNumber,
     String? requestIp,
-  }) async {
+  }) {
     return _registration.sendPhoneCode(
       phoneNumber: phoneNumber,
       requestIp: requestIp,
@@ -491,7 +491,7 @@ class AuthService {
     required String password,
     required String verifyCode,
     String? requestIp,
-  }) async {
+  }) {
     return _registration.registerWithPhone(
       phoneNumber: phoneNumber,
       nickname: nickname,
@@ -505,7 +505,7 @@ class AuthService {
     required String account,
     required String method,
     String? requestIp,
-  }) async {
+  }) {
     return _accountRecovery.sendCode(
       account: account,
       method: method,
@@ -519,7 +519,7 @@ class AuthService {
     required String code,
     required String newPassword,
     String? requestIp,
-  }) async {
+  }) {
     return _accountRecovery.recoverPassword(
       account: account,
       method: method,
@@ -592,7 +592,7 @@ class AuthService {
     String? nickname,
     String? newEmail,
     String? newPassword,
-  }) async {
+  }) {
     return _accountManagement.updateAccount(
       userId: userId,
       currentPassword: currentPassword,
@@ -607,7 +607,7 @@ class AuthService {
     required String newEmail,
     required String currentPassword,
     String? requestIp,
-  }) async {
+  }) {
     return _accountManagement.sendBindEmailCode(
       userId: userId,
       newEmail: newEmail,
@@ -622,7 +622,7 @@ class AuthService {
     required String currentPassword,
     required String emailCode,
     String? preservedAccessTokenId,
-  }) async {
+  }) {
     return _accountManagement.bindEmail(
       userId: userId,
       newEmail: newEmail,
@@ -637,7 +637,7 @@ class AuthService {
     required String phoneNumber,
     required String currentPassword,
     String? requestIp,
-  }) async {
+  }) {
     return _accountManagement.sendBindPhoneCode(
       userId: userId,
       phoneNumber: phoneNumber,
@@ -653,7 +653,7 @@ class AuthService {
     required String verifyCode,
     String? requestIp,
     String? preservedAccessTokenId,
-  }) async {
+  }) {
     return _accountManagement.bindPhone(
       userId: userId,
       phoneNumber: phoneNumber,
@@ -667,7 +667,7 @@ class AuthService {
   Future<EmailActionAttempt> sendPasswordResetCode({
     required String userId,
     String? requestIp,
-  }) async {
+  }) {
     return _accountManagement.sendPasswordResetCode(
       userId: userId,
       requestIp: requestIp,
@@ -678,7 +678,7 @@ class AuthService {
     required String userId,
     required String newPassword,
     required String emailCode,
-  }) async {
+  }) {
     return _accountManagement.resetPassword(
       userId: userId,
       newPassword: newPassword,
@@ -690,7 +690,7 @@ class AuthService {
     required String userId,
     required String currentPassword,
     required String securityCode,
-  }) async {
+  }) {
     return _credentials.updateSecurityCode(
       userId: userId,
       currentPassword: currentPassword,
@@ -701,7 +701,7 @@ class AuthService {
   Future<Map<String, String>?> beginAuthenticatorSetup({
     required String userId,
     required String currentPassword,
-  }) async {
+  }) {
     return _credentials.beginAuthenticatorSetup(
       userId: userId,
       currentPassword: currentPassword,
@@ -713,7 +713,7 @@ class AuthService {
     required String currentPassword,
     required String secret,
     required String code,
-  }) async {
+  }) {
     return _credentials.verifyAuthenticatorSetup(
       userId: userId,
       currentPassword: currentPassword,
@@ -727,7 +727,7 @@ class AuthService {
     required String origin,
     String? currentPassword,
     bool allowPostRegistrationBootstrap = false,
-  }) async {
+  }) {
     return _credentials.beginWebAuthnRegistration(
       userId: userId,
       origin: origin,
@@ -739,7 +739,7 @@ class AuthService {
   Future<bool> verifyWebAuthnRegistration({
     required String userId,
     required Map<String, dynamic> response,
-  }) async {
+  }) {
     return _credentials.verifyWebAuthnRegistration(
       userId: userId,
       response: response,
@@ -748,14 +748,14 @@ class AuthService {
 
   Future<List<Map<String, dynamic>>> listWebAuthnCredentials({
     required String userId,
-  }) async {
+  }) {
     return _credentials.listWebAuthnCredentials(userId: userId);
   }
 
   Future<void> deleteWebAuthnCredential({
     required String userId,
     required String credentialId,
-  }) async {
+  }) {
     return _credentials.deleteWebAuthnCredential(
       userId: userId,
       credentialId: credentialId,
@@ -765,7 +765,7 @@ class AuthService {
   Future<Map<String, dynamic>?> beginWebAuthnAuthentication({
     String? email,
     required String origin,
-  }) async {
+  }) {
     return _credentials.beginWebAuthnAuthentication(
       email: email,
       origin: origin,
@@ -786,11 +786,11 @@ class AuthService {
     );
   }
 
-  Future<Map<String, bool>> getSecurityState({required String userId}) async {
+  Future<Map<String, bool>> getSecurityState({required String userId}) {
     return _credentials.getSecurityState(userId: userId);
   }
 
-  Future<TokenPair?> refresh(String refreshToken) async {
+  Future<TokenPair?> refresh(String refreshToken) {
     return _sessions.refresh(refreshToken);
   }
 
@@ -798,7 +798,7 @@ class AuthService {
     String refreshToken, {
     required String clientId,
     String? requestIp,
-  }) async {
+  }) {
     return _sessions.refreshForClient(
       refreshToken,
       clientId: clientId,
@@ -810,7 +810,7 @@ class AuthService {
     String? accessToken,
     String? refreshToken,
     String? requestIp,
-  }) async {
+  }) {
     return _sessions.logoutFirstPartySession(
       accessToken: accessToken,
       refreshToken: refreshToken,
