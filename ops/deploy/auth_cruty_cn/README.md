@@ -47,5 +47,7 @@ PITR 演练必须在隔离主机进行：下载 `physical/latest.json` 指向的
 
 - 每次发布前执行 CI 的格式、静态分析、单元/集成测试、依赖审计、secret scan、Trivy 和 SBOM。
 - 使用 `ops/load/sla_capacity.js` 完成 50 RPS/30 分钟、100 RPS/5 分钟和 500 会话测试。
+  默认测试需准备 1,500 组互不复用的 Access/Refresh Token（每个场景的最大 VU 各自隔离）；
+  会话文件必须为 `0600`，测试结束后立即销毁，禁止提交到 Git 或归档到 CI 构件。
 - 生产发布后进行 14 天观察：不得出现崩溃循环、迁移失败、备份失败或 high/critical 可达漏洞。
 - 计划维护窗口不得超过 15 分钟。正式 99.9% SLA 仍需第二应用节点、数据库 HA、负载均衡和外部 SLO 计量。
