@@ -49,6 +49,8 @@ grep -q 'mktemp -d' "$deploy_script"
 grep -q -- '--no-same-owner' "$deploy_script"
 grep -q 'valid RFC 3339 UTC timestamp' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'finalize_legacy_refresh_sunset.sh' \
+  "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 
 compose_file="$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
 runtime_example="$repo_root/ops/deploy/auth_cruty_cn/runtime.env.example"
