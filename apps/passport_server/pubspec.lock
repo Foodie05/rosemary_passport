@@ -573,10 +573,10 @@ packages:
     dependency: "direct main"
     description:
       name: postgres
-      sha256: fefbbfe749c6130e5096588b9c4459173684c695952cd7636ab19be76f255469
+      sha256: "123de5cbadc56a7e8d9fa485c780b6b56940b4081f4c74f3a5578682757c299b"
       url: "https://pub.dev"
     source: hosted
-    version: "3.5.9"
+    version: "3.5.12"
   process:
     dependency: transitive
     description:
