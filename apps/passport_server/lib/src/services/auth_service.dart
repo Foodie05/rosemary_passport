@@ -9,6 +9,7 @@ import '../security/password_hasher.dart';
 import '../security/password_policy.dart';
 import '../security/token_service.dart';
 import 'audit_service.dart';
+import 'account_recovery_service.dart';
 import 'auth_attempts.dart';
 import 'auth_throttle_service.dart';
 import 'authenticator_service.dart';
@@ -66,6 +67,25 @@ class AuthService {
        _throttles = AuthThrottleService(
          securityService: securityService,
          securityPolicyService: securityPolicyService,
+       ),
+       _accountRecovery = AccountRecoveryService(
+         userRepository: userRepository,
+         passwordHasher: passwordHasher,
+         passwordPolicy: passwordPolicy,
+         emailCodeService: emailCodeService,
+         throttleService: AuthThrottleService(
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         sessionService: SessionService(
+           userRepository: userRepository,
+           tokenService: tokenService,
+           oidcRepository: oidcRepository,
+           auditService: auditService,
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         phoneVerificationService: phoneVerificationService,
        );
 
   final UserRepository _users;
@@ -82,6 +102,7 @@ class AuthService {
   final SessionService _sessions;
   final CredentialService _credentials;
   final AuthThrottleService _throttles;
+  final AccountRecoveryService _accountRecovery;
   final _uuid = const Uuid();
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
@@ -789,74 +810,10 @@ class AuthService {
     required String method,
     String? requestIp,
   }) async {
-    final normalizedMethod = method.trim();
-    if (normalizedMethod == 'email') {
-      final email = account.trim().toLowerCase();
-      final user = await _users.findByEmail(email);
-      if (user != null) {
-        final policy = await _throttles.loadPolicy();
-        final limited = await _throttles.enforceVerificationCodeSendGuards(
-          email: user.email,
-          requestIp: requestIp,
-          policy: policy,
-          emailScope: _verificationCodeResetEmailScope,
-          ipScope: _verificationCodeResetIpScope,
-          cooldownScope: _verificationCodeResetCooldownScope,
-          emailLimit: policy.adminLoginCodeEmailLimit,
-          ipLimit: policy.adminLoginCodeIpLimit,
-        );
-        if (limited != null) {
-          return EmailActionAttempt.failure(
-            code: limited.code,
-            message: limited.message,
-            statusCode: limited.statusCode,
-          );
-        }
-        await _emailCodeService.issuePasswordResetCode(user.email);
-        await _throttles.startVerificationCodeCooldown(
-          email: user.email,
-          seconds: policy.passwordResetCodeCooldownSeconds,
-          cooldownScope: _verificationCodeResetCooldownScope,
-        );
-      }
-      return const EmailActionAttempt.success();
-    }
-    if (normalizedMethod == 'phone') {
-      final phoneService = _phoneVerification;
-      if (phoneService == null) {
-        return const EmailActionAttempt.failure(
-          code: 'phone_verification_not_configured',
-          message: '手机号验证码服务尚未配置。',
-          statusCode: 503,
-        );
-      }
-      final normalized = phoneService.normalizePhone(account);
-      if (normalized == null) {
-        return const EmailActionAttempt.failure(
-          code: 'invalid_phone_number',
-          message: '手机号格式不正确。',
-        );
-      }
-      final user = await _users.findByPhoneNumber(normalized);
-      if (user != null) {
-        final sent = await phoneService.sendCode(
-          phoneNumber: normalized,
-          requestIp: _subjectOrEmpty(requestIp),
-        );
-        if (!sent.ok) {
-          return EmailActionAttempt.failure(
-            code: sent.code ?? 'temporary_issue',
-            message: sent.message ?? '验证码发送失败，请稍后重试。',
-            statusCode: sent.statusCode,
-          );
-        }
-      }
-      return const EmailActionAttempt.success();
-    }
-    return const EmailActionAttempt.failure(
-      code: 'invalid_request',
-      message: 'unsupported recovery method',
-      statusCode: 400,
+    return _accountRecovery.sendCode(
+      account: account,
+      method: method,
+      requestIp: requestIp,
     );
   }
 
@@ -867,93 +824,13 @@ class AuthService {
     required String newPassword,
     String? requestIp,
   }) async {
-    if (newPassword.trim().isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'new_password is required.',
-      );
-    }
-    final passwordPolicy = _passwordPolicy.validate(newPassword);
-    if (!passwordPolicy.ok) {
-      return EmailActionAttempt.failure(
-        code: 'password_policy_violation',
-        message: passwordPolicy.message!,
-      );
-    }
-    final normalizedMethod = method.trim();
-    UserRecord? user;
-    if (normalizedMethod == 'email') {
-      final email = account.trim().toLowerCase();
-      user = await _users.findByEmail(email);
-      if (user == null) {
-        return const EmailActionAttempt.failure(
-          code: 'invalid_code',
-          message: '验证码无效或已过期。',
-          statusCode: 401,
-        );
-      }
-      final ok = await _emailCodeService.verifyPasswordResetCode(
-        user.email,
-        code.trim(),
-      );
-      if (!ok) {
-        return const EmailActionAttempt.failure(
-          code: 'invalid_code',
-          message: '验证码无效或已过期。',
-          statusCode: 401,
-        );
-      }
-    } else if (normalizedMethod == 'phone') {
-      final phoneService = _phoneVerification;
-      if (phoneService == null) {
-        return const EmailActionAttempt.failure(
-          code: 'phone_verification_not_configured',
-          message: '手机号验证码服务尚未配置。',
-          statusCode: 503,
-        );
-      }
-      final normalized = phoneService.normalizePhone(account);
-      if (normalized == null) {
-        return const EmailActionAttempt.failure(
-          code: 'invalid_phone_number',
-          message: '手机号格式不正确。',
-        );
-      }
-      user = await _users.findByPhoneNumber(normalized);
-      if (user == null) {
-        return const EmailActionAttempt.failure(
-          code: 'invalid_code',
-          message: '验证码无效或已过期。',
-          statusCode: 401,
-        );
-      }
-      final checked = await phoneService.verifyCode(
-        phoneNumber: normalized,
-        verifyCode: code.trim(),
-        requestIp: _subjectOrEmpty(requestIp),
-      );
-      if (!checked.ok) {
-        return EmailActionAttempt.failure(
-          code: checked.code ?? 'invalid_code',
-          message: checked.message ?? '验证码无效或已过期。',
-          statusCode: checked.statusCode,
-        );
-      }
-    } else {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'unsupported recovery method',
-        statusCode: 400,
-      );
-    }
-
-    final passwordHash = await _passwordHasher.hash(newPassword.trim());
-    await _users.updatePasswordHash(
-      userId: user.id,
-      passwordHash: passwordHash,
+    return _accountRecovery.recoverPassword(
+      account: account,
+      method: method,
+      code: code,
+      newPassword: newPassword,
+      requestIp: requestIp,
     );
-    await _revokeAllRefreshTokens(user.id);
-    return const EmailActionAttempt.success();
   }
 
   Future<LoginAttempt> login({
