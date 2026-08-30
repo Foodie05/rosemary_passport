@@ -27,21 +27,8 @@ versioning="$(aws --endpoint-url "$S3_ENDPOINT" s3api get-bucket-versioning \
 archive="$TMP_DIR/audit-$TIMESTAMP.jsonl"
 (
   cd "$TARGET_DIR"
-  broken_links="$(docker compose --env-file "$RUNTIME_ENV_FILE" exec -T postgres \
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc \
-      "with chain as (
-         select previous_hash,
-                lag(entry_hash) over (order by created_at, id) as expected_previous,
-                row_number() over (order by created_at, id) as position
-         from audit_logs where entry_hash is not null
-       )
-       select count(*) from chain
-       where (position = 1 and previous_hash is not null)
-          or (position > 1 and previous_hash is distinct from expected_previous)")"
-  [[ "$broken_links" == 0 ]] || {
-    echo "audit hash chain linkage validation failed" >&2
-    exit 65
-  }
+  docker compose --env-file "$RUNTIME_ENV_FILE" exec -T passport_server \
+    /app/bin/verify_audit_chain >&2
   docker compose --env-file "$RUNTIME_ENV_FILE" exec -T postgres \
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc \
       "select jsonb_build_object(
@@ -49,9 +36,16 @@ archive="$TMP_DIR/audit-$TIMESTAMP.jsonl"
         'actor_type', actor_type, 'resource_type', resource_type,
         'resource_id', resource_id, 'metadata', metadata,
         'ip_address', ip_address, 'created_at', created_at,
-        'previous_hash', previous_hash, 'entry_hash', entry_hash
-      ) from audit_logs order by created_at, id"
+        'previous_hash', previous_hash, 'entry_hash', entry_hash,
+        'chain_position', chain_position
+      ) from audit_logs order by chain_position"
 ) >"$archive"
+
+(
+  cd "$TARGET_DIR"
+  docker compose --env-file "$RUNTIME_ENV_FILE" exec -T passport_server \
+    /app/bin/verify_audit_chain --stdin <"$archive"
+)
 
 openssl pkeyutl -sign -rawin \
   -inkey "$SECRETS_DIR/audit_signing.private.pem" \

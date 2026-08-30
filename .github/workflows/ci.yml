@@ -100,6 +100,7 @@ jobs:
           TEST_DB_NAME: rosm_passport_test
         run: >-
           dart --branch-coverage run test
+          --concurrency=1
           --reporter=expanded
           --coverage-path=coverage/lcov.info
           --branch-coverage

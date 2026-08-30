@@ -130,8 +130,11 @@ create table if not exists app_authorizations (
   unique(user_id, client_id)
 );
 
+create sequence if not exists audit_chain_position_seq;
+
 create table if not exists audit_logs (
   id uuid primary key default gen_random_uuid(),
+  chain_position bigint not null unique default nextval('audit_chain_position_seq'),
   action text not null,
   actor_id text not null,
   actor_type text not null,
@@ -141,6 +144,8 @@ create table if not exists audit_logs (
   ip_address text,
   created_at timestamptz not null default now()
 );
+
+alter sequence audit_chain_position_seq owned by audit_logs.chain_position;
 create index if not exists idx_audit_created_at on audit_logs(created_at desc);
 
 create table if not exists system_settings (

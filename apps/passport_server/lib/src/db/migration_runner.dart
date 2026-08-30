@@ -100,6 +100,33 @@ class MigrationRunner {
           is_official = true
       where client_id = 'first_party_web';
     '''),
+    DatabaseMigration('20260830_002_audit_chain_position', '''
+      create sequence if not exists audit_chain_position_seq;
+      alter table audit_logs
+        add column if not exists chain_position bigint;
+      with ranked as (
+        select id, row_number() over (order by created_at, id) as position
+        from audit_logs
+      )
+      update audit_logs as target
+      set chain_position = ranked.position
+      from ranked
+      where target.id = ranked.id and target.chain_position is null;
+      select setval(
+        'audit_chain_position_seq',
+        coalesce(max(chain_position), 1),
+        max(chain_position) is not null
+      ) from audit_logs;
+      alter sequence audit_chain_position_seq
+        owned by audit_logs.chain_position;
+      alter table audit_logs
+        alter column chain_position
+        set default nextval('audit_chain_position_seq');
+      alter table audit_logs
+        alter column chain_position set not null;
+      create unique index if not exists idx_audit_chain_position
+        on audit_logs(chain_position);
+    '''),
   ];
 
   final Database _database;

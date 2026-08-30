@@ -83,6 +83,12 @@ echo "[build_linux_x64] building passport server routes"
     -Ddart.vm.product=true \
     bin/migrate.dart \
     -o "$RELEASE_DIR/backend/bin/migrate"
+  dart compile exe \
+    --target-os linux \
+    --target-arch x64 \
+    -Ddart.vm.product=true \
+    bin/verify_audit_chain.dart \
+    -o "$RELEASE_DIR/backend/bin/verify_audit_chain"
 )
 
 cp -R "$SERVER_DIR/scripts/." "$RELEASE_DIR/backend/scripts/"

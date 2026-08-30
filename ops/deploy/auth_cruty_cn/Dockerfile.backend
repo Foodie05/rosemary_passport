@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY --chown=node:node backend/ /app/
 
-RUN chmod +x /app/bin/passport_server /app/bin/migrate /app/bin/seed_local_admin /app/entrypoint.sh
+RUN chmod +x /app/bin/passport_server /app/bin/migrate /app/bin/seed_local_admin /app/bin/verify_audit_chain /app/entrypoint.sh
 
 EXPOSE 8091
 

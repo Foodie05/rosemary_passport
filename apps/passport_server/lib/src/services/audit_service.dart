@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
 import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
 
 import '../db/database.dart';
+import '../security/audit_chain.dart';
 
 class AuditService {
   AuditService(this._db);
@@ -29,24 +29,22 @@ class AuditService {
       final previous = await tx.execute('''
         select entry_hash from audit_logs
         where entry_hash is not null
-        order by created_at desc, id desc
+        order by chain_position desc
         limit 1
       ''');
       final previousHash = previous.isEmpty ? '' : previous.first[0].toString();
-      final canonical = _canonicalJson({
-        'id': id,
-        'action': action,
-        'actor_id': actorId,
-        'actor_type': actorType,
-        'resource_type': resourceType,
-        'resource_id': resourceId,
-        'metadata': sanitizedMetadata,
-        'ip_address': ip,
-        'created_at': createdAt.toIso8601String(),
-      });
-      final entryHash = sha256
-          .convert(utf8.encode('$previousHash\n$canonical'))
-          .toString();
+      final entryHash = AuditChain.entryHash(
+        previousHash: previousHash,
+        id: id,
+        action: action,
+        actorId: actorId,
+        actorType: actorType,
+        resourceType: resourceType,
+        resourceId: resourceId,
+        metadata: sanitizedMetadata,
+        ipAddress: ip,
+        createdAt: createdAt,
+      );
       await tx.execute(
         Sql.named('''
           insert into audit_logs(
@@ -82,9 +80,10 @@ class AuditService {
     final result = await _db.execute(
       '''
       select id, action, actor_id, actor_type, resource_type, resource_id,
-             metadata, ip_address, created_at, previous_hash, entry_hash
+             metadata, ip_address, created_at, previous_hash, entry_hash,
+             chain_position
       from audit_logs
-      order by created_at desc
+      order by chain_position desc
       limit @limit offset @offset
       ''',
       params: {'limit': limit, 'offset': offset},
@@ -104,9 +103,67 @@ class AuditService {
             'created_at': row[8].toString(),
             'previous_hash': row[9],
             'entry_hash': row[10],
+            'chain_position': row[11],
           },
         )
         .toList();
+  }
+
+  Future<int> verifyChain() async {
+    final unhashed = await _db.execute('''
+      select count(*)
+      from audit_logs
+      where entry_hash is null
+        and chain_position > coalesce(
+          (select min(chain_position) from audit_logs where entry_hash is not null),
+          9223372036854775807
+        )
+    ''');
+    if ((unhashed.first[0] as int) > 0) {
+      throw StateError('Unhashed audit records exist inside the hash chain.');
+    }
+    var afterPosition = 0;
+    var previousHash = '';
+    var verified = 0;
+    while (true) {
+      final result = await _db.execute(
+        '''
+        select id, action, actor_id, actor_type, resource_type, resource_id,
+               metadata, ip_address, created_at, previous_hash, entry_hash,
+               chain_position
+        from audit_logs
+        where entry_hash is not null
+          and chain_position > @after_position
+        order by chain_position
+        limit 1000
+        ''',
+        params: {'after_position': afterPosition},
+      );
+      if (result.isEmpty) {
+        return verified;
+      }
+      final records = result
+          .map(
+            (row) => <String, dynamic>{
+              'id': row[0],
+              'action': row[1],
+              'actor_id': row[2],
+              'actor_type': row[3],
+              'resource_type': row[4],
+              'resource_id': row[5],
+              'metadata': row[6],
+              'ip_address': row[7],
+              'created_at': row[8],
+              'previous_hash': row[9],
+              'entry_hash': row[10],
+              'chain_position': row[11],
+            },
+          )
+          .toList();
+      previousHash = AuditChain.verify(records, previousHash: previousHash);
+      verified += records.length;
+      afterPosition = records.last['chain_position'] as int;
+    }
   }
 
   Map<String, dynamic> _sanitizeMetadata(Map<String, dynamic> metadata) {
@@ -143,21 +200,6 @@ class AuditService {
       return _maskEmail(value);
     }
     return value;
-  }
-
-  String _canonicalJson(dynamic value) {
-    dynamic normalize(dynamic item) {
-      if (item is Map) {
-        final keys = item.keys.map((key) => key.toString()).toList()..sort();
-        return {for (final key in keys) key: normalize(item[key])};
-      }
-      if (item is List) {
-        return item.map(normalize).toList();
-      }
-      return item;
-    }
-
-    return jsonEncode(normalize(value));
   }
 
   String _maskEmail(String raw) {
