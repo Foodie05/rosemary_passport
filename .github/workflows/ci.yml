@@ -43,6 +43,7 @@ jobs:
           ./ops/tests/legacy_refresh_sunset_test.sh
           ./ops/tests/legacy_env_transition_test.sh
           ./ops/tests/legacy_cutover_layout_test.sh
+          ./ops/tests/deploy_transaction_rollback_test.sh
           ./ops/tests/pitr_drill_safety_test.sh
           ./ops/tests/sla_observation_test.sh
       - name: Validate pull request title
