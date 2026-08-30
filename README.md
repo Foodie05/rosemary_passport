@@ -14,7 +14,7 @@ Rosemary Passport 是面向多应用接入的身份与单点登录服务。服�
 - 数据库迁移具有版本、校验和、事务和 PostgreSQL advisory lock；采用 expand/backfill/validate，禁止本周期破坏旧列。
 - 生产容器非 root、只读根文件系统、最小权限并提供 `/health/live` 与 `/health/ready`。
 
-代码通过仓库卫生、服务端测试、Web、Flutter、供应链和 CodeQL 六项默认分支门禁。绿色 CI 只证明代码候选满足工程门禁；正式生产 SLA 仍必须完成容量、PITR 和稳定观察验收。
+代码通过仓库卫生（含 ShellCheck）、服务端测试、Web、Flutter、供应链和 CodeQL 六项默认分支门禁。绿色 CI 只证明代码候选满足工程门禁；正式生产 SLA 仍必须完成容量、PITR 和稳定观察验收。
 
 ## 仓库结构
 
@@ -49,6 +49,7 @@ macOS 开发环境可运行：
 
 ```bash
 ./scripts/check_repo_hygiene.sh
+./scripts/check_shell_scripts.sh
 ./scripts/check_commit_messages.sh master HEAD
 (cd web && npm ci && npm audit --audit-level=high && npm test && npm run build)
 (cd packages/rosm_passport_flutter && flutter pub get && flutter analyze && flutter test)

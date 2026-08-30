@@ -7,8 +7,9 @@ secret_dir="${PG_BACKUP_SECRETS_DIR:-/tmp/pg-backup-secrets}"
 temporary="${destination}.encrypted.$$"
 trap 'unlink "$temporary" 2>/dev/null || true' EXIT
 
-export AWS_ACCESS_KEY_ID="$(<"$secret_dir/s3_access_key_id")"
-export AWS_SECRET_ACCESS_KEY="$(<"$secret_dir/s3_secret_access_key")"
+AWS_ACCESS_KEY_ID="$(<"$secret_dir/s3_access_key_id")"
+AWS_SECRET_ACCESS_KEY="$(<"$secret_dir/s3_secret_access_key")"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 
 aws --endpoint-url "$S3_ENDPOINT" s3 cp \

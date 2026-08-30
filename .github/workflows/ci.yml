@@ -25,6 +25,10 @@ jobs:
         run: |
           ./scripts/check_repo_hygiene.sh
           ./scripts/check_commit_messages_test.sh
+      - name: Static analysis for shell scripts
+        run: |
+          shellcheck --version
+          ./scripts/check_shell_scripts.sh
       - name: Validate commit messages
         env:
           BASE_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}

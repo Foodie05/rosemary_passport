@@ -28,6 +28,7 @@ test(migrations): preserve legacy authenticator secrets
 
 ```bash
 ./scripts/check_repo_hygiene.sh
+./scripts/check_shell_scripts.sh
 ./scripts/check_commit_messages.sh master HEAD
 ./ops/tests/remote_deploy_safety_test.sh
 ./ops/tests/secret_provisioning_test.sh

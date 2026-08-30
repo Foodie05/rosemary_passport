@@ -51,6 +51,7 @@ required_executables=(
   scripts/check_commit_messages.sh
   scripts/check_commit_messages_test.sh
   scripts/check_repo_hygiene.sh
+  scripts/check_shell_scripts.sh
   scripts/deploy_auth_cruty_cn.sh
   scripts/local-down.sh
   scripts/local-up.sh
