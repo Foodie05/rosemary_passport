@@ -40,6 +40,8 @@ Docker Compose 管理，Apache 只代理 `127.0.0.1:8091` 并托管原子切换�
 - `archive_timeout=300s`，WAL 加密后连续写入 `s3://BUCKET/wal/`。
 - `backup_to_s3.sh` 创建可逐表恢复的加密逻辑备份。
 - `physical_backup_to_s3.sh` 创建含起始 WAL 的加密物理基线，用于 PITR。
+- 所有备份和签名证据在上传后都会通过 `head-object` 核对 SHA-256 元数据与对象长度；
+  校验不一致会使发布、演练或观察任务失败。
 - `archive_audit_to_s3.sh` 导出哈希链审计日志，以 Ed25519 签名并上传 S3。建议每小时执行。
 - `restore_from_s3.sh` 只恢复到新的数据库名，必须用 `ROSM_RESTORE_CONFIRM` 明确确认，不会覆盖当前数据库。
 

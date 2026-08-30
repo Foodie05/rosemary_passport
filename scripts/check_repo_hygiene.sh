@@ -32,6 +32,7 @@ required_executables=(
   ops/deploy/auth_cruty_cn/check_disk_capacity.sh
   ops/deploy/auth_cruty_cn/check_host_capacity.sh
   ops/deploy/auth_cruty_cn/check_s3_storage.sh
+  ops/deploy/auth_cruty_cn/upload_s3_verified.sh
   ops/deploy/auth_cruty_cn/archive_audit_to_s3.sh
   ops/deploy/auth_cruty_cn/backup_to_s3.sh
   ops/deploy/auth_cruty_cn/backend-entrypoint.sh
@@ -55,6 +56,7 @@ required_executables=(
   ops/tests/sla_observation_test.sh
   ops/tests/pitr_drill_safety_test.sh
   ops/tests/s3_storage_preflight_test.sh
+  ops/tests/s3_upload_integrity_test.sh
 )
 for path in "${required_executables[@]}"; do
   mode="$(git ls-files --stage -- "$path" | awk '{print $1}')"

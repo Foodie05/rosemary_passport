@@ -42,10 +42,11 @@ openssl enc -aes-256-cbc -pbkdf2 -salt \
   -pass file:"$SECRETS_DIR/backup_encryption_key" \
   -in "$dump_path" -out "$encrypted_path"
 checksum="$(sha256sum "$encrypted_path" | awk '{print $1}')"
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$encrypted_path" \
-  "s3://$S3_BUCKET/$object_key" --only-show-errors
+"$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh" \
+  "$encrypted_path" "$S3_ENDPOINT" "$S3_BUCKET" "$object_key"
 printf '{"created_at":"%s","object":"%s","sha256":"%s"}\n' \
   "$TIMESTAMP" "$object_key" "$checksum" >"$TMP_DIR/manifest.json"
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$TMP_DIR/manifest.json" \
-  "s3://$S3_BUCKET/base/$TIMESTAMP.manifest.json" --only-show-errors
+"$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh" \
+  "$TMP_DIR/manifest.json" "$S3_ENDPOINT" "$S3_BUCKET" \
+  "base/$TIMESTAMP.manifest.json"
 printf 'backup_object=%s\n' "$object_key"

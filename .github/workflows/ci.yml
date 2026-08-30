@@ -33,6 +33,7 @@ jobs:
           ./ops/tests/host_capacity_test.sh
           ./ops/tests/disk_capacity_test.sh
           ./ops/tests/s3_storage_preflight_test.sh
+          ./ops/tests/s3_upload_integrity_test.sh
           ./ops/tests/pitr_drill_safety_test.sh
           ./ops/tests/sla_observation_test.sh
       - name: Validate pull request title

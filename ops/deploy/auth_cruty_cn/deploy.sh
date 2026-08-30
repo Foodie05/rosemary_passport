@@ -127,6 +127,7 @@ tar --exclude='./.env' -C "$SOURCE_DIR" -cf - . | tar -C "$TARGET_DIR" -xf -
 chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
   "$TARGET_DIR/physical_backup_to_s3.sh" \
   "$TARGET_DIR/check_s3_storage.sh" \
+  "$TARGET_DIR/upload_s3_verified.sh" \
   "$TARGET_DIR/check_host_capacity.sh" \
   "$TARGET_DIR/check_disk_capacity.sh" \
   "$TARGET_DIR/archive_audit_to_s3.sh" \
