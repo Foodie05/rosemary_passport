@@ -73,6 +73,7 @@ void main(List<String> arguments) {
     '/lib/src/services/account_recovery_service.dart',
     '/lib/src/services/account_management_service.dart',
     '/lib/src/services/registration_service.dart',
+    '/lib/src/services/login_service.dart',
     '/lib/src/security/token_service.dart',
     '/lib/src/repositories/oidc_repository.dart',
     '/lib/src/db/migration_runner.dart',

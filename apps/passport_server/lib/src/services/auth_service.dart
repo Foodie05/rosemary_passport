@@ -15,6 +15,7 @@ import 'authenticator_service.dart';
 import 'captcha_service.dart';
 import 'credential_service.dart';
 import 'email_code_service.dart';
+import 'login_service.dart';
 import 'phone_verification_service.dart';
 import 'registration_service.dart';
 import 'security_policy_service.dart';
@@ -40,13 +41,10 @@ class AuthService {
     PhoneVerificationService? phoneVerificationService,
   }) : _users = userRepository,
        _passwordHasher = passwordHasher,
-       _emailCodeService = emailCodeService,
        _captchaService = captchaService,
        _settings = settingsRepository,
        _audit = auditService,
-       _authenticator = authenticatorService,
        _webAuthn = webAuthnService,
-       _phoneVerification = phoneVerificationService,
        _sessions = SessionService(
          userRepository: userRepository,
          tokenService: tokenService,
@@ -125,23 +123,43 @@ class AuthService {
          auditService: auditService,
          securityPolicyService: securityPolicyService,
          phoneVerificationService: phoneVerificationService,
+       ),
+       _login = LoginService(
+         userRepository: userRepository,
+         settingsRepository: settingsRepository,
+         passwordHasher: passwordHasher,
+         emailCodeService: emailCodeService,
+         throttleService: AuthThrottleService(
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         sessionService: SessionService(
+           userRepository: userRepository,
+           tokenService: tokenService,
+           oidcRepository: oidcRepository,
+           auditService: auditService,
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         auditService: auditService,
+         authenticatorService: authenticatorService,
+         phoneVerificationService: phoneVerificationService,
+         webAuthnService: webAuthnService,
        );
 
   final UserRepository _users;
   final PasswordHasher _passwordHasher;
-  final EmailCodeService _emailCodeService;
   final CaptchaService _captchaService;
   final SettingsRepository _settings;
   final AuditService _audit;
-  final AuthenticatorService? _authenticator;
   final WebAuthnService? _webAuthn;
-  final PhoneVerificationService? _phoneVerification;
   final SessionService _sessions;
   final CredentialService _credentials;
   final AuthThrottleService _throttles;
   final AccountRecoveryService _accountRecovery;
   final AccountManagementService _accountManagement;
   final RegistrationService _registration;
+  final LoginService _login;
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
   static const _verificationCodeRegisterIpScope =
@@ -380,54 +398,11 @@ class AuthService {
     required String password,
     String? requestIp,
   }) async {
-    final policy = await _throttles.loadPolicy();
-    final loginCodeLimited = await _throttles.enforceVerificationCodeSendGuards(
+    return _login.sendPasswordEmailCode(
       email: email,
+      password: password,
       requestIp: requestIp,
-      policy: policy,
-      emailScope: _verificationCodeMfaEmailScope,
-      ipScope: _verificationCodeMfaIpScope,
-      cooldownScope: _verificationCodeMfaCooldownScope,
-      emailLimit: policy.adminLoginCodeEmailLimit,
-      ipLimit: policy.adminLoginCodeIpLimit,
     );
-    if (loginCodeLimited != null) {
-      return loginCodeLimited;
-    }
-
-    final user = await _users.findByEmail(email);
-    if (user == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final passwordValid = await _passwordHasher.verify(
-      user.passwordHash,
-      password,
-    );
-    if (!passwordValid) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    await _emailCodeService.issueLoginCode(
-      user.email,
-      templateName: user.roles.contains('admin')
-          ? 'admin_login_verification'
-          : 'login_verification',
-    );
-    await _throttles.startVerificationCodeCooldown(
-      email: user.email,
-      seconds: policy.adminLoginCodeCooldownSeconds,
-      cooldownScope: _verificationCodeMfaCooldownScope,
-    );
-    return const AdminLoginCodeAttempt.success();
   }
 
   Future<AdminLoginCodeAttempt> sendPasswordPhoneLoginCode({
@@ -435,49 +410,11 @@ class AuthService {
     required String password,
     String? requestIp,
   }) async {
-    final user = await _users.findByEmail(email);
-    if (user == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final passwordValid = await _passwordHasher.verify(
-      user.passwordHash,
-      password,
+    return _login.sendPasswordPhoneCode(
+      email: email,
+      password: password,
+      requestIp: requestIp,
     );
-    if (!passwordValid) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final phoneService = _phoneVerification;
-    final phone = user.phoneNumber?.trim() ?? '';
-    if (phoneService == null || phone.isEmpty || !user.isPhoneVerified) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'mfa_not_available',
-        message: '当前账户未配置手机号验证。',
-        statusCode: 400,
-      );
-    }
-
-    final sent = await phoneService.sendCode(
-      phoneNumber: phone,
-      requestIp: _subjectOrEmpty(requestIp),
-    );
-    if (!sent.ok) {
-      return AdminLoginCodeAttempt.failure(
-        code: sent.code ?? 'temporary_issue',
-        message: sent.message ?? '验证码发送失败，请稍后重试。',
-        statusCode: sent.statusCode,
-      );
-    }
-    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
   }
 
   Future<PasswordLoginPreparation> preparePasswordLogin({
@@ -485,67 +422,10 @@ class AuthService {
     required String password,
     String? requestIp,
   }) async {
-    final policy = await _throttles.loadPolicy();
-    final limited = await _throttles.enforceLoginGuards(
+    return _login.preparePasswordLogin(
       email: email,
+      password: password,
       requestIp: requestIp,
-      emailLimit: policy.loginEmailLimit,
-      ipLimit: policy.loginIpLimit,
-      window: Duration(seconds: policy.loginWindowSeconds),
-      blockDuration: Duration(seconds: policy.loginBlockSeconds),
-    );
-    if (limited != null) {
-      return PasswordLoginPreparation.failure(
-        code: limited.code ?? 'rate_limited',
-        message: limited.message ?? '请求过于频繁，请稍后再试。',
-        statusCode: limited.statusCode,
-      );
-    }
-
-    final user = await _users.findByEmail(email);
-    if (user == null) {
-      return const PasswordLoginPreparation.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final passwordValid = await _passwordHasher.verify(
-      user.passwordHash,
-      password,
-    );
-    if (!passwordValid) {
-      return const PasswordLoginPreparation.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    if (await isBootstrapAdmin(user)) {
-      return const PasswordLoginPreparation.success(
-        factors: [],
-        defaultFactor: null,
-        directLogin: true,
-      );
-    }
-
-    final factors = <String>['email_code'];
-    if ((user.phoneNumber ?? '').trim().isNotEmpty && user.isPhoneVerified) {
-      factors.insert(0, 'phone_code');
-    }
-    if (user.hasAuthenticator) {
-      factors.add('authenticator');
-    }
-    final webAuthn = _webAuthn;
-    if (webAuthn != null && await webAuthn.hasCredentials(user.id)) {
-      factors.add('webauthn');
-    }
-
-    return PasswordLoginPreparation.success(
-      factors: factors,
-      defaultFactor: factors.first,
     );
   }
 
@@ -553,43 +433,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = await _throttles.loadPolicy();
-    final loginCodeLimited = await _throttles.enforceVerificationCodeSendGuards(
-      email: email,
-      requestIp: requestIp,
-      policy: policy,
-      emailScope: _verificationCodeLoginEmailScope,
-      ipScope: _verificationCodeLoginIpScope,
-      cooldownScope: _verificationCodeLoginCooldownScope,
-      emailLimit: policy.adminLoginCodeEmailLimit,
-      ipLimit: policy.adminLoginCodeIpLimit,
-    );
-    if (loginCodeLimited != null) {
-      return loginCodeLimited;
-    }
-
-    final user = await _users.findByEmail(email);
-    if (user == null || user.roles.contains('admin')) {
-      await _throttles.startVerificationCodeCooldown(
-        email: email,
-        seconds: policy.loginCodeCooldownSeconds,
-        cooldownScope: _verificationCodeLoginCooldownScope,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      return const AdminLoginCodeAttempt.success(
-        message: '如果账号存在，验证码将发送到已绑定邮箱。',
-      );
-    }
-    await _emailCodeService.issueLoginCode(
-      user.email,
-      templateName: 'login_verification',
-    );
-    await _throttles.startVerificationCodeCooldown(
-      email: email,
-      seconds: policy.loginCodeCooldownSeconds,
-      cooldownScope: _verificationCodeLoginCooldownScope,
-    );
-    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+    return _login.sendEmailCode(email: email, requestIp: requestIp);
   }
 
   Future<AdminLoginCodeAttempt> sendAdminLoginCode({
@@ -683,187 +527,17 @@ class AuthService {
     String? authenticatorCode,
     String? requestIp,
     bool rememberMe = false,
-  }) async {
-    final policy = await _throttles.loadPolicy();
-    final limited = await _throttles.enforceLoginGuards(
+  }) {
+    return _login.loginWithPassword(
       email: email,
+      password: password,
+      factorType: factorType,
+      emailCode: emailCode,
+      phoneCode: phoneCode,
+      authenticatorCode: authenticatorCode,
       requestIp: requestIp,
-      emailLimit: policy.loginEmailLimit,
-      ipLimit: policy.loginIpLimit,
-      window: Duration(seconds: policy.loginWindowSeconds),
-      blockDuration: Duration(seconds: policy.loginBlockSeconds),
-    );
-    if (limited != null) {
-      return limited;
-    }
-
-    final user = await _users.findByEmail(email);
-    if (user == null) {
-      return const LoginAttempt.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final passwordValid = await _passwordHasher.verify(
-      user.passwordHash,
-      password,
-    );
-    if (!passwordValid) {
-      return const LoginAttempt.failure(
-        code: 'login_failed',
-        message: '账号或密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    if (await isBootstrapAdmin(user)) {
-      final authResult = await _issueFirstPartyAuthResult(
-        user,
-        rememberMe: rememberMe,
-      );
-      await _throttles.clearLoginGuards(email: email);
-      await _audit.log(
-        action: 'user.login',
-        actorId: user.id,
-        actorType: 'user',
-        resourceType: 'user',
-        resourceId: user.id,
-        metadata: {'email': user.email, 'factor_type': 'bootstrap_bypass'},
-        ip: requestIp,
-      );
-      return LoginAttempt.success(authResult);
-    }
-
-    final normalizedFactor = (factorType ?? 'email_code').trim();
-    if (normalizedFactor == 'email_code') {
-      if (emailCode == null || emailCode.trim().isEmpty) {
-        return const LoginAttempt.failure(
-          code: 'mfa_required',
-          message: '登录需要邮箱验证码。',
-          statusCode: 401,
-        );
-      }
-      final codeId = await _emailCodeService.validateLoginCode(
-        user.email,
-        emailCode.trim(),
-      );
-      if (codeId == null) {
-        return const LoginAttempt.failure(
-          code: 'mfa_required',
-          message: '邮箱验证码无效或已过期。',
-          statusCode: 401,
-        );
-      }
-      final authResult = await _issueFirstPartyAuthResult(
-        user,
-        rememberMe: rememberMe,
-      );
-      final consumed = await _emailCodeService.consumeCode(codeId);
-      if (!consumed) {
-        return const LoginAttempt.failure(
-          code: 'mfa_required',
-          message: '邮箱验证码无效或已过期。',
-          statusCode: 401,
-        );
-      }
-      await _throttles.clearLoginGuards(email: email);
-
-      await _audit.log(
-        action: 'user.login',
-        actorId: user.id,
-        actorType: 'user',
-        resourceType: 'user',
-        resourceId: user.id,
-        metadata: {'email': user.email, 'factor_type': normalizedFactor},
-        ip: requestIp,
-      );
-
-      return LoginAttempt.success(authResult);
-    } else if (normalizedFactor == 'phone_code') {
-      if (phoneCode == null || phoneCode.trim().isEmpty) {
-        return const LoginAttempt.failure(
-          code: 'mfa_required',
-          message: '登录需要手机验证码。',
-          statusCode: 401,
-        );
-      }
-      final phoneService = _phoneVerification;
-      final phone = user.phoneNumber?.trim() ?? '';
-      if (phoneService == null || phone.isEmpty || !user.isPhoneVerified) {
-        return const LoginAttempt.failure(
-          code: 'mfa_not_available',
-          message: '当前账户未配置手机号验证。',
-          statusCode: 400,
-        );
-      }
-      final checked = await phoneService.verifyCode(
-        phoneNumber: phone,
-        verifyCode: phoneCode.trim(),
-        requestIp: _subjectOrEmpty(requestIp),
-      );
-      if (!checked.ok) {
-        return LoginAttempt.failure(
-          code: checked.code ?? 'mfa_required',
-          message: checked.message ?? '手机验证码无效或已过期。',
-          statusCode: checked.statusCode,
-        );
-      }
-    } else if (normalizedFactor == 'authenticator') {
-      final authenticator = _authenticator;
-      final secret =
-          (await _users.findAuthenticatorSecretByUserId(user.id))?.trim() ?? '';
-      if (authenticator == null || secret.isEmpty) {
-        return const LoginAttempt.failure(
-          code: 'mfa_not_available',
-          message: '当前账户未配置 Authenticator 验证器。',
-          statusCode: 400,
-        );
-      }
-      if (authenticatorCode == null || authenticatorCode.trim().isEmpty) {
-        return const LoginAttempt.failure(
-          code: 'mfa_required',
-          message: '请输入 Authenticator 动态验证码。',
-          statusCode: 401,
-        );
-      }
-      final verified = authenticator.verifyCode(
-        secret: secret,
-        code: authenticatorCode.trim(),
-      );
-      if (!verified) {
-        return const LoginAttempt.failure(
-          code: 'mfa_required',
-          message: 'Authenticator 动态验证码无效。',
-          statusCode: 401,
-        );
-      }
-    } else {
-      return const LoginAttempt.failure(
-        code: 'invalid_factor',
-        message: '不支持的验证因子。',
-        statusCode: 400,
-      );
-    }
-
-    final authResult = await _issueFirstPartyAuthResult(
-      user,
       rememberMe: rememberMe,
     );
-    await _throttles.clearLoginGuards(email: email);
-
-    await _audit.log(
-      action: 'user.login',
-      actorId: user.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: {'email': user.email, 'factor_type': normalizedFactor},
-      ip: requestIp,
-    );
-
-    return LoginAttempt.success(authResult);
   }
 
   Future<LoginAttempt> loginWithEmailCode({
@@ -871,106 +545,20 @@ class AuthService {
     required String emailCode,
     String? requestIp,
     bool rememberMe = false,
-  }) async {
-    final policy = await _throttles.loadPolicy();
-    final limited = await _throttles.enforceLoginGuards(
+  }) {
+    return _login.loginWithEmailCode(
       email: email,
+      emailCode: emailCode,
       requestIp: requestIp,
-      emailLimit: policy.loginEmailLimit,
-      ipLimit: policy.loginIpLimit,
-      window: Duration(seconds: policy.loginWindowSeconds),
-      blockDuration: Duration(seconds: policy.loginBlockSeconds),
-    );
-    if (limited != null) {
-      return limited;
-    }
-
-    final user = await _users.findByEmail(email);
-    if (user == null || user.roles.contains('admin')) {
-      return const LoginAttempt.failure(
-        code: 'login_failed',
-        message: '登录失败。',
-        statusCode: 401,
-      );
-    }
-
-    final codeId = await _emailCodeService.validateLoginCode(
-      user.email,
-      emailCode.trim(),
-    );
-    if (codeId == null) {
-      return const LoginAttempt.failure(
-        code: 'mfa_required',
-        message: '邮箱验证码无效或已过期。',
-        statusCode: 401,
-      );
-    }
-
-    final authResult = await _issueFirstPartyAuthResult(
-      user,
       rememberMe: rememberMe,
     );
-    final consumed = await _emailCodeService.consumeCode(codeId);
-    if (!consumed) {
-      return const LoginAttempt.failure(
-        code: 'mfa_required',
-        message: '邮箱验证码无效或已过期。',
-        statusCode: 401,
-      );
-    }
-    await _throttles.clearLoginGuards(email: email);
-
-    await _audit.log(
-      action: 'user.login.email_code',
-      actorId: user.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: {'email': user.email, 'email_code_login': true},
-      ip: requestIp,
-    );
-
-    return LoginAttempt.success(authResult);
   }
 
   Future<AdminLoginCodeAttempt> sendPhoneLoginCode({
     required String phoneNumber,
     String? requestIp,
-  }) async {
-    final phoneService = _phoneVerification;
-    if (phoneService == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'phone_verification_not_configured',
-        message: '手机号验证码服务尚未配置。',
-        statusCode: 503,
-      );
-    }
-    final normalized = phoneService.normalizePhone(phoneNumber);
-    if (normalized == null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'invalid_phone_number',
-        message: '手机号格式不正确。',
-      );
-    }
-    final user = await _users.findByPhoneNumber(normalized);
-    if (user == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      return const AdminLoginCodeAttempt.success(
-        message: '如果账号存在，验证码将发送到已绑定手机号。',
-      );
-    }
-    final attempt = await phoneService.sendCode(
-      phoneNumber: normalized,
-      requestIp: _subjectOrEmpty(requestIp),
-    );
-    if (!attempt.ok) {
-      return AdminLoginCodeAttempt.failure(
-        code: attempt.code ?? 'temporary_issue',
-        message: attempt.message ?? '验证码发送失败，请稍后重试。',
-        statusCode: attempt.statusCode,
-      );
-    }
-    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+  }) {
+    return _login.sendPhoneCode(phoneNumber: phoneNumber, requestIp: requestIp);
   }
 
   Future<LoginAttempt> loginWithPhoneCode({
@@ -978,56 +566,13 @@ class AuthService {
     required String verifyCode,
     String? requestIp,
     bool rememberMe = false,
-  }) async {
-    final phoneService = _phoneVerification;
-    if (phoneService == null) {
-      return const LoginAttempt.failure(
-        code: 'phone_verification_not_configured',
-        message: '手机号验证码服务尚未配置。',
-        statusCode: 503,
-      );
-    }
-    final normalized = phoneService.normalizePhone(phoneNumber);
-    if (normalized == null) {
-      return const LoginAttempt.failure(
-        code: 'invalid_phone_number',
-        message: '手机号格式不正确。',
-      );
-    }
-    final user = await _users.findByPhoneNumber(normalized);
-    if (user == null) {
-      return const LoginAttempt.failure(
-        code: 'login_failed',
-        message: '登录失败。',
-        statusCode: 401,
-      );
-    }
-    final checked = await phoneService.verifyCode(
-      phoneNumber: normalized,
+  }) {
+    return _login.loginWithPhoneCode(
+      phoneNumber: phoneNumber,
       verifyCode: verifyCode,
-      requestIp: _subjectOrEmpty(requestIp),
-    );
-    if (!checked.ok) {
-      return LoginAttempt.failure(
-        code: checked.code ?? 'mfa_required',
-        message: checked.message ?? '手机验证码无效或已过期。',
-        statusCode: checked.statusCode,
-      );
-    }
-    final authResult = await _issueFirstPartyAuthResult(
-      user,
+      requestIp: requestIp,
       rememberMe: rememberMe,
     );
-    await _audit.log(
-      action: 'user.login.phone_code',
-      actorId: user.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: {'email': user.email, 'phone_code_login': true},
-      ip: requestIp,
-    );
-    return LoginAttempt.success(authResult);
   }
 
   Future<AccountUpdateAttempt> updateSelfAccount({
@@ -1318,8 +863,6 @@ class AuthService {
       requestIp: requestIp,
     );
   }
-
-  String _subjectOrEmpty(String? raw) => raw?.trim() ?? '';
 
   Future<AuthResult> _issueFirstPartyAuthResult(
     UserRecord user, {
