@@ -14,8 +14,9 @@ S3_BUCKET="$(read_env S3_BUCKET)"
 S3_REGION="$(read_env S3_REGION)"
 POSTGRES_USER="$(read_env POSTGRES_USER)"
 POSTGRES_DB="$(read_env POSTGRES_DB)"
-export AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
-export AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
+AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
+AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 "$(dirname "${BASH_SOURCE[0]}")/check_s3_storage.sh" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
 

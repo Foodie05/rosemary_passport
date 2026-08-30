@@ -52,8 +52,9 @@ pitr_image="${ROSM_PITR_IMAGE:-rosm-passport-postgres:${release_tag:-current}}"
   || die 'S3 and PostgreSQL settings are required'
 docker image inspect "$pitr_image" >/dev/null 2>&1 || die "PITR image is unavailable: $pitr_image"
 
-export AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
-export AWS_SECRET_ACCESS_KEY="$(<"$secrets_dir/s3_secret_access_key")"
+AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
+AWS_SECRET_ACCESS_KEY="$(<"$secrets_dir/s3_secret_access_key")"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${s3_region:-auto}"
 "$script_dir/check_s3_storage.sh" "$runtime_env_file" "$secrets_dir"
 compose() { (cd "$release_dir" && docker compose --env-file "$runtime_env_file" "$@"); }

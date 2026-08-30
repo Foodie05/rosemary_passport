@@ -45,8 +45,9 @@ s3_endpoint="$(read_env S3_ENDPOINT)"
 s3_bucket="$(read_env S3_BUCKET)"
 s3_region="$(read_env S3_REGION)"
 [[ -n "$s3_endpoint" && -n "$s3_bucket" ]] || die 'S3 settings are required'
-export AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
-export AWS_SECRET_ACCESS_KEY="$(<"$secrets_dir/s3_secret_access_key")"
+AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
+AWS_SECRET_ACCESS_KEY="$(<"$secrets_dir/s3_secret_access_key")"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${s3_region:-auto}"
 "$script_dir/check_s3_storage.sh" "$runtime_env_file" "$secrets_dir"
 

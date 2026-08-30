@@ -8,8 +8,9 @@ tmp_file="$(mktemp "/tmp/$wal_name.XXXXXXXX.enc")"
 trap 'rm -f "$tmp_file"' EXIT
 umask 077
 
-export AWS_ACCESS_KEY_ID="$(<"$secret_dir/s3_access_key_id")"
-export AWS_SECRET_ACCESS_KEY="$(<"$secret_dir/s3_secret_access_key")"
+AWS_ACCESS_KEY_ID="$(<"$secret_dir/s3_access_key_id")"
+AWS_SECRET_ACCESS_KEY="$(<"$secret_dir/s3_secret_access_key")"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 
 openssl enc -aes-256-cbc -pbkdf2 -salt \

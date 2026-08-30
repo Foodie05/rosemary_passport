@@ -32,8 +32,9 @@ minimum_retention_days="${minimum_retention_days:-30}"
 [[ "$minimum_retention_days" =~ ^[1-9][0-9]*$ ]] \
   || die 'S3_OBJECT_LOCK_MIN_RETENTION_DAYS must be a positive integer'
 
-export AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
-export AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
+AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
+AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${s3_region:-auto}"
 
 versioning="$(aws --endpoint-url "$s3_endpoint" s3api get-bucket-versioning \
