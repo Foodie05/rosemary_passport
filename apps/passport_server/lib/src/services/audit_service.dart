@@ -166,6 +166,94 @@ class AuditService {
     }
   }
 
+  Future<int> backfillLegacyHashes() async {
+    return _db.runTx((tx) async {
+      await tx.execute('select pg_advisory_xact_lock(82463207240630)');
+      var afterPosition = 0;
+      var previousHash = '';
+      var existingPreviousHash = '';
+      var existingChainStarted = false;
+      var unhashedTailStarted = false;
+      var migrated = 0;
+      while (true) {
+        final result = await tx.execute(
+          Sql.named('''
+            select id, action, actor_id, actor_type, resource_type, resource_id,
+                   metadata, ip_address, created_at, previous_hash, entry_hash,
+                   chain_position
+            from audit_logs
+            where chain_position > @after_position
+            order by chain_position
+            limit 1000
+          '''),
+          parameters: {'after_position': afterPosition},
+        );
+        if (result.isEmpty) {
+          return migrated;
+        }
+        for (final row in result) {
+          final expectedHash = AuditChain.entryHash(
+            previousHash: previousHash,
+            id: row[0].toString(),
+            action: row[1].toString(),
+            actorId: row[2].toString(),
+            actorType: row[3].toString(),
+            resourceType: row[4].toString(),
+            resourceId: row[5].toString(),
+            metadata: Map<String, dynamic>.from(row[6] as Map),
+            ipAddress: row[7]?.toString(),
+            createdAt: row[8] as DateTime,
+          );
+          final storedPrevious = row[9]?.toString() ?? '';
+          final storedHash = row[10]?.toString() ?? '';
+          if (storedHash.isNotEmpty) {
+            if (unhashedTailStarted) {
+              throw StateError(
+                'Existing audit hash chain has an unhashed gap before '
+                'position ${row[11]}.',
+              );
+            }
+            existingChainStarted = true;
+            existingPreviousHash = AuditChain.verify([
+              <String, dynamic>{
+                'id': row[0],
+                'action': row[1],
+                'actor_id': row[2],
+                'actor_type': row[3],
+                'resource_type': row[4],
+                'resource_id': row[5],
+                'metadata': row[6],
+                'ip_address': row[7],
+                'created_at': row[8],
+                'previous_hash': row[9],
+                'entry_hash': row[10],
+              },
+            ], previousHash: existingPreviousHash);
+          } else if (existingChainStarted) {
+            unhashedTailStarted = true;
+          }
+          if (storedPrevious != previousHash || storedHash != expectedHash) {
+            await tx.execute(
+              Sql.named('''
+                update audit_logs
+                set previous_hash = @previous_hash, entry_hash = @entry_hash
+                where id = cast(@id as uuid) and entry_hash is null
+              '''),
+              parameters: {
+                'id': row[0].toString(),
+                'previous_hash': previousHash.isEmpty ? null : previousHash,
+                'entry_hash': expectedHash,
+              },
+            );
+            migrated++;
+          }
+          previousHash = expectedHash;
+        }
+        afterPosition = result.last[11] as int;
+      }
+    });
+  }
+
   Map<String, dynamic> _sanitizeMetadata(Map<String, dynamic> metadata) {
     final next = <String, dynamic>{};
     for (final entry in metadata.entries) {
