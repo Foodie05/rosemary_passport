@@ -90,6 +90,14 @@ void main() {
   test(
     'email recovery send remains non-enumerating and rate limited',
     () async {
+      stubEmailDelivery();
+      when(
+        () => throttles.startVerificationCodeCooldown(
+          email: any(named: 'email'),
+          seconds: any(named: 'seconds'),
+          cooldownScope: any(named: 'cooldownScope'),
+        ),
+      ).thenAnswer((_) async {});
       when(() => users.findByEmail(any())).thenAnswer((_) async => null);
       expect(
         (await service.sendCode(
@@ -119,13 +127,6 @@ void main() {
       when(
         () => emailCodes.issuePasswordResetCode(user.email),
       ).thenAnswer((_) async => 'code-id');
-      when(
-        () => throttles.startVerificationCodeCooldown(
-          email: any(named: 'email'),
-          seconds: any(named: 'seconds'),
-          cooldownScope: any(named: 'cooldownScope'),
-        ),
-      ).thenAnswer((_) async {});
       expect(
         (await service.sendCode(
           account: ' USER@EXAMPLE.INVALID ',
@@ -158,6 +159,14 @@ void main() {
     );
 
     when(() => phones.normalizePhone(any())).thenReturn('+8613800000000');
+    stubEmailDelivery();
+    when(
+      () => throttles.startVerificationCodeCooldown(
+        email: any(named: 'email'),
+        seconds: any(named: 'seconds'),
+        cooldownScope: any(named: 'cooldownScope'),
+      ),
+    ).thenAnswer((_) async {});
     when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
     expect(
       (await service.sendCode(account: '13800000000', method: 'phone')).ok,
@@ -178,8 +187,8 @@ void main() {
       ),
     );
     expect(
-      (await service.sendCode(account: '13800000000', method: 'phone')).code,
-      'provider_failed',
+      (await service.sendCode(account: '13800000000', method: 'phone')).ok,
+      isTrue,
     );
 
     when(

@@ -40,6 +40,8 @@ class LoginService {
   static const _mfaEmailScope = 'verification-code:mfa-login:email';
   static const _mfaIpScope = 'verification-code:mfa-login:ip';
   static const _mfaCooldownScope = 'verification-code:mfa-login:cooldown:email';
+  static const _uniformEmailSendMessage = '如果账号存在，验证码将发送到已绑定邮箱。';
+  static const _uniformPhoneSendMessage = '如果账号存在，验证码将发送到已绑定手机号。';
 
   final UserRepository _users;
   final SettingsRepository _settings;
@@ -197,19 +199,29 @@ class LoginService {
       );
       await Future<void>.delayed(const Duration(milliseconds: 150));
       return const AdminLoginCodeAttempt.success(
-        message: '如果账号存在，验证码将发送到已绑定邮箱。',
+        message: _uniformEmailSendMessage,
       );
     }
-    await _emailCodes.issueLoginCode(
-      user.email,
-      templateName: 'login_verification',
-    );
+    try {
+      await _emailCodes.issueLoginCode(
+        user.email,
+        templateName: 'login_verification',
+      );
+    } catch (_) {
+      await _recordDeliveryFailure(
+        user,
+        channel: 'email',
+        requestIp: requestIp,
+      );
+    }
     await _throttles.startVerificationCodeCooldown(
       email: email,
       seconds: policy.loginCodeCooldownSeconds,
       cooldownScope: _loginCooldownScope,
     );
-    return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+    return const AdminLoginCodeAttempt.success(
+      message: _uniformEmailSendMessage,
+    );
   }
 
   Future<LoginAttempt> loginWithPassword({
@@ -408,20 +420,51 @@ class LoginService {
     if (user == null) {
       await Future<void>.delayed(const Duration(milliseconds: 150));
       return const AdminLoginCodeAttempt.success(
-        message: '如果账号存在，验证码将发送到已绑定手机号。',
+        message: _uniformPhoneSendMessage,
       );
     }
-    final sent = await phones.sendCode(
-      phoneNumber: normalized,
-      requestIp: requestIp?.trim() ?? '',
+    try {
+      final sent = await phones.sendCode(
+        phoneNumber: normalized,
+        requestIp: requestIp?.trim() ?? '',
+      );
+      if (!sent.ok) {
+        await _recordDeliveryFailure(
+          user,
+          channel: 'phone',
+          requestIp: requestIp,
+        );
+      }
+    } catch (_) {
+      await _recordDeliveryFailure(
+        user,
+        channel: 'phone',
+        requestIp: requestIp,
+      );
+    }
+    return const AdminLoginCodeAttempt.success(
+      message: _uniformPhoneSendMessage,
     );
-    return sent.ok
-        ? const AdminLoginCodeAttempt.success(message: '验证码已发送。')
-        : AdminLoginCodeAttempt.failure(
-            code: sent.code ?? 'temporary_issue',
-            message: sent.message ?? '验证码发送失败，请稍后重试。',
-            statusCode: sent.statusCode,
-          );
+  }
+
+  Future<void> _recordDeliveryFailure(
+    UserRecord user, {
+    required String channel,
+    String? requestIp,
+  }) async {
+    try {
+      await _audit.log(
+        action: 'user.login_code.delivery_failed',
+        actorId: user.id,
+        actorType: 'user',
+        resourceType: 'user',
+        resourceId: user.id,
+        metadata: {'channel': channel},
+        ip: requestIp,
+      );
+    } catch (_) {
+      // Delivery privacy must not depend on the audit sink being available.
+    }
   }
 
   Future<LoginAttempt> loginWithPhoneCode({

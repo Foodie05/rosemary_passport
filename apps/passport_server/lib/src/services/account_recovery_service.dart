@@ -29,6 +29,10 @@ class AccountRecoveryService {
   static const _resetIpScope = 'verification-code:password-reset:ip';
   static const _resetCooldownScope =
       'verification-code:password-reset:cooldown:email';
+  static const _resetPhoneScope = 'verification-code:password-reset:phone';
+  static const _resetPhoneIpScope = 'verification-code:password-reset:phone:ip';
+  static const _resetPhoneCooldownScope =
+      'verification-code:password-reset:cooldown:phone';
 
   final UserRepository _users;
   final PasswordHasher _passwords;
@@ -45,33 +49,38 @@ class AccountRecoveryService {
   }) async {
     final normalizedMethod = method.trim();
     if (normalizedMethod == 'email') {
-      final user = await _users.findByEmail(account.trim().toLowerCase());
-      if (user != null) {
-        final policy = await _throttles.loadPolicy();
-        final limited = await _throttles.enforceVerificationCodeSendGuards(
-          email: user.email,
-          requestIp: requestIp,
-          policy: policy,
-          emailScope: _resetEmailScope,
-          ipScope: _resetIpScope,
-          cooldownScope: _resetCooldownScope,
-          emailLimit: policy.adminLoginCodeEmailLimit,
-          ipLimit: policy.adminLoginCodeIpLimit,
-        );
-        if (limited != null) {
-          return EmailActionAttempt.failure(
-            code: limited.code,
-            message: limited.message,
-            statusCode: limited.statusCode,
-          );
-        }
-        await _emailCodes.issuePasswordResetCode(user.email);
-        await _throttles.startVerificationCodeCooldown(
-          email: user.email,
-          seconds: policy.passwordResetCodeCooldownSeconds,
-          cooldownScope: _resetCooldownScope,
+      final normalizedAccount = account.trim().toLowerCase();
+      final policy = await _throttles.loadPolicy();
+      final limited = await _throttles.enforceVerificationCodeSendGuards(
+        email: normalizedAccount,
+        requestIp: requestIp,
+        policy: policy,
+        emailScope: _resetEmailScope,
+        ipScope: _resetIpScope,
+        cooldownScope: _resetCooldownScope,
+        emailLimit: policy.adminLoginCodeEmailLimit,
+        ipLimit: policy.adminLoginCodeIpLimit,
+      );
+      if (limited != null) {
+        return EmailActionAttempt.failure(
+          code: limited.code,
+          message: limited.message,
+          statusCode: limited.statusCode,
         );
       }
+      final user = await _users.findByEmail(normalizedAccount);
+      if (user != null) {
+        try {
+          await _emailCodes.issuePasswordResetCode(user.email);
+        } catch (_) {
+          // The public response intentionally hides delivery and account state.
+        }
+      }
+      await _throttles.startVerificationCodeCooldown(
+        email: normalizedAccount,
+        seconds: policy.passwordResetCodeCooldownSeconds,
+        cooldownScope: _resetCooldownScope,
+      );
       // Do not disclose whether an account exists.
       return const EmailActionAttempt.success();
     }
@@ -91,20 +100,40 @@ class AccountRecoveryService {
           message: '手机号格式不正确。',
         );
       }
+      final policy = await _throttles.loadPolicy();
+      final limited = await _throttles.enforceVerificationCodeSendGuards(
+        email: normalized,
+        requestIp: requestIp,
+        policy: policy,
+        emailScope: _resetPhoneScope,
+        ipScope: _resetPhoneIpScope,
+        cooldownScope: _resetPhoneCooldownScope,
+        emailLimit: policy.adminLoginCodeEmailLimit,
+        ipLimit: policy.adminLoginCodeIpLimit,
+      );
+      if (limited != null) {
+        return EmailActionAttempt.failure(
+          code: limited.code,
+          message: limited.message,
+          statusCode: limited.statusCode,
+        );
+      }
       final user = await _users.findByPhoneNumber(normalized);
       if (user != null) {
-        final sent = await phones.sendCode(
-          phoneNumber: normalized,
-          requestIp: requestIp?.trim() ?? '',
-        );
-        if (!sent.ok) {
-          return EmailActionAttempt.failure(
-            code: sent.code ?? 'temporary_issue',
-            message: sent.message ?? '验证码发送失败，请稍后重试。',
-            statusCode: sent.statusCode,
+        try {
+          await phones.sendCode(
+            phoneNumber: normalized,
+            requestIp: requestIp?.trim() ?? '',
           );
+        } catch (_) {
+          // The public response intentionally hides delivery and account state.
         }
       }
+      await _throttles.startVerificationCodeCooldown(
+        email: normalized,
+        seconds: policy.passwordResetCodeCooldownSeconds,
+        cooldownScope: _resetPhoneCooldownScope,
+      );
       return const EmailActionAttempt.success();
     }
     return const EmailActionAttempt.failure(

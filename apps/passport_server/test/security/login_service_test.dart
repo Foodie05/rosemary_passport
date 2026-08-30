@@ -393,7 +393,8 @@ void main() {
           cooldownScope: any(named: 'cooldownScope'),
         ),
       ).thenAnswer((_) async {});
-      expect((await service.sendEmailCode(email: user.email)).ok, isTrue);
+      final missing = await service.sendEmailCode(email: user.email);
+      expect(missing.ok, isTrue);
       when(() => users.findByEmail(any())).thenAnswer((_) async => user);
       when(
         () => emailCodes.issueLoginCode(
@@ -401,7 +402,19 @@ void main() {
           templateName: any(named: 'templateName'),
         ),
       ).thenAnswer((_) async => 'code-id');
-      expect((await service.sendEmailCode(email: user.email)).ok, isTrue);
+      final existing = await service.sendEmailCode(email: user.email);
+      expect(existing.ok, isTrue);
+      expect(existing.message, missing.message);
+
+      when(
+        () => emailCodes.issueLoginCode(
+          user.email,
+          templateName: any(named: 'templateName'),
+        ),
+      ).thenThrow(StateError('provider unavailable'));
+      final unavailable = await service.sendEmailCode(email: user.email);
+      expect(unavailable.ok, isTrue);
+      expect(unavailable.message, missing.message);
     },
   );
 
@@ -774,10 +787,10 @@ void main() {
       );
       when(() => phones.normalizePhone(any())).thenReturn('+8613800000000');
       when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
-      expect(
-        (await service.sendPhoneCode(phoneNumber: '13800000000')).ok,
-        isTrue,
+      final missingPhone = await service.sendPhoneCode(
+        phoneNumber: '13800000000',
       );
+      expect(missingPhone.ok, isTrue);
       expect(
         (await service.loginWithPhoneCode(
           phoneNumber: '13800000000',
@@ -786,6 +799,23 @@ void main() {
         'login_failed',
       );
       when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
+      when(
+        () => phones.sendCode(
+          phoneNumber: any(named: 'phoneNumber'),
+          requestIp: any(named: 'requestIp'),
+        ),
+      ).thenAnswer(
+        (_) async => const PhoneVerificationAttempt.failure(
+          code: 'temporary_issue',
+          message: 'provider failed',
+          statusCode: 503,
+        ),
+      );
+      final unavailablePhone = await service.sendPhoneCode(
+        phoneNumber: '13800000000',
+      );
+      expect(unavailablePhone.ok, isTrue);
+      expect(unavailablePhone.message, missingPhone.message);
       when(
         () => phones.verifyCode(
           phoneNumber: any(named: 'phoneNumber'),
