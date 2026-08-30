@@ -193,6 +193,115 @@ void main() {
   );
 
   test(
+    'session issuance stores short-lived first-party token metadata',
+    () async {
+      final sessions = SessionService(
+        userRepository: users,
+        tokenService: tokens,
+        oidcRepository: oidc,
+        auditService: audit,
+      );
+      when(
+        () => tokens.firstPartyRefreshTokenTtlSeconds(
+          rememberMe: any(named: 'rememberMe'),
+        ),
+      ).thenReturn(1200);
+      when(
+        () => tokens.issueTokenPair(
+          any(),
+          clientId: any(named: 'clientId'),
+          scopes: any(named: 'scopes'),
+          nonce: any(named: 'nonce'),
+          familyId: any(named: 'familyId'),
+          refreshTokenTtlSeconds: any(named: 'refreshTokenTtlSeconds'),
+          rememberSession: any(named: 'rememberSession'),
+          additionalAccessClaims: any(named: 'additionalAccessClaims'),
+        ),
+      ).thenReturn(pair);
+      when(() => tokens.accessTokenTtlSeconds).thenReturn(900);
+      when(
+        () => oidc.storeTokenPair(
+          accessTokenId: any(named: 'accessTokenId'),
+          refreshTokenId: any(named: 'refreshTokenId'),
+          familyId: any(named: 'familyId'),
+          userId: any(named: 'userId'),
+          clientId: any(named: 'clientId'),
+          accessExpiresAt: any(named: 'accessExpiresAt'),
+          refreshExpiresAt: any(named: 'refreshExpiresAt'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final standard = await sessions.issueFirstPartyAuthResult(user);
+      expect(standard.postRegistrationPasskeyBootstrap, isFalse);
+      final bootstrap = await sessions.issueFirstPartyAuthResult(
+        user,
+        postRegistrationPasskeyBootstrap: true,
+        rememberMe: true,
+      );
+      expect(bootstrap.postRegistrationPasskeyBootstrap, isTrue);
+      final captured =
+          verify(
+                () => tokens.issueTokenPair(
+                  any(),
+                  clientId: any(named: 'clientId'),
+                  scopes: any(named: 'scopes'),
+                  nonce: any(named: 'nonce'),
+                  familyId: any(named: 'familyId'),
+                  refreshTokenTtlSeconds: any(named: 'refreshTokenTtlSeconds'),
+                  rememberSession: true,
+                  additionalAccessClaims: captureAny(
+                    named: 'additionalAccessClaims',
+                  ),
+                ),
+              ).captured.single
+              as Map<String, dynamic>;
+      expect(captured['post_register_passkey_bootstrap_until'], isA<int>());
+      verify(
+        () => oidc.storeTokenPair(
+          accessTokenId: pair.accessTokenId,
+          refreshTokenId: pair.refreshTokenId,
+          familyId: pair.familyId,
+          userId: user.id,
+          clientId: 'first_party_web',
+          accessExpiresAt: any(named: 'accessExpiresAt'),
+          refreshExpiresAt: any(named: 'refreshExpiresAt'),
+        ),
+      ).called(2);
+    },
+  );
+
+  test(
+    'user-wide revocation can preserve the newly issued access token',
+    () async {
+      final sessions = SessionService(
+        userRepository: users,
+        tokenService: tokens,
+        oidcRepository: oidc,
+        auditService: audit,
+      );
+      when(
+        () => oidc.revokeRefreshTokensForUser(user.id),
+      ).thenAnswer((_) async {});
+      when(
+        () => oidc.revokeAccessTokensForUser(user.id),
+      ).thenAnswer((_) async {});
+      when(
+        () => oidc.revokeAccessTokensForUserExcept(user.id, 'preserved-id'),
+      ).thenAnswer((_) async {});
+
+      await sessions.revokeAllUserSessions(user.id);
+      await sessions.revokeAllUserSessions(
+        user.id,
+        preservedAccessTokenId: 'preserved-id',
+      );
+      verify(() => oidc.revokeAccessTokensForUser(user.id)).called(1);
+      verify(
+        () => oidc.revokeAccessTokensForUserExcept(user.id, 'preserved-id'),
+      ).called(1);
+    },
+  );
+
+  test(
     'refresh enforces configured IP throttling before token validation',
     () async {
       final security = _MockSecurity();

@@ -2,6 +2,7 @@ import '../repositories/oidc_repository.dart';
 import '../repositories/user_repository.dart';
 import '../security/token_service.dart';
 import 'audit_service.dart';
+import 'auth_attempts.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
 
@@ -11,6 +12,8 @@ import 'security_service.dart';
 /// registration makes its transaction and compatibility rules independently
 /// testable without changing the public [AuthService] API.
 class SessionService {
+  static const _postRegistrationPasskeyBootstrapSeconds = 600;
+
   SessionService({
     required UserRepository userRepository,
     required TokenService tokenService,
@@ -31,6 +34,68 @@ class SessionService {
   final AuditService _audit;
   final SecurityService? _security;
   final SecurityPolicyService? _policy;
+
+  Future<AuthResult> issueFirstPartyAuthResult(
+    UserRecord user, {
+    bool postRegistrationPasskeyBootstrap = false,
+    bool rememberMe = false,
+  }) async {
+    // This short-lived claim is only minted on the access token returned by
+    // self-registration. Refreshed and later login sessions never receive it.
+    final bootstrapUntilEpochSeconds = postRegistrationPasskeyBootstrap
+        ? DateTime.now()
+                  .toUtc()
+                  .add(
+                    const Duration(
+                      seconds: _postRegistrationPasskeyBootstrapSeconds,
+                    ),
+                  )
+                  .millisecondsSinceEpoch ~/
+              1000
+        : null;
+    final refreshTokenTtlSeconds = _tokens.firstPartyRefreshTokenTtlSeconds(
+      rememberMe: rememberMe,
+    );
+    final tokens = _tokens.issueTokenPair(
+      user.toAuthenticatedUser(),
+      refreshTokenTtlSeconds: refreshTokenTtlSeconds,
+      rememberSession: rememberMe,
+      additionalAccessClaims: {
+        if (bootstrapUntilEpochSeconds != null)
+          'post_register_passkey_bootstrap_until': bootstrapUntilEpochSeconds,
+      },
+    );
+    final now = DateTime.now().toUtc();
+    await _oidc.storeTokenPair(
+      accessTokenId: tokens.accessTokenId,
+      refreshTokenId: tokens.refreshTokenId,
+      familyId: tokens.familyId,
+      userId: user.id,
+      clientId: 'first_party_web',
+      accessExpiresAt: now.add(
+        Duration(seconds: _tokens.accessTokenTtlSeconds),
+      ),
+      refreshExpiresAt: now.add(Duration(seconds: refreshTokenTtlSeconds)),
+    );
+    return AuthResult(
+      user: user.toAuthenticatedUser(),
+      tokens: tokens,
+      postRegistrationPasskeyBootstrap: postRegistrationPasskeyBootstrap,
+    );
+  }
+
+  Future<void> revokeAllUserSessions(
+    String userId, {
+    String? preservedAccessTokenId,
+  }) {
+    return Future.wait([
+      _oidc.revokeRefreshTokensForUser(userId),
+      if (preservedAccessTokenId == null || preservedAccessTokenId.isEmpty)
+        _oidc.revokeAccessTokensForUser(userId)
+      else
+        _oidc.revokeAccessTokensForUserExcept(userId, preservedAccessTokenId),
+    ]);
+  }
 
   Future<TokenPair?> refresh(String refreshToken) {
     return refreshForClient(refreshToken, clientId: 'first_party_web');

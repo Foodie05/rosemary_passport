@@ -21,8 +21,6 @@ import 'session_service.dart';
 import 'webauthn_service.dart';
 
 class AuthService {
-  static const _postRegistrationPasskeyBootstrapSeconds = 600;
-
   AuthService({
     required UserRepository userRepository,
     required PasswordHasher passwordHasher,
@@ -41,10 +39,8 @@ class AuthService {
   }) : _users = userRepository,
        _passwordHasher = passwordHasher,
        _passwordPolicy = passwordPolicy,
-       _tokenService = tokenService,
        _emailCodeService = emailCodeService,
        _captchaService = captchaService,
-       _oidcRepository = oidcRepository,
        _settings = settingsRepository,
        _audit = auditService,
        _security = securityService,
@@ -71,10 +67,8 @@ class AuthService {
   final UserRepository _users;
   final PasswordHasher _passwordHasher;
   final PasswordPolicy _passwordPolicy;
-  final TokenService _tokenService;
   final EmailCodeService _emailCodeService;
   final CaptchaService _captchaService;
-  final OidcRepository _oidcRepository;
   final SettingsRepository _settings;
   final AuditService _audit;
   final SecurityService? _security;
@@ -2284,48 +2278,10 @@ class AuthService {
     bool postRegistrationPasskeyBootstrap = false,
     bool rememberMe = false,
   }) async {
-    // This short-lived claim is intentionally only minted on the access token
-    // returned by self-registration. Later logins and refreshed sessions do
-    // not receive it, so the no-password onboarding flow cannot become a
-    // general-purpose bypass for adding new passkeys.
-    final bootstrapUntilEpochSeconds = postRegistrationPasskeyBootstrap
-        ? DateTime.now()
-                  .toUtc()
-                  .add(
-                    const Duration(
-                      seconds: _postRegistrationPasskeyBootstrapSeconds,
-                    ),
-                  )
-                  .millisecondsSinceEpoch ~/
-              1000
-        : null;
-    final refreshTokenTtlSeconds = _tokenService
-        .firstPartyRefreshTokenTtlSeconds(rememberMe: rememberMe);
-    final tokens = _tokenService.issueTokenPair(
-      user.toAuthenticatedUser(),
-      refreshTokenTtlSeconds: refreshTokenTtlSeconds,
-      rememberSession: rememberMe,
-      additionalAccessClaims: {
-        if (bootstrapUntilEpochSeconds != null)
-          'post_register_passkey_bootstrap_until': bootstrapUntilEpochSeconds,
-      },
-    );
-    final now = DateTime.now().toUtc();
-    await _oidcRepository.storeTokenPair(
-      accessTokenId: tokens.accessTokenId,
-      refreshTokenId: tokens.refreshTokenId,
-      familyId: tokens.familyId,
-      userId: user.id,
-      clientId: 'first_party_web',
-      accessExpiresAt: now.add(
-        Duration(seconds: _tokenService.accessTokenTtlSeconds),
-      ),
-      refreshExpiresAt: now.add(Duration(seconds: refreshTokenTtlSeconds)),
-    );
-    return AuthResult(
-      user: user.toAuthenticatedUser(),
-      tokens: tokens,
+    return _sessions.issueFirstPartyAuthResult(
+      user,
       postRegistrationPasskeyBootstrap: postRegistrationPasskeyBootstrap,
+      rememberMe: rememberMe,
     );
   }
 
@@ -2361,15 +2317,9 @@ class AuthService {
     String userId, {
     String? preservedAccessTokenId,
   }) {
-    return Future.wait([
-      _oidcRepository.revokeRefreshTokensForUser(userId),
-      if (preservedAccessTokenId == null || preservedAccessTokenId.isEmpty)
-        _oidcRepository.revokeAccessTokensForUser(userId)
-      else
-        _oidcRepository.revokeAccessTokensForUserExcept(
-          userId,
-          preservedAccessTokenId,
-        ),
-    ]);
+    return _sessions.revokeAllUserSessions(
+      userId,
+      preservedAccessTokenId: preservedAccessTokenId,
+    );
   }
 }
