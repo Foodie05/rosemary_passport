@@ -28,6 +28,8 @@ Docker Compose 管理，Apache 只代理 `127.0.0.1:8091` 并托管原子切换�
 - JWT 轮换：生成新的 `<kid>.private.pem` / `<kid>.public.pem`，先加入 keyring，再修改
   `JWT_ACTIVE_KID`。至少保留上一把公钥至所有旧令牌过期后再移除。
 - 数据密钥轮换：加入新的 `<kid>.key` 并修改 `DATA_ENCRYPTION_ACTIVE_KID`；旧密钥必须保留，直到完成受控重加密和抽样解密验证。
+- `LEGACY_JSON_REFRESH_SUNSET_AT` 在首次加固发布时一次性设置为该发布时间加 14 天；
+  不得滚动延后。到期后 JSON Refresh Token 自动拒绝，Refresh Cookie 不受影响。
 
 ## 备份、审计与恢复
 

@@ -37,6 +37,7 @@ void main() {
     expect(config.firstPartyRefreshTokenTtlSeconds, 43200);
     expect(config.firstPartyRememberedRefreshTokenTtlSeconds, 2592000);
     expect(config.refreshTokenTtlSeconds, 2592000);
+    expect(config.legacyJsonRefreshSunsetAt, DateTime.utc(2026, 9, 13));
     expect(config.argon2MemoryKb, 65536);
     expect(config.argon2Iterations, 4);
     expect(config.argon2Parallelism, 1);
@@ -96,6 +97,7 @@ void main() {
       'FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS': '100',
       'FIRST_PARTY_REMEMBERED_REFRESH_TOKEN_TTL_SECONDS': '200',
       'REFRESH_TOKEN_TTL_SECONDS': '300',
+      'LEGACY_JSON_REFRESH_SUNSET_AT': '2026-09-14T08:00:00+08:00',
       'ARGON2_MEMORY_KB': '32768',
       'ARGON2_ITERATIONS': '3',
       'ARGON2_PARALLELISM': '2',
@@ -154,6 +156,11 @@ void main() {
     expect(config.firstPartyRefreshTokenTtlSeconds, 100);
     expect(config.firstPartyRememberedRefreshTokenTtlSeconds, 200);
     expect(config.refreshTokenTtlSeconds, 300);
+    expect(config.legacyJsonRefreshSunsetAt, DateTime.utc(2026, 9, 14));
+    expect(
+      config.allowsLegacyJsonRefresh(now: DateTime.utc(2026, 9, 14)),
+      isFalse,
+    );
     expect(config.argon2MemoryKb, 32768);
     expect(config.argon2Iterations, 3);
     expect(config.argon2Parallelism, 2);
@@ -262,5 +269,26 @@ void main() {
     });
     expect(malformed.webBaseUrl, 'http://localhost:5173');
     expect(malformed.corsAllowedOrigins, contains('http://localhost:5173'));
+  });
+
+  test('legacy JSON refresh compatibility has a fixed cutoff', () {
+    final config = AppConfig.forTesting(const {
+      'LEGACY_JSON_REFRESH_SUNSET_AT': '2026-09-13T00:00:00Z',
+    });
+    expect(
+      config.allowsLegacyJsonRefresh(
+        now: DateTime.utc(2026, 9, 12, 23, 59, 59),
+      ),
+      isTrue,
+    );
+    expect(
+      config.allowsLegacyJsonRefresh(now: DateTime.utc(2026, 9, 13)),
+      isFalse,
+    );
+
+    final malformed = AppConfig.forTesting(const {
+      'LEGACY_JSON_REFRESH_SUNSET_AT': '2026-09-13 00:00:00',
+    });
+    expect(() => malformed.legacyJsonRefreshSunsetAt, throwsFormatException);
   });
 }

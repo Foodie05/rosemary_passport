@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dart_frog/dart_frog.dart';
 
 import '../../../../lib/src/config/app_config.dart';
@@ -22,6 +24,18 @@ Future<Response> onRequest(RequestContext context) async {
     context.request.headers['cookie'],
     config,
   );
+  if (legacyBodyToken.isNotEmpty && !config.allowsLegacyJsonRefresh()) {
+    return errorResponse(
+      'legacy_refresh_retired',
+      'JSON refresh tokens are no longer accepted. Use the secure refresh cookie.',
+      statusCode: 400,
+    ).copyWith(
+      headers: {
+        'sunset': HttpDate.format(config.legacyJsonRefreshSunsetAt),
+        'link': '</api/v1/auth/refresh>; rel="successor-version"',
+      },
+    );
+  }
   final refreshToken = legacyBodyToken.isNotEmpty
       ? legacyBodyToken
       : cookieToken ?? '';
@@ -75,10 +89,7 @@ Future<Response> onRequest(RequestContext context) async {
   return response.copyWith(
     headers: {
       'deprecation': 'true',
-      'sunset': DateTime.now()
-          .toUtc()
-          .add(const Duration(days: 14))
-          .toIso8601String(),
+      'sunset': HttpDate.format(config.legacyJsonRefreshSunsetAt),
       'link': '</api/v1/auth/refresh>; rel="successor-version"',
     },
   );

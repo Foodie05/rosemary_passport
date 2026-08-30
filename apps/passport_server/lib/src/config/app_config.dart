@@ -119,6 +119,24 @@ class AppConfig {
   );
   int get refreshTokenTtlSeconds =>
       int.parse(_env['REFRESH_TOKEN_TTL_SECONDS'] ?? '2592000');
+  DateTime get legacyJsonRefreshSunsetAt {
+    final raw = (_env['LEGACY_JSON_REFRESH_SUNSET_AT'] ?? '').trim();
+    if (raw.isEmpty) {
+      return DateTime.utc(2026, 9, 13);
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null ||
+        (!raw.endsWith('Z') && !raw.contains(RegExp(r'[+-]\d\d:\d\d$')))) {
+      throw const FormatException(
+        'LEGACY_JSON_REFRESH_SUNSET_AT must include a UTC offset.',
+      );
+    }
+    return parsed.toUtc();
+  }
+
+  bool allowsLegacyJsonRefresh({DateTime? now}) {
+    return (now ?? DateTime.now().toUtc()).isBefore(legacyJsonRefreshSunsetAt);
+  }
 
   int get argon2MemoryKb => int.parse(_env['ARGON2_MEMORY_KB'] ?? '65536');
   int get argon2Iterations => int.parse(_env['ARGON2_ITERATIONS'] ?? '4');
@@ -352,6 +370,15 @@ class AppConfig {
     }
     if (requireFileSecrets && !_criticalSecretsUseFiles()) {
       weakSecrets.add('production secrets must use *_FILE');
+    }
+    try {
+      legacyJsonRefreshSunsetAt;
+      if (requireFileSecrets &&
+          (_env['LEGACY_JSON_REFRESH_SUNSET_AT'] ?? '').trim().isEmpty) {
+        weakSecrets.add('LEGACY_JSON_REFRESH_SUNSET_AT');
+      }
+    } catch (_) {
+      weakSecrets.add('LEGACY_JSON_REFRESH_SUNSET_AT');
     }
     if (weakSecrets.isEmpty || _isLocalDevelopmentHost) {
       return;

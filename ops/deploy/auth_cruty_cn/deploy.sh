@@ -83,6 +83,9 @@ done
 if grep -Eq 'REPLACE_WITH_VERIFIED_DIGEST|^[[:space:]]*(POSTGRES_IMAGE|NODE_IMAGE)=[^@]*$' "$RUNTIME_ENV_FILE"; then
   die "runtime images must use verified sha256 digests"
 fi
+if grep -q 'LEGACY_JSON_REFRESH_SUNSET_AT=REPLACE_' "$RUNTIME_ENV_FILE"; then
+  die "legacy JSON refresh sunset must be a fixed UTC timestamp"
+fi
 
 compose() { docker compose --env-file "$RUNTIME_ENV_FILE" "$@"; }
 
