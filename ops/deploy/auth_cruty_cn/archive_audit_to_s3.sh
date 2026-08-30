@@ -17,10 +17,31 @@ POSTGRES_DB="$(read_env POSTGRES_DB)"
 export AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
 export AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
+versioning="$(aws --endpoint-url "$S3_ENDPOINT" s3api get-bucket-versioning \
+  --bucket "$S3_BUCKET" --query Status --output text)"
+[[ "$versioning" == "Enabled" ]] || {
+  echo "S3 bucket versioning must be enabled" >&2
+  exit 78
+}
 
 archive="$TMP_DIR/audit-$TIMESTAMP.jsonl"
 (
   cd "$TARGET_DIR"
+  broken_links="$(docker compose --env-file "$RUNTIME_ENV_FILE" exec -T postgres \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc \
+      "with chain as (
+         select previous_hash,
+                lag(entry_hash) over (order by created_at, id) as expected_previous,
+                row_number() over (order by created_at, id) as position
+         from audit_logs where entry_hash is not null
+       )
+       select count(*) from chain
+       where (position = 1 and previous_hash is not null)
+          or (position > 1 and previous_hash is distinct from expected_previous)")"
+  [[ "$broken_links" == 0 ]] || {
+    echo "audit hash chain linkage validation failed" >&2
+    exit 65
+  }
   docker compose --env-file "$RUNTIME_ENV_FILE" exec -T postgres \
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc \
       "select jsonb_build_object(
