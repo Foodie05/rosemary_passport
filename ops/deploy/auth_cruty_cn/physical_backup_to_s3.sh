@@ -37,12 +37,12 @@ openssl enc -aes-256-cbc -pbkdf2 -salt \
   -pass file:"$SECRETS_DIR/backup_encryption_key" \
   -in "$base_path" -out "$encrypted_path"
 checksum="$(sha256sum "$encrypted_path" | awk '{print $1}')"
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$encrypted_path" \
-  "s3://$S3_BUCKET/$object_key" --only-show-errors
+uploader="$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh"
+"$uploader" "$encrypted_path" "$S3_ENDPOINT" "$S3_BUCKET" "$object_key"
 printf '{"created_at":"%s","object":"%s","sha256":"%s","wal_prefix":"wal/"}\n' \
   "$TIMESTAMP" "$object_key" "$checksum" >"$TMP_DIR/manifest.json"
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$TMP_DIR/manifest.json" \
-  "s3://$S3_BUCKET/physical/$TIMESTAMP/manifest.json" --only-show-errors
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$TMP_DIR/manifest.json" \
-  "s3://$S3_BUCKET/physical/latest.json" --only-show-errors
+"$uploader" "$TMP_DIR/manifest.json" "$S3_ENDPOINT" "$S3_BUCKET" \
+  "physical/$TIMESTAMP/manifest.json"
+"$uploader" "$TMP_DIR/manifest.json" "$S3_ENDPOINT" "$S3_BUCKET" \
+  "physical/latest.json"
 printf 'physical_backup_object=%s\n' "$object_key"

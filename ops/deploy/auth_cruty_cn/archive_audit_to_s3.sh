@@ -49,11 +49,11 @@ openssl pkeyutl -verify -rawin \
   -pubin -inkey "$SECRETS_DIR/audit_signing.public.pem" \
   -in "$archive" -sigfile "$archive.sig" >/dev/null
 object_prefix="audit/$TIMESTAMP"
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$archive" \
-  "s3://$S3_BUCKET/$object_prefix/audit.jsonl" --only-show-errors
-aws --endpoint-url "$S3_ENDPOINT" s3 cp "$archive.sig" \
-  "s3://$S3_BUCKET/$object_prefix/audit.jsonl.sig" --only-show-errors
-aws --endpoint-url "$S3_ENDPOINT" s3 cp \
-  "$SECRETS_DIR/audit_signing.public.pem" \
-  "s3://$S3_BUCKET/$object_prefix/audit_signing.public.pem" --only-show-errors
+uploader="$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh"
+"$uploader" "$archive" "$S3_ENDPOINT" "$S3_BUCKET" \
+  "$object_prefix/audit.jsonl"
+"$uploader" "$archive.sig" "$S3_ENDPOINT" "$S3_BUCKET" \
+  "$object_prefix/audit.jsonl.sig"
+"$uploader" "$SECRETS_DIR/audit_signing.public.pem" \
+  "$S3_ENDPOINT" "$S3_BUCKET" "$object_prefix/audit_signing.public.pem"
 printf 'audit_archive=s3://%s/%s\n' "$S3_BUCKET" "$object_prefix"

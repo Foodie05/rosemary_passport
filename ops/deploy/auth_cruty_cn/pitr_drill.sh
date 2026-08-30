@@ -184,11 +184,12 @@ openssl pkeyutl -verify -rawin -pubin -inkey "$secrets_dir/audit_signing.public.
   -in "$evidence_file" -sigfile "$signature_file" >/dev/null
 chmod 0600 "$signature_file"
 archive_prefix="drills/pitr/$timestamp"
-aws --endpoint-url "$s3_endpoint" s3 cp "$evidence_file" \
-  "s3://$s3_bucket/$archive_prefix/evidence.json" --only-show-errors
-aws --endpoint-url "$s3_endpoint" s3 cp "$signature_file" \
-  "s3://$s3_bucket/$archive_prefix/evidence.json.sig" --only-show-errors
-aws --endpoint-url "$s3_endpoint" s3 cp "$secrets_dir/audit_signing.public.pem" \
-  "s3://$s3_bucket/$archive_prefix/audit_signing.public.pem" --only-show-errors
+uploader="$script_dir/upload_s3_verified.sh"
+"$uploader" "$evidence_file" "$s3_endpoint" "$s3_bucket" \
+  "$archive_prefix/evidence.json"
+"$uploader" "$signature_file" "$s3_endpoint" "$s3_bucket" \
+  "$archive_prefix/evidence.json.sig"
+"$uploader" "$secrets_dir/audit_signing.public.pem" \
+  "$s3_endpoint" "$s3_bucket" "$archive_prefix/audit_signing.public.pem"
 printf '[pitr-drill] passed: RPO=%ss RTO=%ss evidence=%s\n' \
   "$rpo_seconds" "$rto_seconds" "$evidence_file"

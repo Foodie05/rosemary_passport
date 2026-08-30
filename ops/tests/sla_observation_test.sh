@@ -43,18 +43,31 @@ cat >"$test_dir/bin/aws" <<'EOF'
 set -Eeuo pipefail
 case " $* " in
   *' s3api get-bucket-versioning '*) printf 'Enabled\n' ;;
-  *' s3api head-object '*) date -u '+%Y-%m-%dT%H:%M:%SZ' ;;
+  *' s3api head-object '*' Metadata.sha256 '*) cat "$SLA_TEST_STATE/upload.sha" ;;
+  *' s3api head-object '*' ContentLength '*) cat "$SLA_TEST_STATE/upload.size" ;;
+  *' s3api head-object '*' LastModified '*) date -u '+%Y-%m-%dT%H:%M:%SZ' ;;
   *' s3api list-objects-v2 '*)
     now="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     printf '{"Key":"wal/000000010000000000000001.enc","LastModified":"%s"}\n' "$now"
     ;;
-  *' s3 cp '*) exit 0 ;;
+  *' s3 cp '*)
+    while [[ $# -gt 0 && "$1" != cp ]]; do shift; done
+    source_file="${2:?}"
+    while [[ $# -gt 0 && "$1" != --metadata ]]; do shift; done
+    printf '%s\n' "${2#sha256=}" >"$SLA_TEST_STATE/upload.sha"
+    if stat -c '%s' "$source_file" >/dev/null 2>&1; then
+      stat -c '%s' "$source_file" >"$SLA_TEST_STATE/upload.size"
+    else
+      stat -f '%z' "$source_file" >"$SLA_TEST_STATE/upload.size"
+    fi
+    ;;
   *) printf 'unexpected aws invocation: %s\n' "$*" >&2; exit 2 ;;
 esac
 EOF
 chmod 0700 "$test_dir/bin/"*
 
 export PATH="$test_dir/bin:$PATH"
+export SLA_TEST_STATE="$test_dir"
 export ROSM_OBSERVATION_CONFIRM=record-production-sla-evidence
 export ROSM_OBSERVATION_MIN_FREE_MB=0
 dates=(

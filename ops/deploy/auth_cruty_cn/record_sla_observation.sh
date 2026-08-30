@@ -142,11 +142,12 @@ else
 fi
 
 archive_prefix="observation/$observation_date"
-aws --endpoint-url "$s3_endpoint" s3 cp "$record_file" \
-  "s3://$s3_bucket/$archive_prefix/evidence.json" --only-show-errors
-aws --endpoint-url "$s3_endpoint" s3 cp "$signature_file" \
-  "s3://$s3_bucket/$archive_prefix/evidence.json.sig" --only-show-errors
-aws --endpoint-url "$s3_endpoint" s3 cp "$secrets_dir/audit_signing.public.pem" \
-  "s3://$s3_bucket/$archive_prefix/audit_signing.public.pem" --only-show-errors
+uploader="$script_dir/upload_s3_verified.sh"
+"$uploader" "$record_file" "$s3_endpoint" "$s3_bucket" \
+  "$archive_prefix/evidence.json"
+"$uploader" "$signature_file" "$s3_endpoint" "$s3_bucket" \
+  "$archive_prefix/evidence.json.sig"
+"$uploader" "$secrets_dir/audit_signing.public.pem" \
+  "$s3_endpoint" "$s3_bucket" "$archive_prefix/audit_signing.public.pem"
 printf '[sla-observation] %s: %s hash=%s\n' "$observation_date" "$result" "$entry_hash"
 [[ "$result" == passed ]]
