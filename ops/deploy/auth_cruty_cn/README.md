@@ -43,6 +43,10 @@ PITR 演练必须在隔离主机进行：下载 `physical/latest.json` 指向的
 每月至少演练一次并记录：最后已归档 WAL 时间、目标恢复时间、服务恢复时间。只有实测
 `RPO <= 5 分钟` 且 `RTO <= 30 分钟` 才能通过发布门禁。
 
+API、helper 和 PostgreSQL 的受控重启演练使用 `ops/tests/fault_recovery_drill.sh`。脚本要求
+显式确认，先创建加密 S3 备份，再逐项重启并将 readiness 恢复耗时写入权限为 `0600` 的
+JSONL 证据；应只在已批准的维护窗口或隔离演练环境运行。
+
 ## 运维门禁
 
 - 每次发布前执行 CI 的格式、静态分析、单元/集成测试、依赖审计、secret scan、Trivy 和 SBOM。
