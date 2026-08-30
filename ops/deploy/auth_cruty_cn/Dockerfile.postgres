@@ -1,11 +1,12 @@
-ARG POSTGRES_IMAGE=postgres:16.10-bookworm
+ARG POSTGRES_IMAGE=postgres:16.15-bookworm
 FROM ${POSTGRES_IMAGE}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends awscli openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
+COPY gosu-setpriv.sh /usr/local/bin/gosu
 COPY postgres/archive-wal.sh /usr/local/bin/archive-wal.sh
 COPY postgres/postgres-entrypoint.sh /usr/local/bin/rosm-postgres-entrypoint.sh
-RUN chmod 0555 /usr/local/bin/archive-wal.sh /usr/local/bin/rosm-postgres-entrypoint.sh
+RUN chmod 0555 /usr/local/bin/gosu /usr/local/bin/archive-wal.sh /usr/local/bin/rosm-postgres-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/rosm-postgres-entrypoint.sh"]

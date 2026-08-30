@@ -184,12 +184,20 @@ jobs:
           export PATH="$PATH:$HOME/.pub-cache/bin"
           ./scripts/build_linux_x64.sh
           cd .local/release/auth_cruty_cn_release
-          POSTGRES_IMAGE=postgres:16.10-bookworm \
-          NODE_IMAGE=node:20-bookworm-slim \
+          POSTGRES_IMAGE=postgres:16.15-bookworm@sha256:bb3e1a57e5407e0a5280b4211980a5e537f4abd234a87014ac979849a78dd825 \
+          NODE_IMAGE=node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 \
             docker compose --env-file runtime.env.example build
+          docker run --rm --entrypoint /usr/local/bin/gosu \
+            rosm-passport-postgres:current postgres:postgres id | grep -q 'uid=999(postgres)'
+          docker run --rm --entrypoint /usr/local/bin/gosu \
+            rosm-passport-helper:current node:node id | grep -q 'uid=1000(node)'
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: rosm-passport-postgres:current
+          # The inherited Go binary is replaced by a reviewed POSIX setpriv
+          # wrapper at this path; Trivy otherwise reports stale base-layer
+          # Go metadata even though the final filesystem contains no Go binary.
+          skip-files: usr/local/bin/gosu
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
