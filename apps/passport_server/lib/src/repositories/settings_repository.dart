@@ -48,6 +48,10 @@ class SettingsRepository {
         continue;
       }
       await upsertJson(key, raw);
+      final verified = await getJson(key);
+      if (_canonicalJson(verified) != _canonicalJson(raw)) {
+        throw StateError('Encrypted settings backfill verification failed.');
+      }
       migrated++;
     }
     return migrated;
@@ -164,5 +168,20 @@ class SettingsRepository {
       }
     }
     return {};
+  }
+
+  String _canonicalJson(dynamic value) {
+    dynamic normalize(dynamic item) {
+      if (item is Map) {
+        final keys = item.keys.map((key) => key.toString()).toList()..sort();
+        return {for (final key in keys) key: normalize(item[key])};
+      }
+      if (item is List) {
+        return item.map(normalize).toList();
+      }
+      return item;
+    }
+
+    return jsonEncode(normalize(value));
   }
 }

@@ -386,6 +386,12 @@ class UserRepository {
         ''',
         params: {'secret': encrypted, 'user_id': userId},
       );
+      final verified = await findAuthenticatorSecretByUserId(userId);
+      if (verified != plaintext) {
+        throw StateError(
+          'Authenticator secret backfill verification failed for user $userId.',
+        );
+      }
       migrated++;
     }
     return migrated;
