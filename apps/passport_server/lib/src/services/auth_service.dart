@@ -12,6 +12,7 @@ import 'account_management_service.dart';
 import 'auth_attempts.dart';
 import 'auth_throttle_service.dart';
 import 'authenticator_service.dart';
+import 'bootstrap_access_service.dart';
 import 'captcha_service.dart';
 import 'credential_service.dart';
 import 'email_code_service.dart';
@@ -40,11 +41,7 @@ class AuthService {
     AuthenticatorService? authenticatorService,
     WebAuthnService? webAuthnService,
     PhoneVerificationService? phoneVerificationService,
-  }) : _users = userRepository,
-       _passwordHasher = passwordHasher,
-       _captchaService = captchaService,
-       _settings = settingsRepository,
-       _sessions = SessionService(
+  }) : _sessions = SessionService(
          userRepository: userRepository,
          tokenService: tokenService,
          oidcRepository: oidcRepository,
@@ -157,12 +154,14 @@ class AuthService {
          ),
          auditService: auditService,
          webAuthnService: webAuthnService,
+       ),
+       _bootstrap = BootstrapAccessService(
+         userRepository: userRepository,
+         passwordHasher: passwordHasher,
+         captchaService: captchaService,
+         settingsRepository: settingsRepository,
        );
 
-  final UserRepository _users;
-  final PasswordHasher _passwordHasher;
-  final CaptchaService _captchaService;
-  final SettingsRepository _settings;
   final SessionService _sessions;
   final CredentialService _credentials;
   final AuthThrottleService _throttles;
@@ -171,6 +170,7 @@ class AuthService {
   final RegistrationService _registration;
   final LoginService _login;
   final PasskeyLoginService _passkeyLogin;
+  final BootstrapAccessService _bootstrap;
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
   static const _verificationCodeRegisterIpScope =
@@ -199,33 +199,18 @@ class AuthService {
   static const _verificationCodeResetCooldownScope =
       'verification-code:password-reset:cooldown:email';
   Future<bool> verifyCaptcha(String token, {String? ip}) {
-    return _captchaService.verifyCaptchaToken(token, remoteIp: ip);
+    return _bootstrap.verifyCaptcha(token, ip: ip);
   }
 
   Future<bool> shouldBypassBootstrapCaptcha({
     required String email,
     required String password,
-  }) async {
-    final user = await _users.findByEmail(email);
-    if (user == null) {
-      return false;
-    }
-    final passwordValid = await _passwordHasher.verify(
-      user.passwordHash,
-      password,
-    );
-    if (!passwordValid) {
-      return false;
-    }
-    return isBootstrapAdmin(user);
+  }) {
+    return _bootstrap.shouldBypassCaptcha(email: email, password: password);
   }
 
-  Future<bool> shouldBypassBootstrapCaptchaForUser(String userId) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return false;
-    }
-    return isBootstrapAdmin(user);
+  Future<bool> shouldBypassBootstrapCaptchaForUser(String userId) {
+    return _bootstrap.shouldBypassCaptchaForUser(userId);
   }
 
   Future<AdminLoginCodeAttempt> sendRegisterCode({
@@ -819,18 +804,10 @@ class AuthService {
   }
 
   bool mustBindAdminEmail(UserRecord user) {
-    return user.roles.contains('admin') &&
-        _isReservedBootstrapEmail(user.email);
+    return _bootstrap.mustBindAdminEmail(user);
   }
 
-  Future<bool> isBootstrapAdmin(UserRecord user) async {
-    if (!mustBindAdminEmail(user)) {
-      return false;
-    }
-    return _settings.isBootstrapLoginEnabled();
-  }
-
-  bool _isReservedBootstrapEmail(String email) {
-    return email.toLowerCase().trim().endsWith('@rosm.local');
+  Future<bool> isBootstrapAdmin(UserRecord user) {
+    return _bootstrap.isBootstrapAdmin(user);
   }
 }

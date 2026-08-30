@@ -66,7 +66,7 @@ void main(List<String> arguments) {
   }
 
   const criticalSuffixes = [
-    '/lib/src/services/auth_service.dart',
+    '/lib/src/services/bootstrap_access_service.dart',
     '/lib/src/services/session_service.dart',
     '/lib/src/services/credential_service.dart',
     '/lib/src/services/auth_throttle_service.dart',
