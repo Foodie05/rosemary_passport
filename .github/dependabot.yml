@@ -5,27 +5,42 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      compatible-updates:
+        update-types: [minor, patch]
 
   - package-ecosystem: pub
     directory: /apps/passport_server
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      compatible-updates:
+        update-types: [minor, patch]
 
   - package-ecosystem: pub
     directory: /packages/rosm_passport_flutter
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      compatible-updates:
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /apps/passport_server
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      compatible-updates:
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /web
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      compatible-updates:
+        update-types: [minor, patch]
