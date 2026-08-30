@@ -7,7 +7,10 @@ class AppConfig {
   AppConfig._(this._env);
 
   factory AppConfig.fromEnv() {
-    final env = DotEnv(includePlatformEnvironment: true)..load();
+    // File values are development defaults. Explicit process/container
+    // environment values must win so deployment configuration is predictable.
+    final env = DotEnv()..load();
+    env.addAll(Platform.environment);
     final config = AppConfig._(env);
     config._validateCriticalSecrets();
     return config;

@@ -24,6 +24,19 @@ mode `0600`, and will not overwrite a file without
 `LOAD_TEST_OVERWRITE=true`. Run the gate with a native k6 process so the load
 generator does not share the target's container runtime:
 
+The target must trust only the load generator's direct proxy address when the
+script's per-session `X-Forwarded-For` values are used. For a macOS loopback
+run, Dart may report IPv4 as `::ffff:127.0.0.1`:
+
+```sh
+TRUST_PROXY_HEADERS=true \
+TRUSTED_PROXY_IPS='127.0.0.1,::1,::ffff:127.0.0.1' \
+dart bin/server.dart
+```
+
+Never copy this list blindly to production; configure the exact address of the
+real reverse proxy there.
+
 ```sh
 BASE_URL=http://127.0.0.1:8080 \
 BROWSER_ORIGIN=http://localhost:5173 \
