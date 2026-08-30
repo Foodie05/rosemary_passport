@@ -3,6 +3,6 @@
     "@alicloud/captcha20230305": "^1.1.4",
     "@alicloud/dypnsapi20170525": "^2.0.0",
     "@alicloud/openapi-core": "^1.0.7",
-    "@simplewebauthn/server": "^13.3.0"
+    "@simplewebauthn/server": "^13.3.3"
   }
 }
