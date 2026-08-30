@@ -1,0 +1,2 @@
+# Documentation uses the literal placeholder "ACCESS_TOKEN"; this is not a credential.
+bab7c3e1d232acea0262dd3d60d95f07c637bcab:docs/oidc-integration-zh.md:curl-auth-header:427
