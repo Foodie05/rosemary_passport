@@ -145,6 +145,11 @@ Middleware _securityHeaders() {
           'referrer-policy':
               response.headers['referrer-policy'] ??
               'strict-origin-when-cross-origin',
+          'permissions-policy':
+              response.headers['permissions-policy'] ??
+              'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+          'cross-origin-opener-policy':
+              response.headers['cross-origin-opener-policy'] ?? 'same-origin',
           'content-security-policy':
               response.headers['content-security-policy'] ??
               "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
