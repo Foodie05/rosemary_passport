@@ -120,8 +120,14 @@ cp "$TEMPLATE_DIR/backup_to_s3.sh" "$RELEASE_DIR/backup_to_s3.sh"
 cp "$TEMPLATE_DIR/physical_backup_to_s3.sh" "$RELEASE_DIR/physical_backup_to_s3.sh"
 cp "$TEMPLATE_DIR/archive_audit_to_s3.sh" "$RELEASE_DIR/archive_audit_to_s3.sh"
 cp "$TEMPLATE_DIR/restore_from_s3.sh" "$RELEASE_DIR/restore_from_s3.sh"
+cp "$TEMPLATE_DIR/pitr_drill.sh" "$RELEASE_DIR/pitr_drill.sh"
+cp "$TEMPLATE_DIR/record_sla_observation.sh" "$RELEASE_DIR/record_sla_observation.sh"
+cp "$TEMPLATE_DIR/evaluate_sla_observation.sh" "$RELEASE_DIR/evaluate_sla_observation.sh"
+cp "$TEMPLATE_DIR/install_systemd_units.sh" "$RELEASE_DIR/install_systemd_units.sh"
+cp -R "$TEMPLATE_DIR/systemd" "$RELEASE_DIR/systemd"
 cp "$TEMPLATE_DIR/provision_secrets.sh" "$RELEASE_DIR/provision_secrets.sh"
 cp "$TEMPLATE_DIR/postgres/archive-wal.sh" "$RELEASE_DIR/postgres/archive-wal.sh"
+cp "$TEMPLATE_DIR/postgres/restore-wal.sh" "$RELEASE_DIR/postgres/restore-wal.sh"
 cp "$TEMPLATE_DIR/postgres/postgres-entrypoint.sh" "$RELEASE_DIR/postgres/postgres-entrypoint.sh"
 cp "$TEMPLATE_DIR/README.md" "$RELEASE_DIR/README.md"
 cp "$TEMPLATE_DIR/runtime.env.example" "$RELEASE_DIR/runtime.env.example"
@@ -133,6 +139,10 @@ chmod +x "$RELEASE_DIR/deploy.sh" "$RELEASE_DIR/backup_to_s3.sh" \
   "$RELEASE_DIR/physical_backup_to_s3.sh" \
   "$RELEASE_DIR/archive_audit_to_s3.sh" \
   "$RELEASE_DIR/restore_from_s3.sh" "$RELEASE_DIR/postgres/archive-wal.sh" \
+  "$RELEASE_DIR/pitr_drill.sh" "$RELEASE_DIR/postgres/restore-wal.sh" \
+  "$RELEASE_DIR/record_sla_observation.sh" \
+  "$RELEASE_DIR/evaluate_sla_observation.sh" \
+  "$RELEASE_DIR/install_systemd_units.sh" \
   "$RELEASE_DIR/postgres/postgres-entrypoint.sh" \
   "$RELEASE_DIR/provision_secrets.sh" \
   "$RELEASE_DIR/helper-entrypoint.sh" \

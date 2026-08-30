@@ -37,7 +37,10 @@ void main() {
     const userId = 'fd11dbf0-7048-4790-b576-8c5a69bab010';
     try {
       await runner.migrate();
-      final compatibilityMigration = MigrationRunner.migrations.last;
+      final compatibilityMigration = MigrationRunner.migrations.firstWhere(
+        (migration) =>
+            migration.version == '20260830_003_rollback_compatibility_defaults',
+      );
       await database.execute(
         'delete from schema_migrations where version = @version',
         params: {'version': compatibilityMigration.version},

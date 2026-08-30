@@ -39,11 +39,17 @@ Docker Compose 管理，Apache 只代理 `127.0.0.1:8091` 并托管原子切换�
 - `archive_audit_to_s3.sh` 导出哈希链审计日志，以 Ed25519 签名并上传 S3。建议每小时执行。
 - `restore_from_s3.sh` 只恢复到新的数据库名，必须用 `ROSM_RESTORE_CONFIRM` 明确确认，不会覆盖当前数据库。
 
-PITR 演练必须在隔离主机进行：下载 `physical/latest.json` 指向的基线并校验 SHA-256，
-解密到空的 PostgreSQL 数据目录；配置 `restore_command` 从 `wal/` 下载并解密 WAL，设置
-`recovery_target_time` 后创建 `recovery.signal`。恢复启动后执行一致性核对与应用冒烟测试。
-每月至少演练一次并记录：最后已归档 WAL 时间、目标恢复时间、服务恢复时间。只有实测
-`RPO <= 5 分钟` 且 `RTO <= 30 分钟` 才能通过发布门禁。
+`pitr_drill.sh` 在独立临时数据目录和独立容器中执行 PITR，不挂载或覆盖生产数据。它写入
+专用恢复标记、强制切换 WAL，校验并解密 `physical/latest.json` 指向的基线，通过加密 WAL
+恢复到标记之后，核对核心表计数并以 Ed25519 签名证据，最后归档到 S3。每月至少执行一次：
+
+```bash
+sudo ROSM_PITR_CONFIRM=isolated-pitr-drill \
+  ./pitr_drill.sh /srv/rosm-passport/current \
+  /etc/rosm-passport/runtime.env /etc/rosm-passport/secrets
+```
+
+只有脚本实测并签名证明 `RPO <= 5 分钟`、`RTO <= 30 分钟` 才能通过恢复门禁。
 
 API、helper 和 PostgreSQL 的受控重启演练使用 `ops/tests/fault_recovery_drill.sh`。脚本要求
 显式确认，先创建加密 S3 备份，再逐项重启并将 readiness 恢复耗时写入权限为 `0600` 的
@@ -55,5 +61,20 @@ JSONL 证据；应只在已批准的维护窗口或隔离演练环境运行。
 - 使用 `ops/load/sla_capacity.js` 完成 50 RPS/30 分钟、100 RPS/5 分钟和 500 会话测试。
   默认测试需准备 1,500 组互不复用的 Access/Refresh Token（每个场景的最大 VU 各自隔离）；
   会话文件必须为 `0600`，测试结束后立即销毁，禁止提交到 Git 或归档到 CI 构件。
-- 生产发布后进行 14 天观察：不得出现崩溃循环、迁移失败、备份失败或 high/critical 可达漏洞。
+- 生产发布后每天运行 `record_sla_observation.sh`。脚本检查 live/ready、三项服务、重启计数、
+  审计哈希链、物理备份/WAL 新鲜度和磁盘余量；每份记录形成哈希链、Ed25519 签名并归档 S3。
+  建议由 root 的 systemd timer/cron 在每天固定 UTC 时间执行：
+
+  ```bash
+  ROSM_OBSERVATION_CONFIRM=record-production-sla-evidence \
+    ./record_sla_observation.sh /srv/rosm-passport/current \
+    /etc/rosm-passport/runtime.env /etc/rosm-passport/secrets \
+    /var/lib/rosm-passport/sla-observation
+  ```
+
+  第 14 天使用 `./evaluate_sla_observation.sh /var/lib/rosm-passport/sla-observation 14`
+  验证日期连续性、签名和哈希链。任一天失败或缺失都必须重新开始完整观察窗口。
+- Linux 生产机可在首次部署完成后运行
+  `sudo ROSM_SYSTEMD_INSTALL_CONFIRM=install-sla-timers ./install_systemd_units.sh`，安装每日物理备份、
+  每小时审计归档和每日 SLA 观察 timer。安装后必须检查 `systemctl list-timers 'rosm-passport-*'`。
 - 计划维护窗口不得超过 15 分钟。正式 99.9% SLA 仍需第二应用节点、数据库 HA、负载均衡和外部 SLO 计量。

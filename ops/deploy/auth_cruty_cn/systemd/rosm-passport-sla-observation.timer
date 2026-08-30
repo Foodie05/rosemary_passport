@@ -1,0 +1,11 @@
+[Unit]
+Description=Record Rosemary Passport SLA evidence daily
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+RandomizedDelaySec=180
+Persistent=true
+Unit=rosm-passport-sla-observation.service
+
+[Install]
+WantedBy=timers.target

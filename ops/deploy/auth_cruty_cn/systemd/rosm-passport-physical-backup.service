@@ -1,0 +1,20 @@
+[Unit]
+Description=Rosemary Passport encrypted physical backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/srv/rosm-passport/current/physical_backup_to_s3.sh /srv/rosm-passport/current /etc/rosm-passport/runtime.env /etc/rosm-passport/secrets
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=full
+ReadOnlyPaths=/etc/rosm-passport
+ReadWritePaths=/srv/rosm-passport/current

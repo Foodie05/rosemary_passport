@@ -119,7 +119,11 @@ chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
   "$TARGET_DIR/physical_backup_to_s3.sh" \
   "$TARGET_DIR/check_disk_capacity.sh" \
   "$TARGET_DIR/archive_audit_to_s3.sh" \
-  "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/provision_secrets.sh" \
+  "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/pitr_drill.sh" \
+  "$TARGET_DIR/record_sla_observation.sh" \
+  "$TARGET_DIR/evaluate_sla_observation.sh" \
+  "$TARGET_DIR/install_systemd_units.sh" \
+  "$TARGET_DIR/provision_secrets.sh" \
   "$TARGET_DIR/backend/entrypoint.sh"
 
 info "building containers before maintenance"

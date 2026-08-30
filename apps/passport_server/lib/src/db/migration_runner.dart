@@ -141,6 +141,14 @@ class MigrationRunner {
         alter column uv_grace_expires_at
         set default (now() + interval '14 days');
     '''),
+    DatabaseMigration('20260830_004_sla_recovery_markers', '''
+      create table if not exists sla_recovery_markers (
+        marker_id text primary key,
+        created_at timestamptz not null default clock_timestamp()
+      );
+      create index if not exists idx_sla_recovery_markers_created_at
+        on sla_recovery_markers(created_at desc);
+    '''),
   ];
 
   final Database _database;

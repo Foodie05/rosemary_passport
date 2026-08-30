@@ -35,10 +35,17 @@ required_executables=(
   ops/deploy/auth_cruty_cn/physical_backup_to_s3.sh
   ops/deploy/auth_cruty_cn/provision_secrets.sh
   ops/deploy/auth_cruty_cn/restore_from_s3.sh
+  ops/deploy/auth_cruty_cn/pitr_drill.sh
+  ops/deploy/auth_cruty_cn/record_sla_observation.sh
+  ops/deploy/auth_cruty_cn/evaluate_sla_observation.sh
+  ops/deploy/auth_cruty_cn/install_systemd_units.sh
   ops/deploy/auth_cruty_cn/postgres/archive-wal.sh
+  ops/deploy/auth_cruty_cn/postgres/restore-wal.sh
   ops/deploy/auth_cruty_cn/postgres/postgres-entrypoint.sh
   ops/tests/restore_integrity_test.sh
   ops/tests/fault_recovery_drill.sh
+  ops/tests/sla_observation_test.sh
+  ops/tests/pitr_drill_safety_test.sh
 )
 for path in "${required_executables[@]}"; do
   mode="$(git ls-files --stage -- "$path" | awk '{print $1}')"

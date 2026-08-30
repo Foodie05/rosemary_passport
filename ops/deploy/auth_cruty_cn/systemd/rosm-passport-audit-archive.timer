@@ -1,0 +1,11 @@
+[Unit]
+Description=Archive Rosemary Passport audit chain hourly
+
+[Timer]
+OnCalendar=*-*-* *:15:00 UTC
+RandomizedDelaySec=120
+Persistent=true
+Unit=rosm-passport-audit-archive.service
+
+[Install]
+WantedBy=timers.target

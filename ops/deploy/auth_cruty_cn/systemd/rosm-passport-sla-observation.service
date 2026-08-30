@@ -1,0 +1,18 @@
+[Unit]
+Description=Rosemary Passport daily SLA evidence observation
+Requires=docker.service
+After=docker.service rosm-passport-physical-backup.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+Environment=ROSM_OBSERVATION_CONFIRM=record-production-sla-evidence
+ExecStart=/srv/rosm-passport/current/record_sla_observation.sh /srv/rosm-passport/current /etc/rosm-passport/runtime.env /etc/rosm-passport/secrets /var/lib/rosm-passport/sla-observation
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=full
+ReadOnlyPaths=/etc/rosm-passport
+ReadWritePaths=/srv/rosm-passport/current /var/lib/rosm-passport

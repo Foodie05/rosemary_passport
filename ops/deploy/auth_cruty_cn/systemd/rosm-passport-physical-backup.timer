@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Rosemary Passport physical backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+Unit=rosm-passport-physical-backup.service
+
+[Install]
+WantedBy=timers.target

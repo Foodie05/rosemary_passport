@@ -275,3 +275,10 @@ create table if not exists user_webauthn_challenges (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_webauthn_challenges_lookup on user_webauthn_challenges(purpose, user_id, email, created_at desc);
+
+create table if not exists sla_recovery_markers (
+  marker_id text primary key,
+  created_at timestamptz not null default clock_timestamp()
+);
+create index if not exists idx_sla_recovery_markers_created_at
+  on sla_recovery_markers(created_at desc);
