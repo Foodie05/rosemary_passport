@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
+import exec from 'k6/execution';
 
 const baseUrl = (__ENV.BASE_URL || 'http://127.0.0.1:8091').replace(/\/$/, '');
 const browserOrigin = __ENV.BROWSER_ORIGIN || baseUrl;
@@ -20,7 +21,12 @@ const concurrentSessions = Number(__ENV.CONCURRENT_SESSIONS || 500);
 const sustainedMaxVUs = Number(__ENV.SUSTAINED_MAX_VUS || 500);
 const burstMaxVUs = Number(__ENV.BURST_MAX_VUS || 500);
 const refreshAfterSeconds = Number(__ENV.REFRESH_AFTER_SECONDS || 720);
-const requiredSessions = sustainedMaxVUs + burstMaxVUs + concurrentSessions;
+const scenarioSessionPoolSize = Math.max(
+  sustainedMaxVUs,
+  burstMaxVUs,
+  concurrentSessions,
+);
+const requiredSessions = scenarioSessionPoolSize * 3;
 const sessions = new SharedArray('first-party sessions', () => {
   const parsed = JSON.parse(open(sessionFile));
   if (!Array.isArray(parsed)) {
@@ -29,6 +35,7 @@ const sessions = new SharedArray('first-party sessions', () => {
   return parsed;
 });
 let initialized = false;
+let activeScenario = '';
 let refreshAt = 0;
 let accessToken = '';
 let refreshToken = '';
@@ -97,14 +104,21 @@ export function setup() {
 }
 
 function authenticatedRequest() {
-  const sessionIndex = __VU - 1;
+  const scenarioOffsets = {
+    sustained_50_rps: 0,
+    burst_100_rps: scenarioSessionPoolSize,
+    concurrent_sessions: scenarioSessionPoolSize * 2,
+  };
+  const scenarioName = exec.scenario.name;
+  const sessionIndex = scenarioOffsets[scenarioName] + __VU - 1;
   const session = sessions[sessionIndex];
   if (!session) {
     throw new Error(`no isolated session allocated for VU ${__VU}`);
   }
   const sourceIp = `198.18.${Math.floor(sessionIndex / 250)}.${(sessionIndex % 250) + 1}`;
   const jar = http.cookieJar();
-  if (!initialized) {
+  if (!initialized || activeScenario !== scenarioName) {
+    activeScenario = scenarioName;
     accessToken = session.access_token;
     refreshToken = session.refresh_token;
     jar.set(baseUrl, 'rosm_access_token', session.access_token, { path: '/' });
@@ -135,8 +149,8 @@ function authenticatedRequest() {
         body_preview: refreshed.body ? refreshed.body.slice(0, 160) : null,
       }));
     }
-    const accessCookies = jar.cookiesForURL(baseUrl).rosm_access_token || [];
-    const refreshCookies = jar.cookiesForURL(baseUrl)[refreshCookieName] || [];
+    const accessCookies = refreshed.cookies.rosm_access_token || [];
+    const refreshCookies = refreshed.cookies[refreshCookieName] || [];
     if (accessCookies.length > 0) {
       accessToken = accessCookies[0].value;
     }
