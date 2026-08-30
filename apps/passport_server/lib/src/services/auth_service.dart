@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
-import '../models/authenticated_user.dart';
+export 'auth_attempts.dart';
+
 import '../repositories/oidc_repository.dart';
 import '../repositories/settings_repository.dart';
 import '../repositories/user_repository.dart';
@@ -8,189 +9,16 @@ import '../security/password_hasher.dart';
 import '../security/password_policy.dart';
 import '../security/token_service.dart';
 import 'audit_service.dart';
+import 'auth_attempts.dart';
 import 'authenticator_service.dart';
 import 'captcha_service.dart';
+import 'credential_service.dart';
 import 'email_code_service.dart';
 import 'phone_verification_service.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
 import 'session_service.dart';
 import 'webauthn_service.dart';
-
-class AuthResult {
-  const AuthResult({
-    required this.user,
-    required this.tokens,
-    this.postRegistrationPasskeyBootstrap = false,
-  });
-
-  final AuthenticatedUser user;
-  final TokenPair tokens;
-  final bool postRegistrationPasskeyBootstrap;
-}
-
-class LoginAttempt {
-  const LoginAttempt.success(this.result)
-    : code = null,
-      message = null,
-      statusCode = 200;
-
-  const LoginAttempt.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 401,
-  }) : result = null;
-
-  final AuthResult? result;
-  final String? code;
-  final String? message;
-  final int statusCode;
-
-  bool get ok => result != null;
-}
-
-class PasswordLoginPreparation {
-  const PasswordLoginPreparation.success({
-    required this.factors,
-    required this.defaultFactor,
-    this.directLogin = false,
-  }) : ok = true,
-       code = null,
-       message = null,
-       statusCode = 200;
-
-  const PasswordLoginPreparation.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 401,
-  }) : ok = false,
-       factors = const [],
-       defaultFactor = null,
-       directLogin = false;
-
-  final bool ok;
-  final String? code;
-  final String? message;
-  final int statusCode;
-  final List<String> factors;
-  final String? defaultFactor;
-  final bool directLogin;
-}
-
-class AdminLoginCodeAttempt {
-  const AdminLoginCodeAttempt.success({
-    this.message,
-    this.requiresBinding = false,
-  }) : ok = true,
-       code = null,
-       statusCode = 200;
-
-  const AdminLoginCodeAttempt.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 400,
-  }) : ok = false,
-       requiresBinding = false;
-
-  final bool ok;
-  final String? code;
-  final String? message;
-  final int statusCode;
-  final bool requiresBinding;
-}
-
-class RegisterAttempt {
-  const RegisterAttempt.success(this.result)
-    : ok = true,
-      code = null,
-      message = null,
-      statusCode = 201;
-
-  const RegisterAttempt.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 400,
-  }) : ok = false,
-       result = null;
-
-  final bool ok;
-  final AuthResult? result;
-  final String? code;
-  final String? message;
-  final int statusCode;
-}
-
-class AccountUpdateAttempt {
-  const AccountUpdateAttempt.success({
-    required this.updatedEmail,
-    required this.updatedPassword,
-    required this.updatedNickname,
-  }) : ok = true,
-       code = null,
-       message = null,
-       statusCode = 200;
-
-  const AccountUpdateAttempt.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 400,
-  }) : ok = false,
-       updatedEmail = false,
-       updatedPassword = false,
-       updatedNickname = false;
-
-  final bool ok;
-  final String? code;
-  final String? message;
-  final int statusCode;
-  final bool updatedEmail;
-  final bool updatedPassword;
-  final bool updatedNickname;
-}
-
-class EmailActionAttempt {
-  const EmailActionAttempt.success({this.message})
-    : ok = true,
-      code = null,
-      statusCode = 200;
-
-  const EmailActionAttempt.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 400,
-  }) : ok = false;
-
-  final bool ok;
-  final String? code;
-  final String? message;
-  final int statusCode;
-}
-
-class CredentialActionAttempt {
-  const CredentialActionAttempt.success({this.message})
-    : ok = true,
-      code = null,
-      statusCode = 200;
-
-  const CredentialActionAttempt.failure({
-    required this.code,
-    required this.message,
-    this.statusCode = 400,
-  }) : ok = false;
-
-  final bool ok;
-  final String? code;
-  final String? message;
-  final int statusCode;
-}
-
-class _CredentialLimitException implements Exception {
-  const _CredentialLimitException();
-}
-
-class WebAuthnUnavailableException implements Exception {
-  const WebAuthnUnavailableException();
-}
 
 class AuthService {
   static const _postRegistrationPasskeyBootstrapSeconds = 600;
@@ -231,6 +59,13 @@ class AuthService {
          auditService: auditService,
          securityService: securityService,
          securityPolicyService: securityPolicyService,
+       ),
+       _credentials = CredentialService(
+         userRepository: userRepository,
+         passwordHasher: passwordHasher,
+         auditService: auditService,
+         authenticatorService: authenticatorService,
+         webAuthnService: webAuthnService,
        );
 
   final UserRepository _users;
@@ -248,6 +83,7 @@ class AuthService {
   final WebAuthnService? _webAuthn;
   final PhoneVerificationService? _phoneVerification;
   final SessionService _sessions;
+  final CredentialService _credentials;
   final _uuid = const Uuid();
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
@@ -276,8 +112,6 @@ class AuthService {
       'verification-code:password-reset:ip';
   static const _verificationCodeResetCooldownScope =
       'verification-code:password-reset:cooldown:email';
-  static const _maxWebAuthnCredentials = 5;
-
   Future<bool> verifyCaptcha(String token, {String? ip}) {
     return _captchaService.verifyCaptchaToken(token, remoteIp: ip);
   }
@@ -2075,81 +1909,21 @@ class AuthService {
     required String currentPassword,
     required String securityCode,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const CredentialActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    if (currentPassword.trim().isEmpty || securityCode.trim().isEmpty) {
-      return const CredentialActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password and security_code are required.',
-      );
-    }
-
-    final normalizedCode = securityCode.trim();
-    final isDigitsOnly = RegExp(r'^\d{6,12}$').hasMatch(normalizedCode);
-    if (!isDigitsOnly) {
-      return const CredentialActionAttempt.failure(
-        code: 'invalid_security_code',
-        message: '安全码需为 6 到 12 位数字。',
-      );
-    }
-
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
+    return _credentials.updateSecurityCode(
+      userId: userId,
+      currentPassword: currentPassword,
+      securityCode: securityCode,
     );
-    if (!valid) {
-      return const CredentialActionAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final securityCodeHash = await _passwordHasher.hash(normalizedCode);
-    await _users.updateSecurityCodeHash(
-      userId: user.id,
-      securityCodeHash: securityCodeHash,
-    );
-    await _audit.log(
-      action: 'user.security_code.updated',
-      actorId: user.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: {'has_security_code': true},
-    );
-    return const CredentialActionAttempt.success();
   }
 
   Future<Map<String, String>?> beginAuthenticatorSetup({
     required String userId,
     required String currentPassword,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null || _authenticator == null) {
-      return null;
-    }
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
+    return _credentials.beginAuthenticatorSetup(
+      userId: userId,
+      currentPassword: currentPassword,
     );
-    if (!valid) {
-      return null;
-    }
-    final secret = _authenticator.generateSecret();
-    return {
-      'secret': secret,
-      'otpauth_uri': _authenticator.buildOtpAuthUri(
-        email: user.email,
-        secret: secret,
-      ),
-    };
   }
 
   Future<CredentialActionAttempt> verifyAuthenticatorSetup({
@@ -2158,49 +1932,12 @@ class AuthService {
     required String secret,
     required String code,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null || _authenticator == null) {
-      return const CredentialActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
+    return _credentials.verifyAuthenticatorSetup(
+      userId: userId,
+      currentPassword: currentPassword,
+      secret: secret,
+      code: code,
     );
-    if (!valid) {
-      return const CredentialActionAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-    final verified = _authenticator.verifyCode(
-      secret: secret.trim(),
-      code: code.trim(),
-    );
-    if (!verified) {
-      return const CredentialActionAttempt.failure(
-        code: 'invalid_totp_code',
-        message: 'Authenticator 动态验证码已过期或不正确，请确认设备时间后重试。',
-        statusCode: 401,
-      );
-    }
-    await _users.updateAuthenticatorSecret(
-      userId: user.id,
-      authenticatorSecret: secret.trim(),
-    );
-    await _audit.log(
-      action: 'user.authenticator.updated',
-      actorId: user.id,
-      actorType: 'user',
-      resourceType: 'user',
-      resourceId: user.id,
-      metadata: {'has_authenticator': true},
-    );
-    return const CredentialActionAttempt.success();
   }
 
   Future<Map<String, dynamic>?> beginWebAuthnRegistration({
@@ -2209,37 +1946,11 @@ class AuthService {
     String? currentPassword,
     bool allowPostRegistrationBootstrap = false,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return null;
-    }
-    if (_webAuthn == null) {
-      throw const WebAuthnUnavailableException();
-    }
-    // Adding a passkey is normally a step-up action, so the standard path
-    // still requires the current password. We only skip that check during the
-    // very short window immediately after a successful self-registration, and
-    // only when the current access token explicitly carries that bootstrap
-    // claim. This keeps the onboarding smooth without creating a standing
-    // privilege for arbitrary logged-in sessions.
-    if (!allowPostRegistrationBootstrap) {
-      final valid = await _passwordHasher.verify(
-        user.passwordHash,
-        currentPassword ?? '',
-      );
-      if (!valid) {
-        return null;
-      }
-    }
-    final credentialCount = await _webAuthn.countCredentials(user.id);
-    if (credentialCount >= _maxWebAuthnCredentials) {
-      throw const _CredentialLimitException();
-    }
-    return _webAuthn.generateRegistrationOptions(
-      userId: user.id,
-      email: user.email,
-      nickname: user.nickname,
+    return _credentials.beginWebAuthnRegistration(
+      userId: userId,
       origin: origin,
+      currentPassword: currentPassword,
+      allowPostRegistrationBootstrap: allowPostRegistrationBootstrap,
     );
   }
 
@@ -2247,39 +1958,25 @@ class AuthService {
     required String userId,
     required Map<String, dynamic> response,
   }) async {
-    final webAuthn = _webAuthn;
-    if (webAuthn == null) {
-      return false;
-    }
-    return webAuthn.verifyRegistration(userId: userId, response: response);
+    return _credentials.verifyWebAuthnRegistration(
+      userId: userId,
+      response: response,
+    );
   }
 
   Future<List<Map<String, dynamic>>> listWebAuthnCredentials({
     required String userId,
   }) async {
-    final webAuthn = _webAuthn;
-    if (webAuthn == null) {
-      return const [];
-    }
-    return webAuthn.listCredentials(userId);
+    return _credentials.listWebAuthnCredentials(userId: userId);
   }
 
   Future<void> deleteWebAuthnCredential({
     required String userId,
     required String credentialId,
   }) async {
-    final webAuthn = _webAuthn;
-    if (webAuthn == null) {
-      return;
-    }
-    await webAuthn.deleteCredential(userId: userId, credentialId: credentialId);
-    await _audit.log(
-      action: 'user.webauthn.deleted',
-      actorId: userId,
-      actorType: 'user',
-      resourceType: 'user_webauthn_credential',
-      resourceId: credentialId,
-      metadata: {'deleted': true},
+    return _credentials.deleteWebAuthnCredential(
+      userId: userId,
+      credentialId: credentialId,
     );
   }
 
@@ -2287,22 +1984,9 @@ class AuthService {
     String? email,
     required String origin,
   }) async {
-    final webAuthn = _webAuthn;
-    if (webAuthn == null) {
-      return null;
-    }
-    if (email == null || email.trim().isEmpty) {
-      return webAuthn.generateAuthenticationOptions(origin: origin);
-    }
-    final user = await _users.findByEmail(email);
-    if (user == null) {
-      return null;
-    }
-    return webAuthn.generateAuthenticationOptions(
-      email: user.email,
+    return _credentials.beginWebAuthnAuthentication(
+      email: email,
       origin: origin,
-      userId: user.id,
-      requireUserVerification: user.roles.contains('admin'),
     );
   }
 
@@ -2390,23 +2074,7 @@ class AuthService {
   }
 
   Future<Map<String, bool>> getSecurityState({required String userId}) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const {
-        'has_passkey': false,
-        'has_authenticator': false,
-        'has_phone': false,
-      };
-    }
-    final hasPasskey = _webAuthn == null
-        ? false
-        : await _webAuthn.hasCredentials(userId);
-    return {
-      'has_passkey': hasPasskey,
-      'has_authenticator': user.hasAuthenticator,
-      'has_phone':
-          (user.phoneNumber ?? '').trim().isNotEmpty && user.isPhoneVerified,
-    };
+    return _credentials.getSecurityState(userId: userId);
   }
 
   Future<TokenPair?> refresh(String refreshToken) async {

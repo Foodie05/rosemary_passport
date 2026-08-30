@@ -68,6 +68,7 @@ void main(List<String> arguments) {
   const criticalSuffixes = [
     '/lib/src/services/auth_service.dart',
     '/lib/src/services/session_service.dart',
+    '/lib/src/services/credential_service.dart',
     '/lib/src/security/token_service.dart',
     '/lib/src/repositories/oidc_repository.dart',
     '/lib/src/db/migration_runner.dart',

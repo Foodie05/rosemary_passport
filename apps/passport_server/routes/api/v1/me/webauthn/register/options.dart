@@ -53,7 +53,7 @@ Future<Response> onRequest(RequestContext context) async {
     }
     return jsonResponse(options);
   } on Exception catch (error) {
-    if (error.runtimeType.toString() == '_CredentialLimitException') {
+    if (error is WebAuthnCredentialLimitException) {
       return errorResponse(
         'credential_limit_reached',
         '最多只能创建 5 个系统通行密钥。',
