@@ -10,6 +10,7 @@ import '../security/password_policy.dart';
 import '../security/token_service.dart';
 import 'audit_service.dart';
 import 'auth_attempts.dart';
+import 'auth_throttle_service.dart';
 import 'authenticator_service.dart';
 import 'captcha_service.dart';
 import 'credential_service.dart';
@@ -43,7 +44,6 @@ class AuthService {
        _captchaService = captchaService,
        _settings = settingsRepository,
        _audit = auditService,
-       _security = securityService,
        _policy = securityPolicyService,
        _authenticator = authenticatorService,
        _webAuthn = webAuthnService,
@@ -62,6 +62,10 @@ class AuthService {
          auditService: auditService,
          authenticatorService: authenticatorService,
          webAuthnService: webAuthnService,
+       ),
+       _throttles = AuthThrottleService(
+         securityService: securityService,
+         securityPolicyService: securityPolicyService,
        );
 
   final UserRepository _users;
@@ -71,13 +75,13 @@ class AuthService {
   final CaptchaService _captchaService;
   final SettingsRepository _settings;
   final AuditService _audit;
-  final SecurityService? _security;
   final SecurityPolicyService? _policy;
   final AuthenticatorService? _authenticator;
   final WebAuthnService? _webAuthn;
   final PhoneVerificationService? _phoneVerification;
   final SessionService _sessions;
   final CredentialService _credentials;
+  final AuthThrottleService _throttles;
   final _uuid = const Uuid();
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
@@ -140,9 +144,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     final emailProviderPolicy = _policy == null
         ? const RegistrationEmailProviderPolicy(
             mode: SecurityPolicyService.blacklistMode,
@@ -157,7 +159,7 @@ class AuthService {
         statusCode: 403,
       );
     }
-    final limited = await _enforceVerificationCodeSendGuards(
+    final limited = await _throttles.enforceVerificationCodeSendGuards(
       email: email,
       requestIp: requestIp,
       policy: policy,
@@ -172,7 +174,7 @@ class AuthService {
     }
 
     await _emailCodeService.issueRegisterCode(email);
-    await _startVerificationCodeCooldown(
+    await _throttles.startVerificationCodeCooldown(
       email: email,
       seconds: policy.registerCodeCooldownSeconds,
       cooldownScope: _verificationCodeRegisterCooldownScope,
@@ -180,41 +182,15 @@ class AuthService {
     return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
   }
 
-  Future<int?> loginRetryAfter({
-    required String email,
-    String? requestIp,
-  }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final security = _security;
-    if (security == null) {
-      return null;
-    }
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final emailRetry = policy.emailRateLimitEnabled
-        ? await security.retryAfterSeconds(
-            scope: 'login:email',
-            subject: normalizedEmail,
-          )
-        : null;
-    final ipSubject = _subjectOrEmpty(requestIp);
-    final ipRetry = ipSubject.isEmpty || !policy.ipRateLimitEnabled
-        ? null
-        : await security.retryAfterSeconds(
-            scope: 'login:ip',
-            subject: ipSubject,
-          );
-    return _maxRetryAfter(emailRetry, ipRetry);
+  Future<int?> loginRetryAfter({required String email, String? requestIp}) {
+    return _throttles.loginRetryAfter(email: email, requestIp: requestIp);
   }
 
   Future<int?> adminCodeRetryAfter({
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     return verificationCodeRetryAfter(
       email: email,
       requestIp: requestIp,
@@ -234,44 +210,25 @@ class AuthService {
     required String cooldownScope,
     required int emailLimit,
     required int ipLimit,
-  }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final security = _security;
-    if (security == null) {
-      return null;
-    }
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final emailRetry = policy.emailRateLimitEnabled && emailLimit > 0
-        ? await security.retryAfterSeconds(
-            scope: emailScope,
-            subject: normalizedEmail,
-          )
-        : null;
-    final ipSubject = _subjectOrEmpty(requestIp);
-    final ipRetry =
-        ipSubject.isEmpty || !policy.ipRateLimitEnabled || ipLimit < 1
-        ? null
-        : await security.retryAfterSeconds(scope: ipScope, subject: ipSubject);
-    final cooldownRetry = await verificationCodeCooldownRetryAfter(
+  }) {
+    return _throttles.verificationCodeRetryAfter(
       email: email,
+      requestIp: requestIp,
+      emailScope: emailScope,
+      ipScope: ipScope,
       cooldownScope: cooldownScope,
+      emailLimit: emailLimit,
+      ipLimit: ipLimit,
     );
-    return _maxRetryAfter(_maxRetryAfter(emailRetry, ipRetry), cooldownRetry);
   }
 
   Future<int?> verificationCodeCooldownRetryAfter({
     required String email,
     required String cooldownScope,
-  }) async {
-    final security = _security;
-    if (security == null) {
-      return null;
-    }
-    return security.retryAfterSeconds(
-      scope: cooldownScope,
-      subject: email.trim().toLowerCase(),
+  }) {
+    return _throttles.verificationCodeCooldownRetryAfter(
+      email: email,
+      cooldownScope: cooldownScope,
     );
   }
 
@@ -300,9 +257,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     return verificationCodeRetryAfter(
       email: email,
       requestIp: requestIp,
@@ -318,9 +273,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     return verificationCodeRetryAfter(
       email: email,
       requestIp: requestIp,
@@ -336,9 +289,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     return verificationCodeRetryAfter(
       email: email,
       requestIp: requestIp,
@@ -354,9 +305,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     return verificationCodeRetryAfter(
       email: email,
       requestIp: requestIp,
@@ -379,9 +328,7 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     return verificationCodeRetryAfter(
       email: email,
       requestIp: requestIp,
@@ -401,24 +348,7 @@ class AuthService {
   }
 
   Future<int?> refreshRetryAfter({String? requestIp}) async {
-    final ipSubject = _subjectOrEmpty(requestIp);
-    if (ipSubject.isEmpty) {
-      return null;
-    }
-    final security = _security;
-    if (security == null) {
-      return null;
-    }
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    if (!policy.ipRateLimitEnabled) {
-      return null;
-    }
-    return security.retryAfterSeconds(
-      scope: 'refresh:first-party:ip',
-      subject: ipSubject,
-    );
+    return _throttles.refreshRetryAfter(requestIp: requestIp);
   }
 
   Future<AdminLoginCodeAttempt> sendLoginCode({
@@ -426,10 +356,8 @@ class AuthService {
     required String password,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final loginCodeLimited = await _enforceVerificationCodeSendGuards(
+    final policy = await _throttles.loadPolicy();
+    final loginCodeLimited = await _throttles.enforceVerificationCodeSendGuards(
       email: email,
       requestIp: requestIp,
       policy: policy,
@@ -470,7 +398,7 @@ class AuthService {
           ? 'admin_login_verification'
           : 'login_verification',
     );
-    await _startVerificationCodeCooldown(
+    await _throttles.startVerificationCodeCooldown(
       email: user.email,
       seconds: policy.adminLoginCodeCooldownSeconds,
       cooldownScope: _verificationCodeMfaCooldownScope,
@@ -533,10 +461,8 @@ class AuthService {
     required String password,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final limited = await _enforceLoginGuards(
+    final policy = await _throttles.loadPolicy();
+    final limited = await _throttles.enforceLoginGuards(
       email: email,
       requestIp: requestIp,
       emailLimit: policy.loginEmailLimit,
@@ -603,10 +529,8 @@ class AuthService {
     required String email,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final loginCodeLimited = await _enforceVerificationCodeSendGuards(
+    final policy = await _throttles.loadPolicy();
+    final loginCodeLimited = await _throttles.enforceVerificationCodeSendGuards(
       email: email,
       requestIp: requestIp,
       policy: policy,
@@ -622,7 +546,7 @@ class AuthService {
 
     final user = await _users.findByEmail(email);
     if (user == null || user.roles.contains('admin')) {
-      await _startVerificationCodeCooldown(
+      await _throttles.startVerificationCodeCooldown(
         email: email,
         seconds: policy.loginCodeCooldownSeconds,
         cooldownScope: _verificationCodeLoginCooldownScope,
@@ -636,7 +560,7 @@ class AuthService {
       user.email,
       templateName: 'login_verification',
     );
-    await _startVerificationCodeCooldown(
+    await _throttles.startVerificationCodeCooldown(
       email: email,
       seconds: policy.loginCodeCooldownSeconds,
       cooldownScope: _verificationCodeLoginCooldownScope,
@@ -870,10 +794,8 @@ class AuthService {
       final email = account.trim().toLowerCase();
       final user = await _users.findByEmail(email);
       if (user != null) {
-        final policy = _policy == null
-            ? SecurityPolicyService.defaultPolicy
-            : await _policy.load();
-        final limited = await _enforceVerificationCodeSendGuards(
+        final policy = await _throttles.loadPolicy();
+        final limited = await _throttles.enforceVerificationCodeSendGuards(
           email: user.email,
           requestIp: requestIp,
           policy: policy,
@@ -891,7 +813,7 @@ class AuthService {
           );
         }
         await _emailCodeService.issuePasswordResetCode(user.email);
-        await _startVerificationCodeCooldown(
+        await _throttles.startVerificationCodeCooldown(
           email: user.email,
           seconds: policy.passwordResetCodeCooldownSeconds,
           cooldownScope: _verificationCodeResetCooldownScope,
@@ -1044,10 +966,8 @@ class AuthService {
     String? requestIp,
     bool rememberMe = false,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final limited = await _enforceLoginGuards(
+    final policy = await _throttles.loadPolicy();
+    final limited = await _throttles.enforceLoginGuards(
       email: email,
       requestIp: requestIp,
       emailLimit: policy.loginEmailLimit,
@@ -1085,7 +1005,7 @@ class AuthService {
         user,
         rememberMe: rememberMe,
       );
-      await _clearLoginGuards(email: email);
+      await _throttles.clearLoginGuards(email: email);
       await _audit.log(
         action: 'user.login',
         actorId: user.id,
@@ -1130,7 +1050,7 @@ class AuthService {
           statusCode: 401,
         );
       }
-      await _clearLoginGuards(email: email);
+      await _throttles.clearLoginGuards(email: email);
 
       await _audit.log(
         action: 'user.login',
@@ -1213,7 +1133,7 @@ class AuthService {
       user,
       rememberMe: rememberMe,
     );
-    await _clearLoginGuards(email: email);
+    await _throttles.clearLoginGuards(email: email);
 
     await _audit.log(
       action: 'user.login',
@@ -1234,10 +1154,8 @@ class AuthService {
     String? requestIp,
     bool rememberMe = false,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    final limited = await _enforceLoginGuards(
+    final policy = await _throttles.loadPolicy();
+    final limited = await _throttles.enforceLoginGuards(
       email: email,
       requestIp: requestIp,
       emailLimit: policy.loginEmailLimit,
@@ -1282,7 +1200,7 @@ class AuthService {
         statusCode: 401,
       );
     }
-    await _clearLoginGuards(email: email);
+    await _throttles.clearLoginGuards(email: email);
 
     await _audit.log(
       action: 'user.login.email_code',
@@ -1509,9 +1427,7 @@ class AuthService {
     required String currentPassword,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     final user = await _users.findById(userId);
     if (user == null) {
       return const EmailActionAttempt.failure(
@@ -1562,7 +1478,7 @@ class AuthService {
       );
     }
 
-    final limited = await _enforceVerificationCodeSendGuards(
+    final limited = await _throttles.enforceVerificationCodeSendGuards(
       email: targetEmail,
       requestIp: requestIp,
       policy: policy,
@@ -1581,7 +1497,7 @@ class AuthService {
     }
 
     await _emailCodeService.issueBindEmailCode(targetEmail);
-    await _startVerificationCodeCooldown(
+    await _throttles.startVerificationCodeCooldown(
       email: targetEmail,
       seconds: policy.bindEmailCodeCooldownSeconds,
       cooldownScope: _verificationCodeBindCooldownScope,
@@ -1811,9 +1727,7 @@ class AuthService {
     required String userId,
     String? requestIp,
   }) async {
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
+    final policy = await _throttles.loadPolicy();
     final user = await _users.findById(userId);
     if (user == null) {
       return const EmailActionAttempt.failure(
@@ -1823,7 +1737,7 @@ class AuthService {
       );
     }
 
-    final limited = await _enforceVerificationCodeSendGuards(
+    final limited = await _throttles.enforceVerificationCodeSendGuards(
       email: user.email,
       requestIp: requestIp,
       policy: policy,
@@ -1842,7 +1756,7 @@ class AuthService {
     }
 
     await _emailCodeService.issuePasswordResetCode(user.email);
-    await _startVerificationCodeCooldown(
+    await _throttles.startVerificationCodeCooldown(
       email: user.email,
       seconds: policy.passwordResetCodeCooldownSeconds,
       cooldownScope: _verificationCodeResetCooldownScope,
@@ -2087,191 +2001,7 @@ class AuthService {
     );
   }
 
-  Future<LoginAttempt?> _enforceLoginGuards({
-    required String email,
-    String? requestIp,
-    required int emailLimit,
-    required int ipLimit,
-    required Duration window,
-    required Duration blockDuration,
-  }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final security = _security;
-    if (security == null) {
-      return null;
-    }
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    if (policy.emailRateLimitEnabled) {
-      final emailDecision = await security.enforce(
-        scope: 'login:email',
-        subject: normalizedEmail,
-        limit: emailLimit,
-        window: window,
-        blockDuration: blockDuration,
-      );
-      if (!emailDecision.allowed) {
-        return LoginAttempt.failure(
-          code: 'rate_limited',
-          message: '尝试次数过多，请稍后再试。',
-          statusCode: 429,
-        );
-      }
-    }
-
-    final ipSubject = _subjectOrEmpty(requestIp);
-    if (ipSubject.isEmpty || !policy.ipRateLimitEnabled) {
-      return null;
-    }
-
-    final ipDecision = await security.enforce(
-      scope: 'login:ip',
-      subject: ipSubject,
-      limit: ipLimit,
-      window: window,
-      blockDuration: blockDuration,
-    );
-    if (!ipDecision.allowed) {
-      return LoginAttempt.failure(
-        code: 'rate_limited',
-        message: '尝试次数过多，请稍后再试。',
-        statusCode: 429,
-      );
-    }
-    return null;
-  }
-
-  Future<void> _clearLoginGuards({required String email}) {
-    final security = _security;
-    if (security == null) {
-      return Future.value();
-    }
-    return security.clear(
-      scope: 'login:email',
-      subject: email.trim().toLowerCase(),
-    );
-  }
-
-  Future<AdminLoginCodeAttempt?> _enforceRequestGuards({
-    required String emailScope,
-    required String ipScope,
-    required String email,
-    String? requestIp,
-    required int emailLimit,
-    required int ipLimit,
-    required Duration window,
-    required Duration blockDuration,
-  }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final security = _security;
-    if (security == null) {
-      return null;
-    }
-    final policy = _policy == null
-        ? SecurityPolicyService.defaultPolicy
-        : await _policy.load();
-    if (policy.emailRateLimitEnabled) {
-      final emailDecision = await security.enforce(
-        scope: emailScope,
-        subject: normalizedEmail,
-        limit: emailLimit,
-        window: window,
-        blockDuration: blockDuration,
-      );
-      if (!emailDecision.allowed) {
-        return const AdminLoginCodeAttempt.failure(
-          code: 'rate_limited',
-          message: '请求过于频繁，请稍后再试。',
-          statusCode: 429,
-        );
-      }
-    }
-
-    final ipSubject = _subjectOrEmpty(requestIp);
-    if (ipSubject.isEmpty || !policy.ipRateLimitEnabled) {
-      return null;
-    }
-
-    final ipDecision = await security.enforce(
-      scope: ipScope,
-      subject: ipSubject,
-      limit: ipLimit,
-      window: window,
-      blockDuration: blockDuration,
-    );
-    if (!ipDecision.allowed) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'rate_limited',
-        message: '请求过于频繁，请稍后再试。',
-        statusCode: 429,
-      );
-    }
-
-    return null;
-  }
-
-  Future<AdminLoginCodeAttempt?> _enforceVerificationCodeSendGuards({
-    required String email,
-    String? requestIp,
-    required SecurityPolicy policy,
-    required String emailScope,
-    required String ipScope,
-    required String cooldownScope,
-    required int emailLimit,
-    required int ipLimit,
-  }) async {
-    final cooldownRetry = await verificationCodeCooldownRetryAfter(
-      email: email,
-      cooldownScope: cooldownScope,
-    );
-    if (cooldownRetry != null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'rate_limited',
-        message: '请求过于频繁，请稍后再试。',
-        statusCode: 429,
-      );
-    }
-
-    return _enforceRequestGuards(
-      emailScope: emailScope,
-      ipScope: ipScope,
-      email: email,
-      requestIp: requestIp,
-      emailLimit: emailLimit,
-      ipLimit: ipLimit,
-      window: Duration(seconds: policy.adminLoginCodeWindowSeconds),
-      blockDuration: Duration(seconds: policy.adminLoginCodeBlockSeconds),
-    );
-  }
-
-  int? _maxRetryAfter(int? left, int? right) {
-    if (left == null) {
-      return right;
-    }
-    if (right == null) {
-      return left;
-    }
-    return left > right ? left : right;
-  }
-
   String _subjectOrEmpty(String? raw) => raw?.trim() ?? '';
-
-  Future<void> _startVerificationCodeCooldown({
-    required String email,
-    required int seconds,
-    required String cooldownScope,
-  }) async {
-    final security = _security;
-    if (security == null) {
-      return;
-    }
-    await security.startCooldown(
-      scope: cooldownScope,
-      subject: email.trim().toLowerCase(),
-      duration: Duration(seconds: seconds),
-    );
-  }
 
   Future<AuthResult> _issueFirstPartyAuthResult(
     UserRecord user, {
