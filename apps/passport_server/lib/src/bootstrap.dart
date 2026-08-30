@@ -7,6 +7,7 @@ import 'repositories/security_repository.dart';
 import 'repositories/settings_repository.dart';
 import 'repositories/user_repository.dart';
 import 'repositories/webauthn_repository.dart';
+import 'runtime/shutdown_coordinator.dart';
 import 'security/password_hasher.dart';
 import 'security/password_policy.dart';
 import 'security/settings_cipher.dart';
@@ -37,6 +38,7 @@ class AppServices {
     settingsRepository = SettingsRepository(_database, settingsCipher);
     webAuthnRepository = WebAuthnRepository(_database);
     migrationRunner = MigrationRunner(_database);
+    shutdownCoordinator = ShutdownCoordinator();
 
     passwordHasher = PasswordHasher(config);
     passwordPolicy = PasswordPolicy();
@@ -111,6 +113,7 @@ class AppServices {
   final AppConfig config;
   final Database _database;
   late final MigrationRunner migrationRunner;
+  late final ShutdownCoordinator shutdownCoordinator;
 
   Future<void> start() async {
     await _database.warmUp();
@@ -124,6 +127,7 @@ class AppServices {
 
   Future<Map<String, dynamic>> readiness() async {
     final checks = <String, bool>{};
+    checks['draining'] = !shutdownCoordinator.isDraining;
     try {
       await _database.execute('select 1');
       checks['database'] = true;

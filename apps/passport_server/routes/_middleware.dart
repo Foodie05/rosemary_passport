@@ -30,6 +30,7 @@ Handler middleware(Handler handler) {
   return handler
       .use(_errorBoundary())
       .use(_requestLogging())
+      .use(_drainControl())
       .use(provider<AppConfig>((_) => services.config))
       .use(provider<TokenService>((_) => services.tokenService))
       .use(provider<PasswordPolicy>((_) => services.passwordPolicy))
@@ -52,6 +53,31 @@ Handler middleware(Handler handler) {
         ),
       )
       .use(_securityHeaders());
+}
+
+Middleware _drainControl() {
+  return (handler) {
+    return (context) async {
+      final coordinator = AppServices.instance.shutdownCoordinator;
+      final path = context.request.uri.path;
+      final isHealthCheck = path == '/health/live' || path == '/health/ready';
+      if (isHealthCheck && coordinator.isDraining) {
+        return handler(context);
+      }
+      if (!coordinator.tryEnter()) {
+        return errorResponse(
+          'service_draining',
+          '服务正在维护，请稍后重试。',
+          statusCode: 503,
+        ).copyWith(headers: {'retry-after': '10'});
+      }
+      try {
+        return await handler(context);
+      } finally {
+        coordinator.leave();
+      }
+    };
+  };
 }
 
 Middleware _errorBoundary() {

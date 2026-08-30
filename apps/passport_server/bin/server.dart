@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import '../build/bin/server.dart' as generated;
-import '../lib/src/bootstrap.dart';
+// Use the bundled service graph as the generated routes. Importing the source
+// tree here would create a second AppServices singleton and leak its pool.
+import '../build/lib/src/bootstrap.dart';
 
 Future<void> main() async {
   final services = AppServices.instance;
@@ -23,10 +25,13 @@ Future<void> main() async {
     // ignore: avoid_print
     print('Received ${signal.name}; draining HTTP requests.');
     try {
-      await server.close(force: false).timeout(const Duration(seconds: 10));
+      await services.shutdownCoordinator.beginDraining().timeout(
+        const Duration(seconds: 10),
+      );
     } on TimeoutException {
-      await server.close(force: true);
+      // The bounded drain window elapsed; remaining requests are terminated.
     } finally {
+      await server.close(force: true).timeout(const Duration(seconds: 2));
       await services.close();
       for (final subscription in subscriptions) {
         await subscription.cancel();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:postgres/postgres.dart';
 import 'package:pool/pool.dart' as resource_pool;
 
@@ -74,8 +76,15 @@ class Database {
   }
 
   Future<void> close() async {
-    await _acquireGate.close();
-    await _pool.close();
+    // HTTP draining has already completed before this is called. Close database
+    // sockets first, then bound the bookkeeping gate so shutdown cannot hang on
+    // a stale resource lease.
+    await _pool.close(force: true).timeout(const Duration(seconds: 2));
+    try {
+      await _acquireGate.close().timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      // The PostgreSQL pool is already closed, so no database work survives.
+    }
   }
 
   static SslMode _parseSslModeValue(String raw) {
