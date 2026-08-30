@@ -11,6 +11,17 @@ legacy_value() {
   sed -n "s/^$1=//p" "$LEGACY_ENV" | tail -n 1
 }
 
+legacy_first() {
+  local name value
+  for name in "$@"; do
+    value="$(legacy_value "$name")"
+    if [[ -n "$value" ]]; then
+      printf '%s' "$value"
+      return 0
+    fi
+  done
+}
+
 write_secret() {
   local path="$1" value="$2"
   [[ -f "$path" ]] && return 0
@@ -51,7 +62,7 @@ if [[ ! -f "$SECRETS_DIR/jwt/signing-v1.private.pem" ]]; then
   else
     openssl genrsa -out "$SECRETS_DIR/jwt/signing-v1.private.pem" 3072
     openssl rsa -in "$SECRETS_DIR/jwt/signing-v1.private.pem" -pubout \
-      -out "$SECRETS_DIR/jwt/signing-v1.public.pem"
+      -out "$SECRETS_DIR/jwt/signing-v1.public.pem" 2>/dev/null
   fi
 fi
 
@@ -64,9 +75,9 @@ write_secret "$SECRETS_DIR/data_keys/data-v1.key" \
 write_secret "$SECRETS_DIR/smtp_password" \
   "$(legacy_value SMTP_PASSWORD || true)"
 write_secret "$SECRETS_DIR/aliyun_captcha_access_key_id" \
-  "$(legacy_value ALIYUN_CAPTCHA_ACCESS_KEY_ID || true)"
+  "$(legacy_first ALIYUN_CAPTCHA_ACCESS_KEY_ID ALIYUN_ACCESS_KEY_ID || true)"
 write_secret "$SECRETS_DIR/aliyun_captcha_access_key_secret" \
-  "$(legacy_value ALIYUN_CAPTCHA_ACCESS_KEY_SECRET || true)"
+  "$(legacy_first ALIYUN_CAPTCHA_ACCESS_KEY_SECRET ALIYUN_ACCESS_KEY_SECRET || true)"
 write_secret "$SECRETS_DIR/local_admin_password" \
   "$(legacy_or_random LOCAL_ADMIN_PASSWORD 24)"
 write_secret "$SECRETS_DIR/backup_encryption_key" "$(random_secret 48)"

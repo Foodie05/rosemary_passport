@@ -63,6 +63,7 @@ echo "[build_linux_x64] building passport server routes"
 (
   cd "$SERVER_DIR"
   dart pub get
+  git diff --exit-code -- pubspec.lock
   npm ci
   dart_frog build
   dart compile exe \
