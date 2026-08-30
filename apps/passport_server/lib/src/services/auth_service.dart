@@ -10,6 +10,7 @@ import '../security/password_policy.dart';
 import '../security/token_service.dart';
 import 'audit_service.dart';
 import 'account_recovery_service.dart';
+import 'account_management_service.dart';
 import 'auth_attempts.dart';
 import 'auth_throttle_service.dart';
 import 'authenticator_service.dart';
@@ -86,6 +87,26 @@ class AuthService {
            securityPolicyService: securityPolicyService,
          ),
          phoneVerificationService: phoneVerificationService,
+       ),
+       _accountManagement = AccountManagementService(
+         userRepository: userRepository,
+         settingsRepository: settingsRepository,
+         passwordHasher: passwordHasher,
+         passwordPolicy: passwordPolicy,
+         emailCodeService: emailCodeService,
+         throttleService: AuthThrottleService(
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         sessionService: SessionService(
+           userRepository: userRepository,
+           tokenService: tokenService,
+           oidcRepository: oidcRepository,
+           auditService: auditService,
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
+         phoneVerificationService: phoneVerificationService,
        );
 
   final UserRepository _users;
@@ -103,6 +124,7 @@ class AuthService {
   final CredentialService _credentials;
   final AuthThrottleService _throttles;
   final AccountRecoveryService _accountRecovery;
+  final AccountManagementService _accountManagement;
   final _uuid = const Uuid();
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
@@ -1196,105 +1218,12 @@ class AuthService {
     String? newEmail,
     String? newPassword,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const AccountUpdateAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-
-    var updatedEmail = false;
-    var updatedPassword = false;
-    var updatedNickname = false;
-
-    if (nickname != null && nickname.trim().isNotEmpty) {
-      await _users.updateNickname(userId: user.id, nickname: nickname.trim());
-      updatedNickname = true;
-    }
-
-    final hasSensitiveChange =
-        (newEmail != null && newEmail.trim().isNotEmpty) ||
-        (newPassword != null && newPassword.trim().isNotEmpty);
-    if (!hasSensitiveChange) {
-      return AccountUpdateAttempt.success(
-        updatedEmail: updatedEmail,
-        updatedPassword: updatedPassword,
-        updatedNickname: updatedNickname,
-      );
-    }
-
-    if (currentPassword.isEmpty) {
-      return const AccountUpdateAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password is required.',
-      );
-    }
-
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
-    );
-    if (!valid) {
-      return const AccountUpdateAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    if (newEmail != null && newEmail.trim().isNotEmpty) {
-      final targetEmail = newEmail.trim().toLowerCase();
-      if (user.roles.contains('admin') &&
-          _isReservedBootstrapEmail(targetEmail)) {
-        return const AccountUpdateAttempt.failure(
-          code: 'invalid_email',
-          message: '管理员邮箱不能使用保留的本地域名。',
-        );
-      }
-      final existing = await _users.findByEmail(targetEmail);
-      if (existing != null && existing.id != user.id) {
-        return const AccountUpdateAttempt.failure(
-          code: 'email_exists',
-          message: '邮箱已被占用。',
-          statusCode: 409,
-        );
-      }
-      await _users.updateEmail(userId: user.id, email: targetEmail);
-      updatedEmail = true;
-    }
-
-    if (newPassword != null && newPassword.trim().isNotEmpty) {
-      final passwordPolicy = _passwordPolicy.validate(newPassword);
-      if (!passwordPolicy.ok) {
-        return AccountUpdateAttempt.failure(
-          code: 'password_policy_violation',
-          message: passwordPolicy.message!,
-        );
-      }
-      final passwordHash = await _passwordHasher.hash(newPassword.trim());
-      await _users.updatePasswordHash(
-        userId: user.id,
-        passwordHash: passwordHash,
-      );
-      updatedPassword = true;
-    }
-
-    if (updatedEmail || updatedPassword) {
-      await _revokeAllRefreshTokens(user.id);
-    }
-    if (updatedEmail && await isBootstrapAdmin(user)) {
-      final boundEmail = newEmail?.trim().toLowerCase();
-      if (boundEmail != null && boundEmail.isNotEmpty) {
-        await _settings.closeBootstrapLogin(boundEmail: boundEmail);
-      }
-    }
-
-    return AccountUpdateAttempt.success(
-      updatedEmail: updatedEmail,
-      updatedPassword: updatedPassword,
-      updatedNickname: updatedNickname,
+    return _accountManagement.updateAccount(
+      userId: userId,
+      currentPassword: currentPassword,
+      nickname: nickname,
+      newEmail: newEmail,
+      newPassword: newPassword,
     );
   }
 
@@ -1304,82 +1233,12 @@ class AuthService {
     required String currentPassword,
     String? requestIp,
   }) async {
-    final policy = await _throttles.loadPolicy();
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const EmailActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    if (currentPassword.trim().isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password is required.',
-      );
-    }
-
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
-    );
-    if (!valid) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final targetEmail = newEmail.trim().toLowerCase();
-    if (targetEmail.isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'email is required.',
-      );
-    }
-    if (user.roles.contains('admin') &&
-        _isReservedBootstrapEmail(targetEmail)) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_email',
-        message: '管理员邮箱不能使用保留的本地域名。',
-      );
-    }
-    final existing = await _users.findByEmail(targetEmail);
-    if (existing != null && existing.id != user.id) {
-      return const EmailActionAttempt.failure(
-        code: 'email_exists',
-        message: '邮箱已被占用。',
-        statusCode: 409,
-      );
-    }
-
-    final limited = await _throttles.enforceVerificationCodeSendGuards(
-      email: targetEmail,
+    return _accountManagement.sendBindEmailCode(
+      userId: userId,
+      newEmail: newEmail,
+      currentPassword: currentPassword,
       requestIp: requestIp,
-      policy: policy,
-      emailScope: _verificationCodeBindEmailScope,
-      ipScope: _verificationCodeBindIpScope,
-      cooldownScope: _verificationCodeBindCooldownScope,
-      emailLimit: policy.adminLoginCodeEmailLimit,
-      ipLimit: policy.adminLoginCodeIpLimit,
     );
-    if (limited != null) {
-      return EmailActionAttempt.failure(
-        code: limited.code,
-        message: limited.message,
-        statusCode: limited.statusCode,
-      );
-    }
-
-    await _emailCodeService.issueBindEmailCode(targetEmail);
-    await _throttles.startVerificationCodeCooldown(
-      email: targetEmail,
-      seconds: policy.bindEmailCodeCooldownSeconds,
-      cooldownScope: _verificationCodeBindCooldownScope,
-    );
-    return const EmailActionAttempt.success();
   }
 
   Future<EmailActionAttempt> bindEmailWithCode({
@@ -1389,71 +1248,13 @@ class AuthService {
     required String emailCode,
     String? preservedAccessTokenId,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const EmailActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    if (currentPassword.trim().isEmpty || emailCode.trim().isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password and email_code are required.',
-      );
-    }
-
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
-    );
-    if (!valid) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-
-    final targetEmail = newEmail.trim().toLowerCase();
-    if (user.roles.contains('admin') &&
-        _isReservedBootstrapEmail(targetEmail)) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_email',
-        message: '管理员邮箱不能使用保留的本地域名。',
-      );
-    }
-    final existing = await _users.findByEmail(targetEmail);
-    if (existing != null && existing.id != user.id) {
-      return const EmailActionAttempt.failure(
-        code: 'email_exists',
-        message: '邮箱已被占用。',
-        statusCode: 409,
-      );
-    }
-
-    final codeValid = await _emailCodeService.verifyBindEmailCode(
-      targetEmail,
-      emailCode.trim(),
-    );
-    if (!codeValid) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_code',
-        message: '邮箱验证码无效或已过期。',
-        statusCode: 401,
-      );
-    }
-
-    await _users.updateEmail(userId: user.id, email: targetEmail);
-    await _revokeAllRefreshTokens(
-      user.id,
+    return _accountManagement.bindEmail(
+      userId: userId,
+      newEmail: newEmail,
+      currentPassword: currentPassword,
+      emailCode: emailCode,
       preservedAccessTokenId: preservedAccessTokenId,
     );
-    if (await isBootstrapAdmin(user)) {
-      await _settings.closeBootstrapLogin(boundEmail: targetEmail);
-    }
-    return const EmailActionAttempt.success();
   }
 
   Future<EmailActionAttempt> sendBindPhoneCode({
@@ -1462,66 +1263,12 @@ class AuthService {
     required String currentPassword,
     String? requestIp,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const EmailActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    if (currentPassword.trim().isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password is required.',
-      );
-    }
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
+    return _accountManagement.sendBindPhoneCode(
+      userId: userId,
+      phoneNumber: phoneNumber,
+      currentPassword: currentPassword,
+      requestIp: requestIp,
     );
-    if (!valid) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-    final phoneService = _phoneVerification;
-    if (phoneService == null) {
-      return const EmailActionAttempt.failure(
-        code: 'phone_verification_not_configured',
-        message: '手机号验证码服务尚未配置。',
-        statusCode: 503,
-      );
-    }
-    final normalized = phoneService.normalizePhone(phoneNumber);
-    if (normalized == null) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_phone_number',
-        message: '手机号格式不正确。',
-      );
-    }
-    final existing = await _users.findByPhoneNumber(normalized);
-    if (existing != null && existing.id != user.id) {
-      return const EmailActionAttempt.failure(
-        code: 'phone_exists',
-        message: '手机号已被占用。',
-        statusCode: 409,
-      );
-    }
-    final sent = await phoneService.sendCode(
-      phoneNumber: normalized,
-      requestIp: _subjectOrEmpty(requestIp),
-    );
-    if (!sent.ok) {
-      return EmailActionAttempt.failure(
-        code: sent.code ?? 'temporary_issue',
-        message: sent.message ?? '验证码发送失败，请稍后重试。',
-        statusCode: sent.statusCode,
-      );
-    }
-    return const EmailActionAttempt.success();
   }
 
   Future<EmailActionAttempt> bindPhoneWithCode({
@@ -1532,113 +1279,24 @@ class AuthService {
     String? requestIp,
     String? preservedAccessTokenId,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const EmailActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    if (currentPassword.trim().isEmpty || verifyCode.trim().isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password and verify_code are required.',
-      );
-    }
-    final valid = await _passwordHasher.verify(
-      user.passwordHash,
-      currentPassword,
-    );
-    if (!valid) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
-    }
-    final phoneService = _phoneVerification;
-    if (phoneService == null) {
-      return const EmailActionAttempt.failure(
-        code: 'phone_verification_not_configured',
-        message: '手机号验证码服务尚未配置。',
-        statusCode: 503,
-      );
-    }
-    final normalized = phoneService.normalizePhone(phoneNumber);
-    if (normalized == null) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_phone_number',
-        message: '手机号格式不正确。',
-      );
-    }
-    final existing = await _users.findByPhoneNumber(normalized);
-    if (existing != null && existing.id != user.id) {
-      return const EmailActionAttempt.failure(
-        code: 'phone_exists',
-        message: '手机号已被占用。',
-        statusCode: 409,
-      );
-    }
-    final checked = await phoneService.verifyCode(
-      phoneNumber: normalized,
+    return _accountManagement.bindPhone(
+      userId: userId,
+      phoneNumber: phoneNumber,
+      currentPassword: currentPassword,
       verifyCode: verifyCode,
-      requestIp: _subjectOrEmpty(requestIp),
-    );
-    if (!checked.ok) {
-      return EmailActionAttempt.failure(
-        code: checked.code ?? 'invalid_code',
-        message: checked.message ?? '验证码无效或已过期。',
-        statusCode: checked.statusCode,
-      );
-    }
-    await _users.updatePhoneNumber(userId: user.id, phoneNumber: normalized);
-    await _revokeAllRefreshTokens(
-      user.id,
+      requestIp: requestIp,
       preservedAccessTokenId: preservedAccessTokenId,
     );
-    return const EmailActionAttempt.success();
   }
 
   Future<EmailActionAttempt> sendPasswordResetCode({
     required String userId,
     String? requestIp,
   }) async {
-    final policy = await _throttles.loadPolicy();
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const EmailActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-
-    final limited = await _throttles.enforceVerificationCodeSendGuards(
-      email: user.email,
+    return _accountManagement.sendPasswordResetCode(
+      userId: userId,
       requestIp: requestIp,
-      policy: policy,
-      emailScope: _verificationCodeResetEmailScope,
-      ipScope: _verificationCodeResetIpScope,
-      cooldownScope: _verificationCodeResetCooldownScope,
-      emailLimit: policy.adminLoginCodeEmailLimit,
-      ipLimit: policy.adminLoginCodeIpLimit,
     );
-    if (limited != null) {
-      return EmailActionAttempt.failure(
-        code: limited.code,
-        message: limited.message,
-        statusCode: limited.statusCode,
-      );
-    }
-
-    await _emailCodeService.issuePasswordResetCode(user.email);
-    await _throttles.startVerificationCodeCooldown(
-      email: user.email,
-      seconds: policy.passwordResetCodeCooldownSeconds,
-      cooldownScope: _verificationCodeResetCooldownScope,
-    );
-    return const EmailActionAttempt.success();
   }
 
   Future<EmailActionAttempt> resetPasswordWithCode({
@@ -1646,47 +1304,11 @@ class AuthService {
     required String newPassword,
     required String emailCode,
   }) async {
-    final user = await _users.findById(userId);
-    if (user == null) {
-      return const EmailActionAttempt.failure(
-        code: 'not_found',
-        message: 'User not found.',
-        statusCode: 404,
-      );
-    }
-    if (newPassword.trim().isEmpty || emailCode.trim().isEmpty) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_request',
-        message: 'new_password and email_code are required.',
-      );
-    }
-    final passwordPolicy = _passwordPolicy.validate(newPassword);
-    if (!passwordPolicy.ok) {
-      return EmailActionAttempt.failure(
-        code: 'password_policy_violation',
-        message: passwordPolicy.message!,
-      );
-    }
-
-    final codeValid = await _emailCodeService.verifyPasswordResetCode(
-      user.email,
-      emailCode.trim(),
+    return _accountManagement.resetPassword(
+      userId: userId,
+      newPassword: newPassword,
+      emailCode: emailCode,
     );
-    if (!codeValid) {
-      return const EmailActionAttempt.failure(
-        code: 'invalid_code',
-        message: '邮箱验证码无效或已过期。',
-        statusCode: 401,
-      );
-    }
-
-    final passwordHash = await _passwordHasher.hash(newPassword.trim());
-    await _users.updatePasswordHash(
-      userId: user.id,
-      passwordHash: passwordHash,
-    );
-    await _revokeAllRefreshTokens(user.id);
-    return const EmailActionAttempt.success();
   }
 
   Future<CredentialActionAttempt> updateSecurityCode({
@@ -1918,15 +1540,5 @@ class AuthService {
 
   bool _isReservedBootstrapEmail(String email) {
     return email.toLowerCase().trim().endsWith('@rosm.local');
-  }
-
-  Future<void> _revokeAllRefreshTokens(
-    String userId, {
-    String? preservedAccessTokenId,
-  }) {
-    return _sessions.revokeAllUserSessions(
-      userId,
-      preservedAccessTokenId: preservedAccessTokenId,
-    );
   }
 }
