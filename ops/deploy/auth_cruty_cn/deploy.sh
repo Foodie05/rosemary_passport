@@ -41,7 +41,7 @@ trap cleanup EXIT
 [[ "$FRONTEND_TARGET_DIR" = /* ]] || die "frontend directory must be absolute"
 
 for command in docker tar rsync curl mkdir ln mv grep readlink aws openssl \
-  sha256sum pg_restore sed tail awk; do require_cmd "$command"; done
+  sha256sum pg_restore sed tail awk df; do require_cmd "$command"; done
 docker compose version >/dev/null 2>&1 || die "docker compose is unavailable"
 
 TARGET_DIR="${TARGET_DIR%/}"
@@ -90,6 +90,7 @@ fi
 compose() { docker compose --env-file "$RUNTIME_ENV_FILE" "$@"; }
 
 mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_RELEASES_DIR"
+"$SOURCE_DIR/check_disk_capacity.sh" "$TARGET_DIR" "$FRONTEND_RELEASES_DIR"
 previous_frontend=""
 if [[ -L "$FRONTEND_TARGET_DIR" ]]; then
   previous_frontend="$(readlink "$FRONTEND_TARGET_DIR")"
@@ -116,6 +117,7 @@ info "syncing credential-free release"
 tar --exclude='./.env' -C "$SOURCE_DIR" -cf - . | tar -C "$TARGET_DIR" -xf -
 chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
   "$TARGET_DIR/physical_backup_to_s3.sh" \
+  "$TARGET_DIR/check_disk_capacity.sh" \
   "$TARGET_DIR/archive_audit_to_s3.sh" \
   "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/provision_secrets.sh" \
   "$TARGET_DIR/backend/entrypoint.sh"
