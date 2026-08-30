@@ -135,6 +135,14 @@ void main() {
         isTrue,
       );
       verify(() => emailCodes.issuePasswordResetCode(user.email)).called(1);
+
+      when(
+        () => emailCodes.issuePasswordResetCode(user.email),
+      ).thenThrow(StateError('provider unavailable'));
+      expect(
+        (await service.sendCode(account: user.email, method: 'email')).ok,
+        isTrue,
+      );
     },
   );
 
@@ -173,7 +181,23 @@ void main() {
       isTrue,
     );
 
+    stubEmailDelivery(
+      limited: const AdminLoginCodeAttempt.failure(
+        code: 'rate_limited',
+        message: 'limited',
+        statusCode: 429,
+      ),
+    );
+    expect(
+      (await service.sendCode(
+        account: '13800000000',
+        method: 'phone',
+      )).statusCode,
+      429,
+    );
+
     when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
+    stubEmailDelivery();
     when(
       () => phones.sendCode(
         phoneNumber: any(named: 'phoneNumber'),
@@ -186,6 +210,17 @@ void main() {
         statusCode: 503,
       ),
     );
+    expect(
+      (await service.sendCode(account: '13800000000', method: 'phone')).ok,
+      isTrue,
+    );
+
+    when(
+      () => phones.sendCode(
+        phoneNumber: any(named: 'phoneNumber'),
+        requestIp: any(named: 'requestIp'),
+      ),
+    ).thenThrow(StateError('provider unavailable'));
     expect(
       (await service.sendCode(account: '13800000000', method: 'phone')).ok,
       isTrue,
@@ -298,6 +333,24 @@ void main() {
   test(
     'phone password recovery rejects invalid and accepts valid codes',
     () async {
+      final disabled = AccountRecoveryService(
+        userRepository: users,
+        passwordHasher: passwords,
+        passwordPolicy: PasswordPolicy(),
+        emailCodeService: emailCodes,
+        throttleService: throttles,
+        sessionService: sessions,
+      );
+      expect(
+        (await disabled.recoverPassword(
+          account: '13800000000',
+          method: 'phone',
+          code: '123456',
+          newPassword: 'A secure historical-compatible passphrase',
+        )).code,
+        'phone_verification_not_configured',
+      );
+
       when(() => phones.normalizePhone(any())).thenReturn(null);
       expect(
         (await service.recoverPassword(
