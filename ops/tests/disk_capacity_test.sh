@@ -9,7 +9,9 @@ trap 'rm -rf "$test_dir"' EXIT
 ROSM_MIN_FREE_BYTES=1 "$preflight" "$test_dir" >/dev/null
 
 available_kib="$(df -Pk "$test_dir" | awk 'NR == 2 {print $4}')"
-too_large_bytes=$(( (available_kib + 1) * 1024 ))
+# Leave enough headroom for concurrent runner cleanup. A one-KiB margin made
+# this assertion race with package caches and other jobs freeing disk blocks.
+too_large_bytes=$(( (available_kib + 1048576) * 1024 ))
 set +e
 ROSM_MIN_FREE_BYTES="$too_large_bytes" "$preflight" "$test_dir" \
   >"$test_dir/stdout" 2>"$test_dir/stderr"
