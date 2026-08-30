@@ -36,6 +36,7 @@ required_executables=(
   ops/deploy/auth_cruty_cn/restore_from_s3.sh
   ops/deploy/auth_cruty_cn/postgres/archive-wal.sh
   ops/deploy/auth_cruty_cn/postgres/postgres-entrypoint.sh
+  ops/tests/restore_integrity_test.sh
 )
 for path in "${required_executables[@]}"; do
   mode="$(git ls-files --stage -- "$path" | awk '{print $1}')"
