@@ -9,7 +9,7 @@ to_epoch() {
   if date --version >/dev/null 2>&1; then
     date -u -d "$1" '+%s'
   else
-    date -j -u -f '%Y-%m-%d' "$1" '+%s'
+    date -j -u -f '%Y-%m-%dT%H:%M:%S' "${1}T00:00:00" '+%s'
   fi
 }
 [[ "$evidence_dir" = /* ]] || die 'evidence directory must be absolute'

@@ -10,7 +10,7 @@ Docker Compose 管理，Apache 只代理 `127.0.0.1:8091` 并托管原子切换�
    `POSTGRES_IMAGE` 和 `NODE_IMAGE` 必须包含已经核验的 `@sha256:` digest。
 2. 运行 `sudo ./provision_secrets.sh /etc/rosm-passport/secrets [legacy.env]`。旧环境文件只用于一次性迁移，随后应移出发布目录并安全销毁。
 3. 填写 S3 凭据，确保所有秘密文件和目录分别保持 `0400`、`0700`。
-4. 为备份桶启用版本控制；对象存储支持时启用 Object Lock/不可变保留策略。部署预检会拒绝未启用版本控制的桶。
+4. 为备份桶启用版本控制和至少 30 天的 Object Lock 默认保留策略。部署预检会拒绝未启用版本控制、Object Lock 或保留期不足的桶。仅当对象存储确实不支持 Object Lock 且已有书面风险例外时，才可将 `S3_REQUIRE_OBJECT_LOCK=false`。
 5. 执行：
 
    ```bash

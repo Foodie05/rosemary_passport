@@ -87,6 +87,9 @@ if grep -q 'LEGACY_JSON_REFRESH_SUNSET_AT=REPLACE_' "$RUNTIME_ENV_FILE"; then
   die "legacy JSON refresh sunset must be a fixed UTC timestamp"
 fi
 
+info "validating off-host storage protection"
+"$SOURCE_DIR/check_s3_storage.sh" "$RUNTIME_ENV_FILE" "$SECRETS_DIR"
+
 compose() { docker compose --env-file "$RUNTIME_ENV_FILE" "$@"; }
 
 mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_RELEASES_DIR"
@@ -117,6 +120,7 @@ info "syncing credential-free release"
 tar --exclude='./.env' -C "$SOURCE_DIR" -cf - . | tar -C "$TARGET_DIR" -xf -
 chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \
   "$TARGET_DIR/physical_backup_to_s3.sh" \
+  "$TARGET_DIR/check_s3_storage.sh" \
   "$TARGET_DIR/check_disk_capacity.sh" \
   "$TARGET_DIR/archive_audit_to_s3.sh" \
   "$TARGET_DIR/restore_from_s3.sh" "$TARGET_DIR/pitr_drill.sh" \
