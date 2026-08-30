@@ -45,6 +45,8 @@ required_executables=(
   ops/deploy/auth_cruty_cn/postgres/restore-wal.sh
   ops/deploy/auth_cruty_cn/postgres/postgres-entrypoint.sh
   ops/tests/restore_integrity_test.sh
+  ops/tests/remote_deploy_safety_test.sh
+  ops/tests/secret_provisioning_test.sh
   ops/tests/fault_recovery_drill.sh
   ops/tests/sla_observation_test.sh
   ops/tests/pitr_drill_safety_test.sh
