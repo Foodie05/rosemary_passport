@@ -65,6 +65,20 @@ void main() {
     isEmailVerified: true,
     isPhoneVerified: false,
   );
+  const boundAdmin = UserRecord(
+    id: 'bound-admin-id',
+    email: 'admin@example.invalid',
+    phoneNumber: null,
+    nickname: 'Bound Admin',
+    passwordHash: 'bound-admin-hash',
+    passkeyHash: null,
+    securityCodeHash: null,
+    authenticatorSecret: null,
+    hasAuthenticator: false,
+    roles: ['admin'],
+    isEmailVerified: true,
+    isPhoneVerified: false,
+  );
   const tokenPair = TokenPair(
     accessToken: 'access',
     refreshToken: 'refresh',
@@ -406,6 +420,23 @@ void main() {
       expect(existing.ok, isTrue);
       expect(existing.message, missing.message);
 
+      when(() => users.findByEmail(any())).thenAnswer((_) async => boundAdmin);
+      when(
+        () => emailCodes.issueLoginCode(
+          boundAdmin.email,
+          templateName: any(named: 'templateName'),
+        ),
+      ).thenAnswer((_) async => 'admin-code-id');
+      final admin = await service.sendEmailCode(email: boundAdmin.email);
+      expect(admin.ok, isTrue);
+      verify(
+        () => emailCodes.issueLoginCode(
+          boundAdmin.email,
+          templateName: 'login_verification',
+        ),
+      ).called(1);
+
+      when(() => users.findByEmail(any())).thenAnswer((_) async => user);
       when(
         () => emailCodes.issueLoginCode(
           user.email,
@@ -688,30 +719,70 @@ void main() {
     );
   });
 
-  test('direct email-code login rejects admins and consumes once', () async {
-    stubAllowedGuards();
-    when(() => users.findByEmail(any())).thenAnswer((_) async => bootstrap);
-    expect(
-      (await service.loginWithEmailCode(
-        email: bootstrap.email,
-        emailCode: '123456',
-      )).code,
-      'login_failed',
-    );
-    when(() => users.findByEmail(any())).thenAnswer((_) async => user);
-    when(
-      () => emailCodes.validateLoginCode(any(), any()),
-    ).thenAnswer((_) async => 'code-id');
-    when(() => emailCodes.consumeCode('code-id')).thenAnswer((_) async => true);
-    stubLoginCompletion();
-    expect(
-      (await service.loginWithEmailCode(
-        email: user.email,
-        emailCode: '123456',
-      )).ok,
-      isTrue,
-    );
-  });
+  test(
+    'direct email-code login requires admin password and consumes once',
+    () async {
+      stubAllowedGuards();
+      when(
+        () => settings.isBootstrapLoginEnabled(),
+      ).thenAnswer((_) async => true);
+      when(() => users.findByEmail(any())).thenAnswer((_) async => bootstrap);
+      expect(
+        (await service.loginWithEmailCode(
+          email: bootstrap.email,
+          emailCode: '123456',
+        )).code,
+        'login_failed',
+      );
+
+      when(() => users.findByEmail(any())).thenAnswer((_) async => boundAdmin);
+      when(
+        () => settings.isBootstrapLoginEnabled(),
+      ).thenAnswer((_) async => false);
+      when(() => passwords.verify(boundAdmin.passwordHash, any())).thenAnswer(
+        (invocation) async =>
+            invocation.positionalArguments[1] == 'correct-password',
+      );
+      expect(
+        (await service.loginWithEmailCode(
+          email: boundAdmin.email,
+          emailCode: '123456',
+        )).code,
+        'login_failed',
+      );
+      when(
+        () => emailCodes.validateLoginCode(boundAdmin.email, any()),
+      ).thenAnswer((_) async => 'admin-code-id');
+      when(
+        () => emailCodes.consumeCode('admin-code-id'),
+      ).thenAnswer((_) async => true);
+      stubLoginCompletion(boundAdmin);
+      expect(
+        (await service.loginWithEmailCode(
+          email: boundAdmin.email,
+          emailCode: '123456',
+          password: 'correct-password',
+        )).ok,
+        isTrue,
+      );
+
+      when(() => users.findByEmail(any())).thenAnswer((_) async => user);
+      when(
+        () => emailCodes.validateLoginCode(any(), any()),
+      ).thenAnswer((_) async => 'code-id');
+      when(
+        () => emailCodes.consumeCode('code-id'),
+      ).thenAnswer((_) async => true);
+      stubLoginCompletion();
+      expect(
+        (await service.loginWithEmailCode(
+          email: user.email,
+          emailCode: '123456',
+        )).ok,
+        isTrue,
+      );
+    },
+  );
 
   test('direct email-code login rejects invalid or reused codes', () async {
     stubAllowedGuards();

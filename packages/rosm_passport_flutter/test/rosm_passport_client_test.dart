@@ -128,6 +128,46 @@ void main() {
     });
   });
 
+  test('sends an optional admin password with email-code login', () async {
+    late http.Request captured;
+    final client = RosmPassportClient(
+      issuer: Uri.parse('https://api.example.com'),
+      clientId: 'app',
+      redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+      tokenStore: _MemoryTokenStore(),
+      lastSignInStore: RosmMemoryLastSignInStore(),
+      httpClient: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'user': {
+              'id': 'admin-1',
+              'email': 'admin@example.com',
+              'nickname': 'Admin',
+              'roles': ['admin'],
+            },
+            'security': {},
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    await client.loginWithEmailCode(
+      email: 'admin@example.com',
+      emailCode: '123456',
+      password: 'admin-password',
+    );
+
+    expect(captured.url.path, '/api/v1/auth/email-login');
+    expect(jsonDecode(captured.body), {
+      'email': 'admin@example.com',
+      'email_code': '123456',
+      'password': 'admin-password',
+    });
+  });
+
   test(
     'remembers only the last successful login method and identifier',
     () async {

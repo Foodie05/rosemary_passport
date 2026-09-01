@@ -28,3 +28,18 @@ test('password recovery uses the shared ROSM Pass authentication frame', () => {
   assert.match(recoveryPage, /<BrandSection \/>/);
   assert.match(recoveryPage, /grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-2/);
 });
+
+test('administrator password is requested only in direct email-code login', () => {
+  const phonePanel = source.slice(
+    source.indexOf("if (view.method === 'phone_code')"),
+    source.indexOf("if (view.method === 'email_code')"),
+  );
+  const emailPanel = source.slice(
+    source.indexOf("if (view.method === 'email_code')"),
+    source.indexOf("if (view.method === 'password')"),
+  );
+
+  assert.doesNotMatch(phonePanel, /管理员密码/);
+  assert.match(emailPanel, /管理员密码（普通账号可留空）/);
+  assert.match(emailPanel, /autoComplete="current-password"/);
+});

@@ -215,6 +215,10 @@ final handoff = await passport.completeServerHandoff(
 );
 ```
 
+Administrator accounts must also pass their password to `loginWithEmailCode`.
+The `password` argument is optional for standard accounts, so existing clients
+remain compatible.
+
 For password login, call `passwordFactors` before the final password login request. If `directLogin` is false, show the returned factors and then complete login with `factorType` plus the selected verification code. The built-in UI does this automatically.
 
 ## Registration

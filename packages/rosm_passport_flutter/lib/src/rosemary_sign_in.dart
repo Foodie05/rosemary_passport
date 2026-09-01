@@ -99,6 +99,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   final _phone = TextEditingController();
   final _passwordEmail = TextEditingController();
   final _password = TextEditingController();
+  final _emailCodePassword = TextEditingController();
   final _mfaCode = TextEditingController();
   final _code = TextEditingController();
   final _recoveryAccount = TextEditingController();
@@ -154,6 +155,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     _phone.dispose();
     _passwordEmail.dispose();
     _password.dispose();
+    _emailCodePassword.dispose();
     _mfaCode.dispose();
     _code.dispose();
     _recoveryAccount.dispose();
@@ -242,6 +244,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           ? await widget.client.loginWithEmailCode(
               email: _email.text.trim(),
               emailCode: _code.text.trim(),
+              password: _emailCodePassword.text,
             )
           : await widget.client.loginWithPhoneCode(
               phoneNumber: _phone.text.trim(),
@@ -788,6 +791,17 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               ),
             ],
           ),
+          if (isEmail) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _emailCodePassword,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: '管理员密码（普通账号可留空）',
+                prefixIcon: Icon(Icons.lock_outline_rounded),
+              ),
+            ),
+          ],
         ],
         const SizedBox(height: 24),
         FilledButton(

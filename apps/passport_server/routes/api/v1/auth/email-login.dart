@@ -28,6 +28,7 @@ Future<Response> onRequest(RequestContext context) async {
   final attempt = await context.read<AuthService>().loginWithEmailCode(
     email: payload.email,
     emailCode: payload.emailCode,
+    password: payload.password,
     requestIp: requestIp,
     rememberMe: payload.rememberMe,
   );

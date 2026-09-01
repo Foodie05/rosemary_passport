@@ -41,3 +41,13 @@ test('password bootstrap login preserves the remember-me choice', () => {
 
   assert.match(prepareLogin, /if \(data\.direct_login\)[\s\S]*remember_me: rememberMe/);
 });
+
+test('direct email-code login forwards an optional administrator password', () => {
+  const completeEmailLogin = appSource.slice(
+    appSource.indexOf('async function completeEmailCodeLogin'),
+    appSource.indexOf('const loadLoginCodeCooldown'),
+  );
+
+  assert.match(completeEmailLogin, /loginForm\.password \? \{ password: loginForm\.password \} : \{\}/);
+  assert.match(completeEmailLogin, /remember_me: rememberMe/);
+});
