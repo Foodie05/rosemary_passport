@@ -259,6 +259,14 @@ void main() {
     );
   });
 
+  test('factor-only recovery preparation remains non-enumerating', () async {
+    expect(
+      (await service.sendCode(account: user.email, method: 'authenticator')).ok,
+      isTrue,
+    );
+    expect((await service.sendCode(account: '', method: 'passkey')).ok, isTrue);
+  });
+
   test(
     'email password recovery validates policy, code, and revokes sessions',
     () async {
@@ -471,6 +479,33 @@ void main() {
           window: any(named: 'window'),
           blockDuration: any(named: 'blockDuration'),
         ),
+      ).thenAnswer(
+        (_) async => const AdminLoginCodeAttempt.failure(
+          code: 'rate_limited',
+          message: 'limited',
+          statusCode: 429,
+        ),
+      );
+      expect(
+        (await service.recoverPassword(
+          account: user.email,
+          method: 'authenticator',
+          code: '123456',
+          newPassword: 'A secure historical-compatible passphrase',
+        )).statusCode,
+        429,
+      );
+      when(
+        () => throttles.enforceRequestGuards(
+          emailScope: any(named: 'emailScope'),
+          ipScope: any(named: 'ipScope'),
+          email: any(named: 'email'),
+          requestIp: any(named: 'requestIp'),
+          emailLimit: any(named: 'emailLimit'),
+          ipLimit: any(named: 'ipLimit'),
+          window: any(named: 'window'),
+          blockDuration: any(named: 'blockDuration'),
+        ),
       ).thenAnswer((_) async => null);
       when(
         () => users.findAuthenticatorSecretByUserId(user.id),
@@ -529,6 +564,19 @@ void main() {
         blockDuration: any(named: 'blockDuration'),
       ),
     ).thenAnswer((_) async => null);
+    when(
+      () => webAuthn.findCredential('missing-credential'),
+    ).thenAnswer((_) async => null);
+    expect(
+      (await service.recoverPassword(
+        account: '',
+        method: 'passkey',
+        code: '',
+        newPassword: 'A secure historical-compatible passphrase',
+        passkeyResponse: const {'id': 'missing-credential'},
+      )).code,
+      'verification_failed',
+    );
     when(
       () => webAuthn.findCredential('credential-id'),
     ).thenAnswer((_) async => credential);
