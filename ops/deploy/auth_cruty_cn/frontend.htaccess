@@ -11,7 +11,7 @@ Header always set X-Frame-Options "DENY"
 Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 Header always set Cross-Origin-Opener-Policy "same-origin"
-Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://o.alicdn.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tianyue.s3.bitiful.net https://*.alicdn.com; connect-src 'self' https://apiauth.cruty.cn https://*.aliyun.com; frame-src https://*.aliyun.com https://*.alicdn.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://g.alicdn.com https://o.alicdn.com https://x.alicdn.com https://static-captcha.aliyuncs.com; style-src 'self' 'unsafe-inline' https://g.alicdn.com https://o.alicdn.com https://x.alicdn.com https://static-captcha.aliyuncs.com; img-src 'self' data: https://tianyue.s3.bitiful.net https://*.alicdn.com https://static-captcha.aliyuncs.com https://*.captcha-open.aliyuncs.com; font-src 'self' data: https://g.alicdn.com https://o.alicdn.com https://x.alicdn.com https://static-captcha.aliyuncs.com; connect-src 'self' https://apiauth.cruty.cn https://cloudauth-device.aliyuncs.com https://cn-shanghai.device.saf.aliyuncs.com https://upload.captcha-open.aliyuncs.com https://*.captcha-open.aliyuncs.com; frame-src https://*.alicdn.com https://static-captcha.aliyuncs.com https://*.captcha-open.aliyuncs.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
 <Files "apple-app-site-association">
   ForceType application/json

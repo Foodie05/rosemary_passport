@@ -50,6 +50,7 @@ jobs:
           ./ops/tests/deploy_transaction_rollback_test.sh
           ./ops/tests/pitr_drill_safety_test.sh
           ./ops/tests/sla_observation_test.sh
+          ./ops/tests/frontend_csp_test.sh
       - name: Validate pull request title
         if: github.event_name == 'pull_request'
         env:

@@ -95,6 +95,7 @@ required_executables=(
   ops/tests/legacy_env_transition_test.sh
   ops/tests/legacy_cutover_layout_test.sh
   ops/tests/deploy_transaction_rollback_test.sh
+  ops/tests/frontend_csp_test.sh
 )
 for path in "${required_executables[@]}"; do
   mode="$(git ls-files --stage -- "$path" | awk '{print $1}')"

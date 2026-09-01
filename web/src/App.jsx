@@ -697,41 +697,71 @@ function App() {
         resolve();
         return;
       }
-      const existing = document.querySelector('script[data-aliyun-captcha]');
+      let existing = document.querySelector('script[data-aliyun-captcha]');
       if (existing) {
         if (existing.dataset.prefix !== config.prefix) {
           existing.remove();
           delete window.initAliyunCaptcha;
-        } else {
-          existing.addEventListener('load', resolve, { once: true });
-          existing.addEventListener('error', reject, { once: true });
+          existing = null;
+        } else if (existing.dataset.loaded === 'true') {
+          resolve();
           return;
         }
       }
-      window.AliyunCaptchaConfig = {
-        region: config.region,
-        prefix: config.prefix,
+
+      const script = existing || document.createElement('script');
+      let settled = false;
+      const cleanup = () => {
+        window.clearTimeout(loadTimer);
+        script.removeEventListener('load', onLoad);
+        script.removeEventListener('error', onError);
       };
-      window.__rosmAliyunCaptchaPrefix = config.prefix;
-      const script = document.createElement('script');
-      script.src = 'https://o.alicdn.com/captcha-frontend/aliyunCaptcha/AliyunCaptcha.js';
-      script.async = true;
-      script.dataset.aliyunCaptcha = 'true';
-      script.dataset.prefix = config.prefix;
-      script.addEventListener('load', () => {
-        window.__rosmAliyunCaptchaLoadedAt = Date.now();
+      const fail = (message) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        script.remove();
+        delete window.initAliyunCaptcha;
+        reject(new Error(message));
+      };
+      const onLoad = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        script.dataset.loaded = 'true';
         resolve();
-      }, { once: true });
-      script.addEventListener('error', reject, { once: true });
-      document.body.appendChild(script);
+      };
+      const onError = () => fail('人机验证组件加载失败，请检查网络后重试。');
+      const loadTimer = window.setTimeout(
+        () => fail('人机验证组件加载超时，请刷新页面后重试。'),
+        15000,
+      );
+      script.addEventListener('load', onLoad, { once: true });
+      script.addEventListener('error', onError, { once: true });
+
+      if (!existing) {
+        window.AliyunCaptchaConfig = {
+          region: config.region,
+          prefix: config.prefix,
+        };
+        window.__rosmAliyunCaptchaPrefix = config.prefix;
+        script.src = 'https://o.alicdn.com/captcha-frontend/aliyunCaptcha/AliyunCaptcha.js';
+        script.async = true;
+        script.dataset.aliyunCaptcha = 'true';
+        script.dataset.prefix = config.prefix;
+        document.body.appendChild(script);
+      }
     });
   }
 
   async function waitForAliyunCaptchaReady(config) {
     await ensureAliyunCaptchaScript(config);
-    const elapsed = Date.now() - Number(window.__rosmAliyunCaptchaLoadedAt || 0);
-    if (elapsed < 2000) {
-      await new Promise((resolve) => window.setTimeout(resolve, 2000 - elapsed));
+    const deadline = Date.now() + 10000;
+    while (typeof window.initAliyunCaptcha !== 'function') {
+      if (Date.now() >= deadline) {
+        throw new Error('人机验证组件初始化超时，请刷新页面后重试。');
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
     }
   }
 
@@ -836,8 +866,17 @@ function App() {
           element: '#aliyun-background-captcha',
           button: '#aliyun-background-captcha-trigger',
           slideStyle: { width: 360, height: 40 },
-          success: (captchaVerifyParam) => finish(resolve, captchaVerifyParam),
-          fail: () => {},
+          success: (captchaVerifyParam) => {
+            if (!captchaVerifyParam) {
+              finish(reject, new Error('人机验证未生成有效凭据，请重试。'));
+              return;
+            }
+            finish(resolve, captchaVerifyParam);
+          },
+          fail: () => finish(
+            reject,
+            new Error('人机验证未通过，请刷新验证后重试。'),
+          ),
           close: () => finish(reject, new Error('人机验证已取消。')),
           getInstance: (instance) => {
             backgroundCaptchaInstanceRef.current = instance;
