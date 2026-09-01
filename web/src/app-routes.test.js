@@ -32,3 +32,12 @@ test('OIDC continuation submits parameters to a fixed authorization endpoint', (
   assert.match(postAuthContinuation, /navigate\('\/oidc\/continue'/);
   assert.doesNotMatch(postAuthContinuation, /navigate\(normalized/);
 });
+
+test('password bootstrap login preserves the remember-me choice', () => {
+  const prepareLogin = appSource.slice(
+    appSource.indexOf('async function prepareLogin'),
+    appSource.indexOf('async function completeLogin'),
+  );
+
+  assert.match(prepareLogin, /if \(data\.direct_login\)[\s\S]*remember_me: rememberMe/);
+});

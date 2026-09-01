@@ -6,6 +6,7 @@ import { useTheme } from './theme';
 import { getUserErrorMessage, getUserMessage } from './lib/errors';
 import { oidcAuthorizationParameters } from './lib/oidc';
 import { normalizeInternalRedirect } from './lib/redirects';
+import { createSingleFlightRefresh, requestWithSessionRefresh } from './lib/session';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
@@ -458,6 +459,19 @@ function App() {
   const backgroundCaptchaButtonRef = useRef(null);
   const backgroundCaptchaInstanceRef = useRef(null);
   const backgroundCaptchaPromiseRef = useRef(null);
+  const refreshFirstPartySession = useMemo(
+    () => createSingleFlightRefresh(async () => {
+      const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store',
+        body: '{}',
+      });
+      return response.ok;
+    }),
+    [],
+  );
 
   const isLoggedIn = Boolean(session.user);
   const isAdmin = session.user?.roles?.includes('admin');
@@ -604,13 +618,16 @@ function App() {
     }
     let response;
     try {
-      response = await fetch(`${API_BASE}${path}`, {
-        method,
-        headers,
-        credentials: 'include',
-        cache: method === 'GET' ? 'default' : 'no-store',
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      response = await requestWithSessionRefresh(
+        () => fetch(`${API_BASE}${path}`, {
+          method,
+          headers,
+          credentials: 'include',
+          cache: method === 'GET' ? 'default' : 'no-store',
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+        { auth, refreshSession: refreshFirstPartySession },
+      );
     } catch (_) {
       const error = new Error('当前无法连接到服务，请检查网络后重试。');
       error.code = 'network_error';
@@ -1090,6 +1107,7 @@ function App() {
           body: {
             email,
             password: loginForm.password,
+            remember_me: rememberMe,
           },
         });
         onLoginSuccess(payload);
