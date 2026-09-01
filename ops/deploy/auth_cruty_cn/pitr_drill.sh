@@ -187,12 +187,12 @@ jq -nS \
     source_counts:$source_counts,restored_counts:$restored_counts}' \
   >"$evidence_file"
 chmod 0600 "$evidence_file"
-openssl pkeyutl -sign -rawin -inkey "$secrets_dir/audit_signing.private.pem" \
-  -in "$evidence_file" -out "$signature_file"
-openssl pkeyutl -verify -rawin -pubin -inkey "$secrets_dir/audit_signing.public.pem" \
-  -in "$evidence_file" -sigfile "$signature_file" >/dev/null
+"$script_dir/ed25519_signature.sh" sign \
+  "$secrets_dir/audit_signing.private.pem" "$evidence_file" "$signature_file"
+"$script_dir/ed25519_signature.sh" verify \
+  "$secrets_dir/audit_signing.public.pem" "$evidence_file" "$signature_file"
 chmod 0600 "$signature_file"
-archive_prefix="drills/pitr/$timestamp"
+archive_prefix="$(s3_key "$s3_prefix" "drills/pitr/$timestamp")"
 uploader="$script_dir/upload_s3_verified.sh"
 "$uploader" "$evidence_file" "$s3_endpoint" "$s3_bucket" \
   "$archive_prefix/evidence.json"

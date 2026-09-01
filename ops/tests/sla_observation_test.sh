@@ -12,6 +12,7 @@ cat >"$test_dir/runtime.env" <<'EOF'
 S3_ENDPOINT=https://object-store.invalid
 S3_BUCKET=sla-test
 S3_REGION=auto
+S3_PREFIX=rosemary-passport/production
 S3_REQUIRE_OBJECT_LOCK=false
 EOF
 printf 'test-access' >"$test_dir/secrets/s3_access_key_id"
@@ -53,6 +54,8 @@ case " $* " in
   *' s3 cp '*)
     while [[ $# -gt 0 && "$1" != cp ]]; do shift; done
     source_file="${2:?}"
+    destination="${3:?}"
+    printf '%s\n' "$destination" >>"$SLA_TEST_STATE/upload.destinations"
     while [[ $# -gt 0 && "$1" != --metadata ]]; do shift; done
     printf '%s\n' "${2#sha256=}" >"$SLA_TEST_STATE/upload.sha"
     if stat -c '%s' "$source_file" >/dev/null 2>&1; then
@@ -79,6 +82,12 @@ for observation_date in "${dates[@]}"; do
     "$recorder" "$test_dir/release" "$test_dir/runtime.env" \
       "$test_dir/secrets" "$test_dir/evidence" >/dev/null
 done
+[[ "$(wc -l <"$test_dir/upload.destinations" | tr -d ' ')" == 42 ]]
+if grep -Ev '^s3://sla-test/rosemary-passport/production/observation/[0-9]{4}-[0-9]{2}-[0-9]{2}/' \
+  "$test_dir/upload.destinations" >/dev/null; then
+  echo 'SLA evidence escaped the configured S3 prefix' >&2
+  exit 1
+fi
 summary="$($evaluator "$test_dir/evidence" 14)"
 [[ "$(jq -r '.result' <<<"$summary")" == passed ]]
 [[ "$(jq -r '.observed_days' <<<"$summary")" == 14 ]]

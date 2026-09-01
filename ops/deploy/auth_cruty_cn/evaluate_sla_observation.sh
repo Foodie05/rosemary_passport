@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 evidence_dir="${1:?evidence directory required}"
 expected_days="${2:-14}"
 die() { printf '[sla-evaluation] %s\n' "$1" >&2; exit 1; }
@@ -28,9 +29,8 @@ previous_epoch=''
 for record_file in "${records[@]}"; do
   signature_file="$record_file.sig"
   [[ -s "$signature_file" ]] || die "signature missing: $record_file"
-  openssl pkeyutl -verify -rawin -pubin \
-    -inkey "$evidence_dir/audit_signing.public.pem" \
-    -in "$record_file" -sigfile "$signature_file" >/dev/null \
+  "$script_dir/ed25519_signature.sh" verify \
+    "$evidence_dir/audit_signing.public.pem" "$record_file" "$signature_file" \
     || die "signature verification failed: $record_file"
   result="$(jq -er '.result' "$record_file")"
   date_value="$(jq -er '.date' "$record_file")"
