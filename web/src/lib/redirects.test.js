@@ -5,8 +5,8 @@ import { normalizeInternalRedirect } from './redirects.js';
 
 test('keeps internal OIDC authorization redirects intact', () => {
   assert.equal(
-    normalizeInternalRedirect('/oauth/authorize?client_id=web&state=abc#resume'),
-    '/oauth/authorize?client_id=web&state=abc#resume',
+    normalizeInternalRedirect('/oidc/continue?client_id=web&state=abc#resume'),
+    '/oidc/continue?client_id=web&state=abc#resume',
   );
 });
 

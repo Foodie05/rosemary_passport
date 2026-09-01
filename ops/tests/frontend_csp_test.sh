@@ -27,4 +27,9 @@ if grep -Fq 'https://*.aliyuncs.com' "$csp_file"; then
   exit 1
 fi
 
+if ! grep -Fq "form-action 'self' https://apiauth.cruty.cn" "$csp_file"; then
+  echo 'Frontend CSP must allow OIDC continuation only to the configured API origin.' >&2
+  exit 1
+fi
+
 echo 'Frontend CSP includes the bounded Aliyun Captcha source set.'

@@ -11,3 +11,24 @@ test('AppRoutes declares every step-up callback it forwards', () => {
   assert.match(signature[1], /\bsendStepUpCode\b/);
   assert.match(signature[1], /\bbeginStepUpPasskey\b/);
 });
+
+test('OIDC continuation submits parameters to a fixed authorization endpoint', () => {
+  const continuation = appSource.slice(
+    appSource.indexOf('function OidcContinueRedirect'),
+    appSource.indexOf('function App()'),
+  );
+
+  assert.match(appSource, /path="\/oidc\/continue"/);
+  assert.match(continuation, /new URL\('\/oidc\/authorize', API_BASE\)/);
+  assert.match(continuation, /OIDC_AUTHORIZATION_PARAMETER_NAMES\.has\(name\)/);
+  assert.match(continuation, /<form ref=\{formRef\} method="get" action=\{authorizationEndpoint\}/);
+  assert.doesNotMatch(continuation, /window\.location/);
+
+  const postAuthContinuation = appSource.slice(
+    appSource.indexOf('const continuePostAuth'),
+    appSource.indexOf('useEffect(() => {', appSource.indexOf('const continuePostAuth')),
+  );
+  assert.match(postAuthContinuation, /parsed\.pathname !== '\/oidc\/continue'/);
+  assert.match(postAuthContinuation, /navigate\('\/oidc\/continue'/);
+  assert.doesNotMatch(postAuthContinuation, /navigate\(normalized/);
+});

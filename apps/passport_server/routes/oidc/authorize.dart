@@ -1,6 +1,8 @@
-import 'package:dart_frog/dart_frog.dart';
 import 'dart:convert';
 import 'dart:math';
+
+import 'package:dart_frog/dart_frog.dart';
+import 'package:meta/meta.dart';
 
 import '../../lib/src/config/app_config.dart';
 import '../../lib/src/middleware/guards.dart';
@@ -31,14 +33,9 @@ Future<Response> onRequest(RequestContext context) async {
     await context.read<AuthService>().logoutFirstPartySession(
       accessToken: accessToken,
     );
-    final nextAuthorizeUrl = Uri.parse(config.serverBaseUrl)
-        .resolveUri(
-          context.request.uri.replace(
-            queryParameters: {...context.request.uri.queryParameters}
-              ..remove('switch_account'),
-          ),
-        )
-        .toString();
+    final resumeParameters = {...context.request.uri.queryParametersAll}
+      ..remove('switch_account');
+    final nextAuthorizeUrl = _webOidcContinuePath(resumeParameters);
     final loginUrl = Uri.parse(
       config.webBaseUrl,
     ).resolve('/login').replace(queryParameters: {'next': nextAuthorizeUrl});
@@ -51,9 +48,9 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
   if (user == null) {
-    final authorizeUrl = Uri.parse(
-      config.serverBaseUrl,
-    ).resolveUri(context.request.uri).toString();
+    final authorizeUrl = _webOidcContinuePath(
+      context.request.uri.queryParametersAll,
+    );
     final loginUrl = Uri.parse(
       config.webBaseUrl,
     ).resolve('/login').replace(queryParameters: {'next': authorizeUrl});
@@ -162,7 +159,7 @@ Future<Response> onRequest(RequestContext context) async {
   if (decision != 'approve') {
     final displayName = (client['display_name'] as String?)?.trim();
     final consentToken = _generateConsentToken();
-    return _authorizationConsentPage(
+    return authorizationConsentPage(
       context,
       clientDisplayName: displayName == null || displayName.isEmpty
           ? clientId
@@ -231,6 +228,13 @@ Future<Response> onRequest(RequestContext context) async {
   );
 }
 
+String _webOidcContinuePath(Map<String, List<String>> queryParameters) {
+  return Uri(
+    path: '/oidc/continue',
+    queryParameters: queryParameters,
+  ).toString();
+}
+
 List<String> _scopeLines(Set<String> scopes) {
   final permissions = <String>[];
   if (scopes.contains('profile')) {
@@ -248,7 +252,8 @@ List<String> _scopeLines(Set<String> scopes) {
   return permissions;
 }
 
-Response _authorizationConsentPage(
+@visibleForTesting
+Response authorizationConsentPage(
   RequestContext context, {
   required String clientDisplayName,
   required bool isOfficial,
@@ -568,6 +573,12 @@ Response _authorizationConsentPage(
         transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
       }
       .button:hover { transform: translateY(-1px); }
+      .button[aria-disabled='true'] {
+        cursor: wait;
+        pointer-events: none;
+        opacity: 0.72;
+        transform: none;
+      }
       .primary {
         background: var(--sage-600);
         color: white;
@@ -637,14 +648,37 @@ Response _authorizationConsentPage(
           <h1>$escapedTitle</h1>
           ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 ROSM 验证你的登录状态。</p>' : '<p class="permission-head">您将授权此应用获取你的：</p><ul class="permission-list">$scopeListHtml</ul>'}
           <div class="actions">
-            <a class="button secondary" href="$cancelUrl">取消</a>
-            <a class="button primary" href="$approveUrl">确认</a>
+            <a class="button secondary" href="${_escapeHtml(cancelUrl)}">取消</a>
+            <a id="approve-button" class="button primary" href="${_escapeHtml(approveUrl)}">确认</a>
           </div>
           </section>
           <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">ROSM 账号中心 <span aria-hidden="true">→</span></a>
         </div>
       </main>
     </div>
+    <script>
+      (function() {
+        var approveButton = document.getElementById('approve-button');
+        if (!approveButton) return;
+
+        function resetApprovalState() {
+          approveButton.removeAttribute('aria-disabled');
+          approveButton.removeAttribute('data-submitting');
+          approveButton.textContent = '确认';
+        }
+
+        approveButton.addEventListener('click', function(event) {
+          if (approveButton.dataset.submitting === 'true') {
+            event.preventDefault();
+            return;
+          }
+          approveButton.dataset.submitting = 'true';
+          approveButton.setAttribute('aria-disabled', 'true');
+          approveButton.textContent = '授权处理中…';
+        });
+        window.addEventListener('pageshow', resetApprovalState);
+      })();
+    </script>
   </body>
 </html>
 ''',
