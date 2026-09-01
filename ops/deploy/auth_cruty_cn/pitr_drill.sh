@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
 release_dir="${1:?release directory required}"
 runtime_env_file="${2:?runtime env required}"
 secrets_dir="${3:?secrets directory required}"
@@ -44,12 +47,14 @@ docker compose version >/dev/null 2>&1 || die 'docker compose is unavailable'
 s3_endpoint="$(read_env S3_ENDPOINT)"
 s3_bucket="$(read_env S3_BUCKET)"
 s3_region="$(read_env S3_REGION)"
+s3_prefix="$(read_env S3_PREFIX)"
 postgres_user="$(read_env POSTGRES_USER)"
 postgres_db="$(read_env POSTGRES_DB)"
 release_tag="$(read_env RELEASE_TAG)"
 pitr_image="${ROSM_PITR_IMAGE:-rosm-passport-postgres:${release_tag:-current}}"
 [[ -n "$s3_endpoint" && -n "$s3_bucket" && -n "$postgres_user" && -n "$postgres_db" ]] \
   || die 'S3 and PostgreSQL settings are required'
+validate_s3_prefix "$s3_prefix" || die 'S3_PREFIX is invalid'
 docker image inspect "$pitr_image" >/dev/null 2>&1 || die "PITR image is unavailable: $pitr_image"
 
 AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
@@ -87,7 +92,7 @@ wal_name="$(source_sql "select pg_walfile_name(pg_switch_wal())")"
 printf '[pitr-drill] waiting for marker WAL archive %s\n' "$wal_name"
 wal_wait_started="$SECONDS"
 until aws --endpoint-url "$s3_endpoint" s3api head-object \
-  --bucket "$s3_bucket" --key "wal/$wal_name.enc" >/dev/null 2>&1; do
+  --bucket "$s3_bucket" --key "$(s3_key "$s3_prefix" "wal/$wal_name.enc")" >/dev/null 2>&1; do
   (( SECONDS - wal_wait_started <= max_rpo_seconds )) \
     || die "marker WAL was not archived within ${max_rpo_seconds}s"
   sleep 2
@@ -96,10 +101,12 @@ failure_epoch="$(date -u '+%s')"
 
 rto_started="$SECONDS"
 aws --endpoint-url "$s3_endpoint" s3 cp \
-  "s3://$s3_bucket/physical/latest.json" "$work_dir/manifest.json" --only-show-errors
+  "s3://$s3_bucket/$(s3_key "$s3_prefix" 'physical/latest.json')" \
+  "$work_dir/manifest.json" --only-show-errors
 object_key="$(jq -er '.object | strings' "$work_dir/manifest.json")"
 expected_checksum="$(jq -er '.sha256 | strings' "$work_dir/manifest.json")"
-[[ "$object_key" =~ ^physical/[0-9]{8}T[0-9]{6}Z/base\.tar\.enc$ ]] \
+relative_object_key="$(s3_relative_key "$s3_prefix" "$object_key" 2>/dev/null || true)"
+[[ "$relative_object_key" =~ ^physical/[0-9]{8}T[0-9]{6}Z/base\.tar\.enc$ ]] \
   || die 'physical backup manifest contains an unsafe object key'
 [[ "$expected_checksum" =~ ^[0-9a-f]{64}$ ]] || die 'physical backup checksum is invalid'
 aws --endpoint-url "$s3_endpoint" s3 cp \
@@ -126,6 +133,7 @@ docker run -d --name "$container_name" \
   --security-opt no-new-privileges:true \
   -e POSTGRES_USER="$postgres_user" -e POSTGRES_DB="$postgres_db" \
   -e S3_ENDPOINT="$s3_endpoint" -e S3_BUCKET="$s3_bucket" -e S3_REGION="${s3_region:-auto}" \
+  -e S3_PREFIX="$s3_prefix" \
   -v "$work_dir/data:/var/lib/postgresql/data" \
   -v "$work_dir/secrets:/run/secrets/rosm-passport:ro" \
   "$pitr_image" postgres >/dev/null

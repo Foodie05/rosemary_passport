@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source /usr/local/bin/s3-key.sh
+
 wal_name="${1:?WAL name required}"
 destination="${2:?destination path required}"
 secret_dir="${PG_BACKUP_SECRETS_DIR:-/tmp/pg-backup-secrets}"
@@ -13,7 +16,8 @@ export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 
 aws --endpoint-url "$S3_ENDPOINT" s3 cp \
-  "s3://$S3_BUCKET/wal/$wal_name.enc" "$temporary" --only-show-errors
+  "s3://$S3_BUCKET/$(s3_key "${S3_PREFIX:-}" "wal/$wal_name.enc")" \
+  "$temporary" --only-show-errors
 openssl enc -d -aes-256-cbc -pbkdf2 \
   -pass file:"$secret_dir/backup_encryption_key" \
   -in "$temporary" -out "$destination"

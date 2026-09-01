@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
+
 TARGET_DIR="${1:?target directory required}"
 RUNTIME_ENV_FILE="${2:?runtime env required}"
 SECRETS_DIR="${3:?secrets directory required}"
@@ -12,6 +16,7 @@ read_env() { sed -n "s/^$1=//p" "$RUNTIME_ENV_FILE" | tail -n 1; }
 S3_ENDPOINT="$(read_env S3_ENDPOINT)"
 S3_BUCKET="$(read_env S3_BUCKET)"
 S3_REGION="$(read_env S3_REGION)"
+S3_PREFIX="$(read_env S3_PREFIX)"
 POSTGRES_USER="$(read_env POSTGRES_USER)"
 [[ -n "$S3_ENDPOINT" && -n "$S3_BUCKET" && -n "$POSTGRES_USER" ]] || {
   echo "S3 and PostgreSQL settings are required" >&2
@@ -26,7 +31,9 @@ export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 
 base_path="$TMP_DIR/base.tar"
 encrypted_path="$TMP_DIR/base.tar.enc"
-object_key="physical/$TIMESTAMP/base.tar.enc"
+validate_s3_prefix "$S3_PREFIX" || { echo 'S3_PREFIX is invalid' >&2; exit 78; }
+object_key="$(s3_key "$S3_PREFIX" "physical/$TIMESTAMP/base.tar.enc")"
+wal_prefix="$(s3_key "$S3_PREFIX" 'wal/')"
 compose_env_file="$RUNTIME_ENV_FILE"
 if [[ -e "$TARGET_DIR/.env" ]]; then
   [[ -f "$TARGET_DIR/.env" && ! -L "$TARGET_DIR/.env" ]] || {
@@ -60,10 +67,10 @@ openssl enc -aes-256-cbc -pbkdf2 -salt \
 checksum="$(sha256sum "$encrypted_path" | awk '{print $1}')"
 uploader="$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh"
 "$uploader" "$encrypted_path" "$S3_ENDPOINT" "$S3_BUCKET" "$object_key"
-printf '{"created_at":"%s","object":"%s","sha256":"%s","wal_prefix":"wal/"}\n' \
-  "$TIMESTAMP" "$object_key" "$checksum" >"$TMP_DIR/manifest.json"
+printf '{"created_at":"%s","object":"%s","sha256":"%s","wal_prefix":"%s"}\n' \
+  "$TIMESTAMP" "$object_key" "$checksum" "$wal_prefix" >"$TMP_DIR/manifest.json"
 "$uploader" "$TMP_DIR/manifest.json" "$S3_ENDPOINT" "$S3_BUCKET" \
-  "physical/$TIMESTAMP/manifest.json"
+  "$(s3_key "$S3_PREFIX" "physical/$TIMESTAMP/manifest.json")"
 "$uploader" "$TMP_DIR/manifest.json" "$S3_ENDPOINT" "$S3_BUCKET" \
-  "physical/latest.json"
+  "$(s3_key "$S3_PREFIX" 'physical/latest.json')"
 printf 'physical_backup_object=%s\n' "$object_key"

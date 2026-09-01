@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
+
 RUNTIME_ENV_FILE="${1:?runtime env required}"
 SECRETS_DIR="${2:?secrets directory required}"
 
@@ -21,12 +25,14 @@ command -v aws >/dev/null 2>&1 || die 'aws CLI is required'
 s3_endpoint="$(read_env S3_ENDPOINT)"
 s3_bucket="$(read_env S3_BUCKET)"
 s3_region="$(read_env S3_REGION)"
+s3_prefix="$(read_env S3_PREFIX)"
 require_object_lock="$(read_env S3_REQUIRE_OBJECT_LOCK)"
 minimum_retention_days="$(read_env S3_OBJECT_LOCK_MIN_RETENTION_DAYS)"
 require_object_lock="${require_object_lock:-false}"
 minimum_retention_days="${minimum_retention_days:-30}"
 
 [[ -n "$s3_endpoint" && -n "$s3_bucket" ]] || die 'S3_ENDPOINT and S3_BUCKET are required'
+validate_s3_prefix "$s3_prefix" || die 'S3_PREFIX must be empty or a safe path without leading/trailing slashes'
 [[ "$require_object_lock" == true || "$require_object_lock" == false ]] \
   || die 'S3_REQUIRE_OBJECT_LOCK must be true or false'
 [[ "$minimum_retention_days" =~ ^[1-9][0-9]*$ ]] \

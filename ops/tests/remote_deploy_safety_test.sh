@@ -3,10 +3,14 @@ set -Eeuo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 deploy_script="$repo_root/scripts/deploy_auth_cruty_cn.sh"
+interactive_script="$repo_root/scripts/configure_s3_and_deploy_auth_cruty_cn.sh"
 test_dir="$(mktemp -d)"
 trap 'rm -rf "$test_dir"' EXIT
 
 bash -n "$deploy_script"
+bash -n "$interactive_script"
+interactive_help="$($interactive_script --help)"
+grep -q 'Credentials never enter argv' <<<"$interactive_help"
 help_text="$($deploy_script --help)"
 grep -q 'has no database deletion mode' <<<"$help_text"
 grep -q 'never creates, downloads, or prints secrets' <<<"$help_text"
@@ -42,6 +46,15 @@ grep -q 'unsafe SSH target' "$test_dir/invalid-target.err"
 grep -q 'unsafe or non-absolute remote path' "$test_dir/invalid-path.err"
 
 grep -q 'BatchMode=yes' "$deploy_script"
+grep -q "read -r -s -p 'AccessKey ID: '" "$interactive_script"
+grep -q "read -r -s -p 'Secret AccessKey: '" "$interactive_script"
+grep -Fq 'printf '\''%s\n%s\n'\'' "$access_key_id" "$secret_access_key" |' \
+  "$interactive_script"
+if grep -Eq 'export (AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY)|--access-key|--secret-key' \
+  "$interactive_script"; then
+  echo 'interactive deployment must not expose S3 credentials through argv or environment' >&2
+  exit 1
+fi
 grep -q 'runtime env is missing or is a symlink' "$deploy_script"
 grep -q 'every secret file mode must be 0400' "$deploy_script"
 grep -q 'release archive contains a forbidden environment or secrets path' "$deploy_script"

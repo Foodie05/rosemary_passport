@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source /usr/local/bin/s3-key.sh
+
 wal_path="${1:?wal path required}"
 wal_name="${2:?wal name required}"
 secret_dir="${PG_BACKUP_SECRETS_DIR:-/tmp/pg-backup-secrets}"
@@ -17,4 +20,4 @@ openssl enc -aes-256-cbc -pbkdf2 -salt \
   -pass file:"$secret_dir/backup_encryption_key" \
   -in "$wal_path" -out "$tmp_file"
 /usr/local/bin/upload-s3-verified.sh "$tmp_file" "$S3_ENDPOINT" \
-  "$S3_BUCKET" "wal/$wal_name.enc"
+  "$S3_BUCKET" "$(s3_key "${S3_PREFIX:-}" "wal/$wal_name.enc")"
