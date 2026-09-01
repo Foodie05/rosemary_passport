@@ -83,13 +83,16 @@ class CredentialService {
   Future<Map<String, String>?> beginAuthenticatorSetup({
     required String userId,
     required String currentPassword,
+    bool stepUpVerified = false,
   }) async {
     final user = await _users.findById(userId);
     final authenticator = _authenticator;
     if (user == null || authenticator == null) {
       return null;
     }
-    final valid = await _passwords.verify(user.passwordHash, currentPassword);
+    final valid =
+        stepUpVerified ||
+        await _passwords.verify(user.passwordHash, currentPassword);
     if (!valid) {
       return null;
     }
@@ -108,6 +111,7 @@ class CredentialService {
     required String currentPassword,
     required String secret,
     required String code,
+    bool stepUpVerified = false,
   }) async {
     final user = await _users.findById(userId);
     final authenticator = _authenticator;
@@ -118,7 +122,9 @@ class CredentialService {
         statusCode: 404,
       );
     }
-    final valid = await _passwords.verify(user.passwordHash, currentPassword);
+    final valid =
+        stepUpVerified ||
+        await _passwords.verify(user.passwordHash, currentPassword);
     if (!valid) {
       return const CredentialActionAttempt.failure(
         code: 'invalid_password',
@@ -157,6 +163,7 @@ class CredentialService {
     required String origin,
     String? currentPassword,
     bool allowPostRegistrationBootstrap = false,
+    bool stepUpVerified = false,
   }) async {
     final user = await _users.findById(userId);
     if (user == null) {
@@ -166,7 +173,7 @@ class CredentialService {
     if (webAuthn == null) {
       throw const WebAuthnUnavailableException();
     }
-    if (!allowPostRegistrationBootstrap) {
+    if (!allowPostRegistrationBootstrap && !stepUpVerified) {
       final valid = await _passwords.verify(
         user.passwordHash,
         currentPassword ?? '',

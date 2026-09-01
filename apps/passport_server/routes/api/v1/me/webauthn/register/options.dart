@@ -1,8 +1,10 @@
 import 'package:dart_frog/dart_frog.dart';
 
 import '../../../../../../lib/src/models/authenticated_user.dart';
+import '../../../../../../lib/src/config/app_config.dart';
 import '../../../../../../lib/src/services/auth_service.dart';
 import '../../../../../../lib/src/utils/http.dart';
+import '../../../../../../lib/src/utils/step_up_http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -18,10 +20,6 @@ Future<Response> onRequest(RequestContext context) async {
   }
   final currentPassword = body['current_password']?.toString() ?? '';
   final usePostRegistrationBootstrap = body['post_register_bootstrap'] == true;
-  if (!usePostRegistrationBootstrap && currentPassword.trim().isEmpty) {
-    return errorResponse('invalid_request', 'current_password is required.');
-  }
-
   final user = context.read<AuthenticatedUser>();
   // Only a freshly self-registered session may use this bootstrap path.
   // All ordinary "add passkey" flows must keep the current-password check.
@@ -34,12 +32,32 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
   final origin = context.request.headers['origin'] ?? '';
+  final authService = context.read<AuthService>();
+  if (!usePostRegistrationBootstrap) {
+    final stepUp = await authService.verifyStepUp(
+      userId: user.id,
+      excludedFactor: 'passkey',
+      proof: stepUpProofFromBody(body, legacyPassword: currentPassword),
+      requestIp: clientIpFromRequest(
+        context.request,
+        config: context.read<AppConfig>(),
+      ),
+    );
+    if (!stepUp.ok) {
+      return errorResponse(
+        stepUp.code ?? 'verification_failed',
+        stepUp.message ?? '二次验证失败。',
+        statusCode: stepUp.statusCode,
+      );
+    }
+  }
   try {
-    final options = await context.read<AuthService>().beginWebAuthnRegistration(
+    final options = await authService.beginWebAuthnRegistration(
       userId: user.id,
       currentPassword: currentPassword,
       origin: origin,
       allowPostRegistrationBootstrap: usePostRegistrationBootstrap,
+      stepUpVerified: !usePostRegistrationBootstrap,
     );
     if (options == null) {
       if (usePostRegistrationBootstrap) {

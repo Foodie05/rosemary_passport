@@ -16,9 +16,12 @@ Future<Response> onRequest(RequestContext context) async {
   final method = (body['method'] ?? '').toString().trim();
   final code = (body['code'] ?? '').toString().trim();
   final newPassword = (body['new_password'] ?? '').toString();
-  if (account.isEmpty ||
+  final passkeyResponse = body['passkey_response'] is Map
+      ? Map<String, dynamic>.from(body['passkey_response'] as Map)
+      : null;
+  if ((account.isEmpty && method != 'passkey') ||
       method.isEmpty ||
-      code.isEmpty ||
+      (code.isEmpty && method != 'passkey') ||
       newPassword.isEmpty) {
     return errorResponse(
       'invalid_request',
@@ -36,6 +39,7 @@ Future<Response> onRequest(RequestContext context) async {
     code: code,
     newPassword: newPassword,
     requestIp: requestIp,
+    passkeyResponse: passkeyResponse,
   );
   if (!result.ok) {
     return errorResponse(

@@ -46,6 +46,14 @@ class EmailCodeService {
     );
   }
 
+  Future<void> issueStepUpCode(String email) async {
+    await issueCode(
+      email,
+      purpose: 'step_up',
+      templateName: 'login_verification',
+    );
+  }
+
   Future<void> issueCode(
     String email, {
     required String purpose,
@@ -121,6 +129,10 @@ class EmailCodeService {
 
   Future<bool> verifyPasswordResetCode(String email, String code) async {
     return _verifyCode(email: email, code: code, purpose: 'password_reset');
+  }
+
+  Future<bool> verifyStepUpCode(String email, String code) async {
+    return _verifyCode(email: email, code: code, purpose: 'step_up');
   }
 
   Future<bool> _verifyCode({

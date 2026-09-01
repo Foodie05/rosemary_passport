@@ -18,19 +18,16 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final currentPassword = body['current_password']?.toString() ?? '';
-  if (currentPassword.trim().isEmpty) {
-    return errorResponse('invalid_request', 'current_password is required.');
-  }
 
   final user = context.read<AuthenticatedUser>();
   final payload = await context.read<AuthService>().beginAuthenticatorSetup(
     userId: user.id,
     currentPassword: currentPassword,
+    stepUpVerified: true,
   );
 
-  if (payload == null) {
-    return errorResponse('invalid_password', '当前密码错误。', statusCode: 401);
-  }
+  if (payload == null)
+    return errorResponse('temporary_issue', '暂时无法初始化验证器。', statusCode: 503);
 
   return jsonResponse(payload);
 }

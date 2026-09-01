@@ -52,6 +52,7 @@ class AccountManagementService {
     String? nickname,
     String? newEmail,
     String? newPassword,
+    bool stepUpVerified = false,
   }) async {
     final user = await _users.findById(userId);
     if (user == null) {
@@ -80,18 +81,20 @@ class AccountManagementService {
         updatedNickname: updatedNickname,
       );
     }
-    if (currentPassword.isEmpty) {
-      return const AccountUpdateAttempt.failure(
-        code: 'invalid_request',
-        message: 'current_password is required.',
-      );
-    }
-    if (!await _passwords.verify(user.passwordHash, currentPassword)) {
-      return const AccountUpdateAttempt.failure(
-        code: 'invalid_password',
-        message: '当前密码错误。',
-        statusCode: 401,
-      );
+    if (!stepUpVerified) {
+      if (currentPassword.isEmpty) {
+        return const AccountUpdateAttempt.failure(
+          code: 'invalid_request',
+          message: 'current_password is required.',
+        );
+      }
+      if (!await _passwords.verify(user.passwordHash, currentPassword)) {
+        return const AccountUpdateAttempt.failure(
+          code: 'invalid_password',
+          message: '当前密码错误。',
+          statusCode: 401,
+        );
+      }
     }
 
     if (newEmail != null && newEmail.trim().isNotEmpty) {
@@ -147,6 +150,7 @@ class AccountManagementService {
     required String userId,
     required String newEmail,
     required String currentPassword,
+    bool skipCurrentPassword = false,
     String? requestIp,
   }) async {
     final user = await _users.findById(userId);
@@ -157,12 +161,12 @@ class AccountManagementService {
         statusCode: 404,
       );
     }
-    final passwordFailure = await _validateCurrentPassword(
-      user,
-      currentPassword,
-    );
-    if (passwordFailure != null) {
-      return passwordFailure;
+    if (!skipCurrentPassword) {
+      final passwordFailure = await _validateCurrentPassword(
+        user,
+        currentPassword,
+      );
+      if (passwordFailure != null) return passwordFailure;
     }
     final targetEmail = newEmail.trim().toLowerCase();
     final emailFailure = await _validateTargetEmail(user, targetEmail);
@@ -202,6 +206,7 @@ class AccountManagementService {
     required String newEmail,
     required String currentPassword,
     required String emailCode,
+    bool stepUpVerified = false,
     String? preservedAccessTokenId,
   }) async {
     final user = await _users.findById(userId);
@@ -218,12 +223,12 @@ class AccountManagementService {
         message: 'current_password and email_code are required.',
       );
     }
-    final passwordFailure = await _validateCurrentPassword(
-      user,
-      currentPassword,
-    );
-    if (passwordFailure != null) {
-      return passwordFailure;
+    if (!stepUpVerified) {
+      final passwordFailure = await _validateCurrentPassword(
+        user,
+        currentPassword,
+      );
+      if (passwordFailure != null) return passwordFailure;
     }
     final targetEmail = newEmail.trim().toLowerCase();
     final emailFailure = await _validateTargetEmail(user, targetEmail);
@@ -252,6 +257,7 @@ class AccountManagementService {
     required String userId,
     required String phoneNumber,
     required String currentPassword,
+    bool skipCurrentPassword = false,
     String? requestIp,
   }) async {
     final resolved = await _resolvePhoneBinding(
@@ -259,6 +265,7 @@ class AccountManagementService {
       phoneNumber: phoneNumber,
       currentPassword: currentPassword,
       verifyCode: null,
+      skipCurrentPassword: skipCurrentPassword,
     );
     if (resolved.failure != null) {
       return resolved.failure!;
@@ -281,6 +288,7 @@ class AccountManagementService {
     required String phoneNumber,
     required String currentPassword,
     required String verifyCode,
+    bool stepUpVerified = false,
     String? requestIp,
     String? preservedAccessTokenId,
   }) async {
@@ -289,6 +297,7 @@ class AccountManagementService {
       phoneNumber: phoneNumber,
       currentPassword: currentPassword,
       verifyCode: verifyCode,
+      skipCurrentPassword: stepUpVerified,
     );
     if (resolved.failure != null) {
       return resolved.failure!;
@@ -359,6 +368,7 @@ class AccountManagementService {
     required String userId,
     required String newPassword,
     required String emailCode,
+    bool stepUpVerified = false,
   }) async {
     final user = await _users.findById(userId);
     if (user == null) {
@@ -368,7 +378,8 @@ class AccountManagementService {
         statusCode: 404,
       );
     }
-    if (newPassword.trim().isEmpty || emailCode.trim().isEmpty) {
+    if (newPassword.trim().isEmpty ||
+        (!stepUpVerified && emailCode.trim().isEmpty)) {
       return const EmailActionAttempt.failure(
         code: 'invalid_request',
         message: 'new_password and email_code are required.',
@@ -381,10 +392,11 @@ class AccountManagementService {
         message: policy.message!,
       );
     }
-    if (!await _emailCodes.verifyPasswordResetCode(
-      user.email,
-      emailCode.trim(),
-    )) {
+    if (!stepUpVerified &&
+        !await _emailCodes.verifyPasswordResetCode(
+          user.email,
+          emailCode.trim(),
+        )) {
       return const EmailActionAttempt.failure(
         code: 'invalid_code',
         message: '邮箱验证码无效或已过期。',
@@ -449,6 +461,7 @@ class AccountManagementService {
     required String phoneNumber,
     required String currentPassword,
     required String? verifyCode,
+    bool skipCurrentPassword = false,
   }) async {
     final user = await _users.findById(userId);
     if (user == null) {
@@ -468,12 +481,14 @@ class AccountManagementService {
         ),
       );
     }
-    final passwordFailure = await _validateCurrentPassword(
-      user,
-      currentPassword,
-    );
-    if (passwordFailure != null) {
-      return _PhoneBindingResolution.failure(passwordFailure);
+    if (!skipCurrentPassword) {
+      final passwordFailure = await _validateCurrentPassword(
+        user,
+        currentPassword,
+      );
+      if (passwordFailure != null) {
+        return _PhoneBindingResolution.failure(passwordFailure);
+      }
     }
     final phones = _phones;
     if (phones == null) {

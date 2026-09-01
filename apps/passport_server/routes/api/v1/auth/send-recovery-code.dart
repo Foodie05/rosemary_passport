@@ -15,7 +15,9 @@ Future<Response> onRequest(RequestContext context) async {
   final account = (body['account'] ?? '').toString().trim();
   final method = (body['method'] ?? '').toString().trim();
   final captchaToken = (body['captcha_token'] ?? '').toString().trim();
-  if (account.isEmpty || method.isEmpty || captchaToken.isEmpty) {
+  if ((account.isEmpty && method != 'passkey') ||
+      method.isEmpty ||
+      captchaToken.isEmpty) {
     return errorResponse(
       'invalid_request',
       'account, method and captcha_token are required.',

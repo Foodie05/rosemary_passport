@@ -6,6 +6,8 @@ import { getUserErrorMessage } from '../lib/errors';
 import { cn } from '../lib/utils';
 import {
   preparePublicKeyCreationOptions,
+  preparePublicKeyRequestOptions,
+  serializeAuthenticationCredential,
   serializeRegistrationCredential,
 } from '../lib/utils';
 
@@ -71,6 +73,67 @@ function getPasskeyErrorMessage(error) {
   return getUserErrorMessage(error, '通行密钥连接失败，请重试。');
 }
 
+const STEP_UP_LABELS = {
+  password: '当前密码',
+  email_code: '当前邮箱验证码',
+  phone_code: '当前手机验证码',
+  authenticator: 'Authenticator 动态码',
+  passkey: '系统通行密钥',
+};
+
+function StepUpFields({ methods, excludedFactor, value, onChange, sendStepUpCode, beginStepUpPasskey }) {
+  const factorByMethod = { password: 'password', email_code: 'email', phone_code: 'phone', authenticator: 'authenticator', passkey: 'passkey' };
+  const available = methods.filter((method) => factorByMethod[method] !== excludedFactor);
+  const selected = available.includes(value.method) ? value.method : (available[0] || '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (selected && selected !== value.method) onChange({ method: selected, password: '', code: '', response: null });
+  }, [selected, value.method]);
+
+  async function handleAction() {
+    setBusy(true);
+    setError('');
+    try {
+      if (selected === 'passkey') {
+        const options = await beginStepUpPasskey(excludedFactor);
+        const credential = await navigator.credentials.get({ publicKey: preparePublicKeyRequestOptions(options) });
+        if (!credential) throw new Error('未获取到通行密钥响应');
+        onChange({ method: selected, password: '', code: '', response: serializeAuthenticationCredential(credential) });
+      } else {
+        await sendStepUpCode(selected, excludedFactor);
+      }
+    } catch (actionError) {
+      setError(getUserErrorMessage(actionError, '验证方式准备失败，请重试。'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!available.length) return <p className="text-sm text-red-600">当前没有可用的其他验证方式，请先绑定一种恢复因素。</p>;
+  return (
+    <div className="space-y-3 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
+      <label className="text-sm font-bold text-sage-700">账户二次验证</label>
+      <select className="input-field" value={selected} onChange={(event) => onChange({ method: event.target.value, password: '', code: '', response: null })}>
+        {available.map((method) => <option key={method} value={method}>{STEP_UP_LABELS[method] || method}</option>)}
+      </select>
+      {selected === 'password' ? (
+        <input className="input-field" type="password" placeholder="输入当前密码" value={value.password || ''} onChange={(event) => onChange({ ...value, method: selected, password: event.target.value })} />
+      ) : selected === 'passkey' ? (
+        <button className="btn-secondary w-full" type="button" disabled={busy} onClick={() => void handleAction()}>{value.response ? '通行密钥已验证' : busy ? '等待系统验证...' : '使用通行密钥验证'}</button>
+      ) : (
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <input className="input-field" inputMode="numeric" placeholder="输入验证码" value={value.code || ''} onChange={(event) => onChange({ ...value, method: selected, code: event.target.value.replace(/\D/g, '') })} />
+          {selected !== 'authenticator' ? <button className="btn-secondary" type="button" disabled={busy} onClick={() => void handleAction()}>{busy ? '发送中...' : '发送'}</button> : null}
+        </div>
+      )}
+      <p className="text-xs text-sage-500">当前变更项本身不能用于本次校验。</p>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+    </div>
+  );
+}
+
 export function UserAccountPage({
   session,
   mustBindEmail,
@@ -79,7 +142,6 @@ export function UserAccountPage({
   bindEmail,
   sendBindPhoneCode,
   bindPhone,
-  sendPasswordResetCode,
   resetPasswordWithCode,
   beginAuthenticatorSetup,
   verifyAuthenticatorSetup,
@@ -87,6 +149,8 @@ export function UserAccountPage({
   verifyWebAuthnRegistration,
   listWebAuthnCredentials,
   deleteWebAuthnCredential,
+  sendStepUpCode,
+  beginStepUpPasskey,
 }) {
   const displayName = cleanDisplayName(session.user?.nickname, session.user?.email || '-');
   const [nickname, setNickname] = useState(displayName);
@@ -96,11 +160,11 @@ export function UserAccountPage({
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [authenticatorModalOpen, setAuthenticatorModalOpen] = useState(false);
   const [passkeyModalOpen, setPasskeyModalOpen] = useState(false);
+  const [stepUp, setStepUp] = useState({ method: 'password', password: '', code: '', response: null });
   const [bindForm, setBindForm] = useState({ email: '', current_password: '', email_code: '' });
   const [bindPhoneForm, setBindPhoneForm] = useState({ phone_number: '', current_password: '', verify_code: '' });
   const [resetForm, setResetForm] = useState({ new_password: '', email_code: '' });
   const [authenticatorForm, setAuthenticatorForm] = useState({ current_password: '', code: '' });
-  const [passkeyForm, setPasskeyForm] = useState({ current_password: '' });
   const [bindError, setBindError] = useState('');
   const [bindPhoneError, setBindPhoneError] = useState('');
   const [resetError, setResetError] = useState('');
@@ -108,10 +172,8 @@ export function UserAccountPage({
   const [passkeyError, setPasskeyError] = useState('');
   const [bindCodeSent, setBindCodeSent] = useState(false);
   const [bindPhoneCodeSent, setBindPhoneCodeSent] = useState(false);
-  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [bindSending, setBindSending] = useState(false);
   const [bindPhoneSending, setBindPhoneSending] = useState(false);
-  const [resetSending, setResetSending] = useState(false);
   const [bindSaving, setBindSaving] = useState(false);
   const [bindPhoneSaving, setBindPhoneSaving] = useState(false);
   const [resetSaving, setResetSaving] = useState(false);
@@ -122,7 +184,6 @@ export function UserAccountPage({
   const [passkeyRemovingId, setPasskeyRemovingId] = useState('');
   const [bindCooldownRemaining, setBindCooldownRemaining] = useState(0);
   const [bindPhoneCooldownRemaining, setBindPhoneCooldownRemaining] = useState(0);
-  const [resetCooldownRemaining, setResetCooldownRemaining] = useState(0);
   const [authenticatorSecret, setAuthenticatorSecret] = useState('');
   const [authenticatorOtpAuthUri, setAuthenticatorOtpAuthUri] = useState('');
   const [authenticatorQrDataUrl, setAuthenticatorQrDataUrl] = useState('');
@@ -130,21 +191,27 @@ export function UserAccountPage({
   const [passkeyMaxCount, setPasskeyMaxCount] = useState(5);
   const nicknameRef = useRef(null);
 
+  function openSecurityModal(setOpen) {
+    setStepUp({ method: 'password', password: '', code: '', response: null });
+    setOpen(true);
+  }
+
   const hasAuthenticator = Boolean(session.security?.has_authenticator);
   const hasPasskey = Boolean(session.security?.has_passkey);
   const passkeyCount = passkeyCredentials.length;
   const passkeyLimitReached = passkeyCount >= passkeyMaxCount;
+  const stepUpMethods = session.security?.step_up_methods || ['password'];
+  const stepUpReady = Boolean(stepUp.method === 'password' ? stepUp.password : stepUp.method === 'passkey' ? stepUp.response : stepUp.code);
   const bindSendDisabled =
     bindSending ||
     bindCooldownRemaining > 0 ||
     !bindForm.email.trim() ||
-    !bindForm.current_password;
+    !stepUpReady;
   const bindPhoneSendDisabled =
     bindPhoneSending ||
     bindPhoneCooldownRemaining > 0 ||
     !bindPhoneForm.phone_number.trim() ||
-    !bindPhoneForm.current_password;
-  const resetSendDisabled = resetSending || resetCooldownRemaining > 0;
+    !stepUpReady;
 
   useEffect(() => {
     if (bindCooldownRemaining <= 0) {
@@ -165,16 +232,6 @@ export function UserAccountPage({
     }, 1000);
     return () => window.clearInterval(timer);
   }, [bindPhoneCooldownRemaining]);
-
-  useEffect(() => {
-    if (resetCooldownRemaining <= 0) {
-      return undefined;
-    }
-    const timer = window.setInterval(() => {
-      setResetCooldownRemaining((current) => (current > 1 ? current - 1 : 0));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [resetCooldownRemaining]);
 
   useEffect(() => {
     setNickname(displayName);
@@ -242,7 +299,7 @@ export function UserAccountPage({
     setBindError('');
     setBindSaving(true);
     try {
-      await bindEmail(bindForm);
+      await bindEmail({ ...bindForm, verification: stepUp });
       setBindModalOpen(false);
       setBindCodeSent(false);
       setBindForm({ email: '', current_password: '', email_code: '' });
@@ -271,7 +328,7 @@ export function UserAccountPage({
     setBindPhoneError('');
     setBindPhoneSaving(true);
     try {
-      await bindPhone(bindPhoneForm);
+      await bindPhone({ ...bindPhoneForm, verification: stepUp });
       setBindPhoneModalOpen(false);
       setBindPhoneCodeSent(false);
       setBindPhoneForm({ phone_number: '', current_password: '', verify_code: '' });
@@ -282,27 +339,12 @@ export function UserAccountPage({
     }
   }
 
-  async function handleSendResetCode() {
-    setResetError('');
-    setResetSending(true);
-    try {
-      const result = await sendPasswordResetCode();
-      setResetCodeSent(true);
-      setResetCooldownRemaining(Math.max(0, Number(result?.retry_after || 0)));
-    } catch (error) {
-      setResetError(getUserErrorMessage(error, '验证码发送失败，请稍后重试。'));
-    } finally {
-      setResetSending(false);
-    }
-  }
-
   async function handleResetPassword() {
     setResetError('');
     setResetSaving(true);
     try {
-      await resetPasswordWithCode(resetForm);
+      await resetPasswordWithCode({ ...resetForm, verification: stepUp });
       setResetModalOpen(false);
-      setResetCodeSent(false);
       setResetForm({ new_password: '', email_code: '' });
     } catch (error) {
       setResetError(getUserErrorMessage(error, '重置失败，请稍后重试。'));
@@ -315,9 +357,7 @@ export function UserAccountPage({
     setAuthenticatorError('');
     setAuthenticatorSettingUp(true);
     try {
-      const payload = await beginAuthenticatorSetup({
-        current_password: authenticatorForm.current_password,
-      });
+      const payload = await beginAuthenticatorSetup({});
       setAuthenticatorSecret(payload.secret || '');
       setAuthenticatorOtpAuthUri(payload.otpauth_uri || '');
     } catch (error) {
@@ -346,9 +386,9 @@ export function UserAccountPage({
     setAuthenticatorSaving(true);
     try {
       await verifyAuthenticatorSetup({
-        current_password: authenticatorForm.current_password,
         secret: authenticatorSecret,
         code: authenticatorForm.code,
+        verification: stepUp,
       });
       setAuthenticatorModalOpen(false);
       setAuthenticatorForm({ current_password: '', code: '' });
@@ -369,7 +409,7 @@ export function UserAccountPage({
         throw new Error(`最多只能创建 ${passkeyMaxCount} 个系统通行密钥`);
       }
       const options = await beginWebAuthnRegistration({
-        current_password: passkeyForm.current_password,
+        verification: stepUp,
       });
       const credential = await navigator.credentials.create({
         publicKey: preparePublicKeyCreationOptions(options),
@@ -380,7 +420,6 @@ export function UserAccountPage({
       await verifyWebAuthnRegistration({
         response: serializeRegistrationCredential(credential),
       });
-      setPasskeyForm({ current_password: '' });
       await loadPasskeys();
     } catch (error) {
       setPasskeyError(getPasskeyErrorMessage(error));
@@ -393,7 +432,7 @@ export function UserAccountPage({
     setPasskeyError('');
     setPasskeyRemovingId(credentialId);
     try {
-      await deleteWebAuthnCredential(credentialId);
+      await deleteWebAuthnCredential(credentialId, stepUp);
       await loadPasskeys();
     } catch (error) {
       setPasskeyError(getUserErrorMessage(error, '移除失败，请稍后重试。'));
@@ -431,7 +470,7 @@ export function UserAccountPage({
             <div className="mt-3 flex min-w-0 flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sage-500 md:justify-start">
               <span className="max-w-full break-all">UID: {session.user?.id || '-'}</span>
               <span aria-hidden="true">·</span>
-              <button type="button" onClick={() => setBindModalOpen(true)} className="max-w-full break-all font-medium text-sage-600 hover:text-sage-900">
+              <button type="button" onClick={() => openSecurityModal(setBindModalOpen)} className="max-w-full break-all font-medium text-sage-600 hover:text-sage-900">
                 {session.user?.email || '-'}
               </button>
             </div>
@@ -458,7 +497,7 @@ export function UserAccountPage({
                   <p className="text-xs font-bold uppercase tracking-tight text-sage-400">重置密码</p>
                   <p className="mt-0.5 text-sm font-semibold text-sage-900">通过邮箱验证码重置当前账户密码</p>
                 </div>
-                <button type="button" onClick={() => setResetModalOpen(true)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
+                <button type="button" onClick={() => openSecurityModal(setResetModalOpen)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
                   重置密码
                 </button>
               </div>
@@ -469,7 +508,7 @@ export function UserAccountPage({
                   <p className="text-xs font-bold uppercase tracking-tight text-sage-400">系统通行密钥</p>
                   <p className="mt-0.5 text-sm font-semibold text-sage-900">连接浏览器和操作系统的 WebAuthn 服务，使用指纹、人脸或设备凭据完成验证</p>
                 </div>
-                <button type="button" onClick={() => setPasskeyModalOpen(true)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
+                <button type="button" onClick={() => openSecurityModal(setPasskeyModalOpen)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
                   {hasPasskey ? '管理通行密钥' : '连接通行密钥'}
                 </button>
               </div>
@@ -480,7 +519,7 @@ export function UserAccountPage({
                   <p className="text-xs font-bold uppercase tracking-tight text-sage-400">Authenticator 验证器</p>
                   <p className="mt-0.5 text-sm font-semibold text-sage-900">连接 Google Authenticator、1Password 或其他 TOTP 应用作为动态口令验证方式</p>
                 </div>
-                <button type="button" onClick={() => setAuthenticatorModalOpen(true)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
+                <button type="button" onClick={() => openSecurityModal(setAuthenticatorModalOpen)} className="btn-primary w-full shrink-0 px-4 py-2.5 sm:w-auto">
                   {hasAuthenticator ? '更新验证器' : '设置验证器'}
                 </button>
               </div>
@@ -499,10 +538,10 @@ export function UserAccountPage({
             </p>
             <div className="mt-6 flex justify-end">
               <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-                <button type="button" onClick={() => setBindModalOpen(true)} className="btn-primary px-4 py-2.5">
+                <button type="button" onClick={() => openSecurityModal(setBindModalOpen)} className="btn-primary px-4 py-2.5">
                   绑定邮箱
                 </button>
-                <button type="button" onClick={() => setBindPhoneModalOpen(true)} className="btn-secondary px-4 py-2.5">
+                <button type="button" onClick={() => openSecurityModal(setBindPhoneModalOpen)} className="btn-secondary px-4 py-2.5">
                   绑定手机号
                 </button>
               </div>
@@ -565,10 +604,7 @@ export function UserAccountPage({
             <label className="text-sm font-bold text-sage-700">新邮箱</label>
             <input className="input-field" type="email" value={bindForm.email} onChange={(event) => setBindForm((current) => ({ ...current, email: event.target.value }))} />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-sage-700">当前密码</label>
-            <input className="input-field" type="password" value={bindForm.current_password} onChange={(event) => setBindForm((current) => ({ ...current, current_password: event.target.value }))} />
-          </div>
+          <StepUpFields methods={stepUpMethods} excludedFactor="email" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
             <label className="text-sm font-bold text-sage-700">邮箱验证码</label>
             <input className="input-field" value={bindForm.email_code} onChange={(event) => setBindForm((current) => ({ ...current, email_code: event.target.value }))} />
@@ -601,10 +637,7 @@ export function UserAccountPage({
             <label className="text-sm font-bold text-sage-700">手机号</label>
             <input className="input-field" value={bindPhoneForm.phone_number} onChange={(event) => setBindPhoneForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))} />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-sage-700">当前密码</label>
-            <input className="input-field" type="password" value={bindPhoneForm.current_password} onChange={(event) => setBindPhoneForm((current) => ({ ...current, current_password: event.target.value }))} />
-          </div>
+          <StepUpFields methods={stepUpMethods} excludedFactor="phone" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
             <label className="text-sm font-bold text-sage-700">短信验证码</label>
             <input className="input-field" value={bindPhoneForm.verify_code} onChange={(event) => setBindPhoneForm((current) => ({ ...current, verify_code: event.target.value.replace(/\D/g, '') }))} />
@@ -619,31 +652,22 @@ export function UserAccountPage({
           onClose={() => {
             setResetModalOpen(false);
             setResetError('');
-            setResetCodeSent(false);
+            setStepUp({ method: 'password', password: '', code: '', response: null });
           }}
           actions={
-            <>
-              <button type="button" onClick={handleSendResetCode} className="btn-secondary" disabled={resetSendDisabled}>
-                <LoadingButtonText loading={resetSending} loadingText="发送中..." idleText={resetCooldownRemaining > 0 ? `${resetCooldownRemaining} 秒后重发` : '发送验证码'} />
-              </button>
-              <button type="button" onClick={handleResetPassword} className="btn-primary" disabled={resetSaving || !resetCodeSent || !resetForm.new_password || !resetForm.email_code}>
-                <LoadingButtonText loading={resetSaving} loadingText="重置中..." idleText="重置密码" />
-              </button>
-            </>
+            <button type="button" onClick={handleResetPassword} className="btn-primary" disabled={resetSaving || !stepUpReady || !resetForm.new_password}>
+              <LoadingButtonText loading={resetSaving} loadingText="重置中..." idleText="重置密码" />
+            </button>
           }
         >
           <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4 text-sm text-sage-600">
-            验证码会发送到当前绑定邮箱 {session.user?.email || '-'}。
+            可使用当前邮箱、手机、Authenticator 或通行密钥中任意一种完成校验。
           </div>
+          <StepUpFields methods={stepUpMethods} excludedFactor="password" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
             <label className="text-sm font-bold text-sage-700">新密码</label>
             <input className="input-field" type="password" value={resetForm.new_password} onChange={(event) => setResetForm((current) => ({ ...current, new_password: event.target.value }))} />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-sage-700">邮箱验证码</label>
-            <input className="input-field" value={resetForm.email_code} onChange={(event) => setResetForm((current) => ({ ...current, email_code: event.target.value }))} />
-          </div>
-          <p className="text-xs text-sage-500">发送成功后，这个邮箱会进入共享发码冷却；在倒计时结束前不能再次发送。</p>
           {resetError ? <p className="text-sm text-red-600">{resetError}</p> : null}
         </Modal>
       )}
@@ -654,10 +678,10 @@ export function UserAccountPage({
           onClose={() => {
             setPasskeyModalOpen(false);
             setPasskeyError('');
-            setPasskeyForm({ current_password: '' });
+            setStepUp({ method: 'password', password: '', code: '', response: null });
           }}
           actions={
-            <button type="button" onClick={handleRegisterPasskey} className="btn-primary" disabled={passkeySaving || passkeyLimitReached || !passkeyForm.current_password}>
+            <button type="button" onClick={handleRegisterPasskey} className="btn-primary" disabled={passkeySaving || passkeyLimitReached || !stepUpReady}>
               <LoadingButtonText loading={passkeySaving} loadingText="等待系统验证..." idleText={passkeyLimitReached ? '已达上限' : '新增通行密钥'} />
             </button>
           }
@@ -686,7 +710,7 @@ export function UserAccountPage({
                       type="button"
                       onClick={() => void handleDeletePasskey(credential.credential_id)}
                       className="btn-secondary px-3 py-2"
-                      disabled={passkeyRemovingId === credential.credential_id}
+                      disabled={passkeyRemovingId === credential.credential_id || !stepUpReady}
                     >
                       <LoadingButtonText
                         loading={passkeyRemovingId === credential.credential_id}
@@ -703,10 +727,7 @@ export function UserAccountPage({
               )}
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-sage-700">当前密码</label>
-            <input className="input-field" type="password" value={passkeyForm.current_password} onChange={(event) => setPasskeyForm((current) => ({ ...current, current_password: event.target.value }))} />
-          </div>
+          <StepUpFields methods={stepUpMethods} excludedFactor="passkey" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           {passkeyError ? <p className="text-sm text-red-600">{passkeyError}</p> : null}
         </Modal>
       )}
@@ -724,23 +745,20 @@ export function UserAccountPage({
           actions={
             <>
               {!authenticatorSecret ? (
-                <button type="button" onClick={handleBeginAuthenticatorSetup} className="btn-secondary" disabled={authenticatorSettingUp || !authenticatorForm.current_password}>
-                  <LoadingButtonText loading={authenticatorSettingUp} loadingText="校验中..." idleText="验证密码" />
+                <button type="button" onClick={handleBeginAuthenticatorSetup} className="btn-secondary" disabled={authenticatorSettingUp}>
+                  <LoadingButtonText loading={authenticatorSettingUp} loadingText="初始化中..." idleText="显示新验证器" />
                 </button>
               ) : null}
-              <button type="button" onClick={handleVerifyAuthenticator} className="btn-primary" disabled={authenticatorSaving || !authenticatorSecret || !authenticatorForm.code}>
+              <button type="button" onClick={handleVerifyAuthenticator} className="btn-primary" disabled={authenticatorSaving || !authenticatorSecret || !authenticatorForm.code || !stepUpReady}>
                 <LoadingButtonText loading={authenticatorSaving} loadingText="验证中..." idleText={hasAuthenticator ? '更新验证器' : '完成设置'} />
               </button>
             </>
           }
         >
           <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4 text-sm text-sage-600">
-            输入当前密码并通过校验后，会直接显示二维码。此验证器仅保留一个配置，如再次设置会覆盖原有绑定。
+            新验证器动态码只证明新配置可用；账户校验必须使用验证器以外的因素。
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-sage-700">当前密码</label>
-            <input className="input-field" type="password" value={authenticatorForm.current_password} onChange={(event) => setAuthenticatorForm((current) => ({ ...current, current_password: event.target.value }))} />
-          </div>
+          <StepUpFields methods={stepUpMethods} excludedFactor="authenticator" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           {authenticatorSecret ? (
             <div className="space-y-4 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
               {authenticatorQrDataUrl ? <img src={authenticatorQrDataUrl} alt="Authenticator QR" className="aspect-square h-auto w-40 max-w-full rounded-xl border border-sage-100 bg-white p-2" /> : null}
