@@ -33,9 +33,11 @@ assert_capacity_failure() {
 assert_capacity_failure 'insufficient CPUs' env \
   ROSM_MEMINFO_PATH="$test_dir/meminfo" ROSM_CPU_COUNT_OVERRIDE=1 "$preflight"
 
+# Physical memory is intentionally not a fixed deployment gate. Small hosts may
+# deploy when they have enough immediately available RAM and free swap.
 write_meminfo 1933828 1048576 1048576 1048576
-assert_capacity_failure 'insufficient physical memory' env \
-  ROSM_MEMINFO_PATH="$test_dir/meminfo" ROSM_CPU_COUNT_OVERRIDE=2 "$preflight"
+ROSM_MEMINFO_PATH="$test_dir/meminfo" ROSM_CPU_COUNT_OVERRIDE=2 \
+  "$preflight" >/dev/null
 
 write_meminfo 8388608 262144 1048576 262144
 assert_capacity_failure 'insufficient memory headroom' env \
