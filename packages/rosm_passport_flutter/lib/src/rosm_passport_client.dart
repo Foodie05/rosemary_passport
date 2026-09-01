@@ -33,6 +33,7 @@ class RosmPassportClient {
   final RosmTokenStore _tokenStore;
   final RosmLastSignInStore _lastSignInStore;
   final Map<String, String> _cookies = {};
+  Future<RosmTokenSet>? _refreshInFlight;
 
   RosmAuthorizationRequest createAuthorizationRequest({
     Set<String>? scopes,
@@ -135,7 +136,23 @@ class RosmPassportClient {
     return RosmServerHandoffResult(authorization: approval, payload: json);
   }
 
-  Future<RosmTokenSet> refresh() async {
+  Future<RosmTokenSet> refresh() {
+    final existing = _refreshInFlight;
+    if (existing != null) {
+      return existing;
+    }
+
+    late final Future<RosmTokenSet> pending;
+    pending = _refreshFromStore().whenComplete(() {
+      if (identical(_refreshInFlight, pending)) {
+        _refreshInFlight = null;
+      }
+    });
+    _refreshInFlight = pending;
+    return pending;
+  }
+
+  Future<RosmTokenSet> _refreshFromStore() async {
     final current = await _tokenStore.read();
     final refreshToken = current?.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) {
@@ -716,7 +733,7 @@ class RosmPassportClient {
       return false;
     }
     try {
-      await _refreshWithToken(refreshToken);
+      await refresh();
       logger.info(
         'Access token refreshed after unauthorized response.',
         source: 'rosm_passport.client',
