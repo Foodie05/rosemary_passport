@@ -85,6 +85,8 @@ function AppRoutes({
   verifyWebAuthnRegistration,
   listWebAuthnCredentials,
   deleteWebAuthnCredential,
+  sendStepUpCode,
+  beginStepUpPasskey,
   systemForm,
   setSystemForm,
   saveServiceConfig,
