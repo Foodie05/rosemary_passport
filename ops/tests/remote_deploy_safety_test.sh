@@ -71,6 +71,8 @@ grep -q "rsync -a --checksum --delete" \
 grep -q "up -d --no-build --remove-orphans" \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 grep -q 'compose_source build' "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+! grep -q 'sha256sum pg_restore' "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'COPYFILE_DISABLE=1 tar --no-xattrs' "$repo_root/scripts/build_linux_x64.sh"
 grep -q 'NEW_RELEASE_TAG="release-\$TIMESTAMP"' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 grep -q 'restore_cutover' "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"

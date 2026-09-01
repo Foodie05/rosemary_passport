@@ -64,7 +64,11 @@ project_name="$(basename "$TARGET_DIR")"
     pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
       --format=custom --no-owner --no-acl >"$dump_path"
 )
-pg_restore --list "$dump_path" >/dev/null
+(
+  cd "$TARGET_DIR"
+  docker compose --project-name "$project_name" --env-file "$compose_env_file" \
+    exec -T postgres pg_restore --list <"$dump_path" >/dev/null
+)
 openssl enc -aes-256-cbc -pbkdf2 -salt \
   -pass file:"$SECRETS_DIR/backup_encryption_key" \
   -in "$dump_path" -out "$encrypted_path"

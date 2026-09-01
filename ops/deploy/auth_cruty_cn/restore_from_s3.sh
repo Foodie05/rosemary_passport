@@ -21,7 +21,7 @@ RESTORE_DATABASE="${5:-rosm_passport_restore_$(date -u '+%Y%m%d%H%M%S')}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-for command in aws jq openssl pg_restore sha256sum awk docker; do
+for command in aws jq openssl sha256sum awk docker; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "missing required command: $command" >&2
     exit 69
@@ -70,7 +70,11 @@ actual_checksum="$(sha256sum "$TMP_DIR/database.dump.enc" | awk '{print $1}')"
 openssl enc -d -aes-256-cbc -pbkdf2 \
   -pass file:"$SECRETS_DIR/backup_encryption_key" \
   -in "$TMP_DIR/database.dump.enc" -out "$TMP_DIR/database.dump"
-pg_restore --list "$TMP_DIR/database.dump" >/dev/null
+(
+  cd "$TARGET_DIR"
+  docker compose --env-file "$RUNTIME_ENV_FILE" exec -T postgres \
+    pg_restore --list <"$TMP_DIR/database.dump" >/dev/null
+)
 
 (
   cd "$TARGET_DIR"
