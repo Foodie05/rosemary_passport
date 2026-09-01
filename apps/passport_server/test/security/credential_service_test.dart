@@ -389,12 +389,24 @@ void main() {
           requireUserVerification: any(named: 'requireUserVerification'),
         ),
       ).thenAnswer((_) async => {'challenge': 'challenge'});
+      when(
+        () => webAuthn.generateAuthenticationOptions(
+          origin: any(named: 'origin'),
+          requireUserVerification: true,
+        ),
+      ).thenAnswer((_) async => {'challenge': 'challenge'});
       expect(
         await service.beginWebAuthnAuthentication(
           origin: 'https://passport.example.invalid',
         ),
         {'challenge': 'challenge'},
       );
+      verify(
+        () => webAuthn.generateAuthenticationOptions(
+          origin: 'https://passport.example.invalid',
+          requireUserVerification: true,
+        ),
+      ).called(1);
 
       when(() => users.findByEmail(any())).thenAnswer((_) async => null);
       expect(

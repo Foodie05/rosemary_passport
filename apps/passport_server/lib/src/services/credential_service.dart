@@ -230,7 +230,13 @@ class CredentialService {
       return null;
     }
     if (email == null || email.trim().isEmpty) {
-      return webAuthn.generateAuthenticationOptions(origin: origin);
+      // A discoverable credential does not reveal its account until after the
+      // assertion. Require UV up front so an administrator assertion cannot be
+      // generated as "preferred" and then rejected by the role-aware verifier.
+      return webAuthn.generateAuthenticationOptions(
+        origin: origin,
+        requireUserVerification: true,
+      );
     }
     final user = await _users.findByEmail(email);
     if (user == null) {
