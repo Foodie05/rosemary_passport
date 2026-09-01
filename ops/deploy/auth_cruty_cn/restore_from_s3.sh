@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
+
 TARGET_DIR="${1:?target directory required}"
 RUNTIME_ENV_FILE="${2:?runtime env required}"
 SECRETS_DIR="${3:?secrets directory required}"
 OBJECT_KEY="${4:?S3 object key required}"
 RESTORE_DATABASE="${5:-rosm_passport_restore_$(date -u '+%Y%m%d%H%M%S')}"
-[[ "$OBJECT_KEY" =~ ^base/[0-9]{8}T[0-9]{6}Z\.dump\.enc$ ]] || {
-  echo "object key must match base/YYYYMMDDTHHMMSSZ.dump.enc" >&2
-  exit 64
-}
 [[ "$RESTORE_DATABASE" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || {
   echo "restore database must be a safe lowercase PostgreSQL identifier" >&2
   exit 64
@@ -32,11 +32,20 @@ read_env() { sed -n "s/^$1=//p" "$RUNTIME_ENV_FILE" | tail -n 1; }
 S3_ENDPOINT="$(read_env S3_ENDPOINT)"
 S3_BUCKET="$(read_env S3_BUCKET)"
 S3_REGION="$(read_env S3_REGION)"
+S3_PREFIX="$(read_env S3_PREFIX)"
 POSTGRES_USER="$(read_env POSTGRES_USER)"
 AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
 AWS_SECRET_ACCESS_KEY="$(<"$SECRETS_DIR/s3_secret_access_key")"
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
 export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
+
+validate_s3_prefix "$S3_PREFIX" || { echo 'S3_PREFIX is invalid' >&2; exit 78; }
+relative_object_key="$(s3_relative_key "$S3_PREFIX" "$OBJECT_KEY" 2>/dev/null || printf '%s' "$OBJECT_KEY")"
+[[ "$relative_object_key" =~ ^base/[0-9]{8}T[0-9]{6}Z\.dump\.enc$ ]] || {
+  echo "object key must match [S3_PREFIX/]base/YYYYMMDDTHHMMSSZ.dump.enc" >&2
+  exit 64
+}
+OBJECT_KEY="$(s3_key "$S3_PREFIX" "$relative_object_key")"
 
 manifest_key="${OBJECT_KEY%.dump.enc}.manifest.json"
 aws --endpoint-url "$S3_ENDPOINT" s3 cp \

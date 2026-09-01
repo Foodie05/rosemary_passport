@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
 release_dir="${1:?release directory required}"
 runtime_env_file="${2:?runtime env required}"
 secrets_dir="${3:?secrets directory required}"
@@ -44,7 +46,9 @@ docker compose version >/dev/null 2>&1 || die 'docker compose is unavailable'
 s3_endpoint="$(read_env S3_ENDPOINT)"
 s3_bucket="$(read_env S3_BUCKET)"
 s3_region="$(read_env S3_REGION)"
+s3_prefix="$(read_env S3_PREFIX)"
 [[ -n "$s3_endpoint" && -n "$s3_bucket" ]] || die 'S3 settings are required'
+validate_s3_prefix "$s3_prefix" || die 'S3_PREFIX is invalid'
 AWS_ACCESS_KEY_ID="$(<"$secrets_dir/s3_access_key_id")"
 AWS_SECRET_ACCESS_KEY="$(<"$secrets_dir/s3_secret_access_key")"
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
@@ -78,9 +82,10 @@ if compose exec -T passport_server /app/bin/verify_audit_chain >/dev/null 2>&1; 
 fi
 
 physical_modified="$(aws --endpoint-url "$s3_endpoint" s3api head-object \
-  --bucket "$s3_bucket" --key physical/latest.json --query LastModified --output text)"
+  --bucket "$s3_bucket" --key "$(s3_key "$s3_prefix" 'physical/latest.json')" \
+  --query LastModified --output text)"
 wal_json="$(aws --endpoint-url "$s3_endpoint" s3api list-objects-v2 \
-  --bucket "$s3_bucket" --prefix wal/ \
+  --bucket "$s3_bucket" --prefix "$(s3_key "$s3_prefix" 'wal/')" \
   --query 'sort_by(Contents,&LastModified)[-1]' --output json)"
 wal_key="$(jq -er '.Key | strings' <<<"$wal_json")"
 wal_modified="$(jq -er '.LastModified | strings' <<<"$wal_json")"

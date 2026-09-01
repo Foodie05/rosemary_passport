@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
+
 TARGET_DIR="${1:?target directory required}"
 RUNTIME_ENV_FILE="${2:?runtime env required}"
 SECRETS_DIR="${3:?secrets directory required}"
@@ -15,6 +19,7 @@ read_env() {
 S3_ENDPOINT="$(read_env S3_ENDPOINT)"
 S3_BUCKET="$(read_env S3_BUCKET)"
 S3_REGION="$(read_env S3_REGION)"
+S3_PREFIX="$(read_env S3_PREFIX)"
 POSTGRES_DB="$(read_env POSTGRES_DB)"
 POSTGRES_USER="$(read_env POSTGRES_USER)"
 [[ -n "$S3_ENDPOINT" && -n "$S3_BUCKET" ]] || {
@@ -30,7 +35,8 @@ export AWS_DEFAULT_REGION="${S3_REGION:-auto}"
 
 dump_path="$TMP_DIR/database.dump"
 encrypted_path="$TMP_DIR/database.dump.enc"
-object_key="base/$TIMESTAMP.dump.enc"
+validate_s3_prefix "$S3_PREFIX" || { echo 'S3_PREFIX is invalid' >&2; exit 78; }
+object_key="$(s3_key "$S3_PREFIX" "base/$TIMESTAMP.dump.enc")"
 compose_env_file="$RUNTIME_ENV_FILE"
 if [[ -e "$TARGET_DIR/.env" ]]; then
   [[ -f "$TARGET_DIR/.env" && ! -L "$TARGET_DIR/.env" ]] || {
@@ -69,5 +75,5 @@ printf '{"created_at":"%s","object":"%s","sha256":"%s"}\n' \
   "$TIMESTAMP" "$object_key" "$checksum" >"$TMP_DIR/manifest.json"
 "$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh" \
   "$TMP_DIR/manifest.json" "$S3_ENDPOINT" "$S3_BUCKET" \
-  "base/$TIMESTAMP.manifest.json"
+  "$(s3_key "$S3_PREFIX" "base/$TIMESTAMP.manifest.json")"
 printf 'backup_object=%s\n' "$object_key"

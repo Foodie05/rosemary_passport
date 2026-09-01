@@ -53,12 +53,15 @@ required_executables=(
   scripts/check_repo_hygiene.sh
   scripts/check_shell_scripts.sh
   scripts/deploy_auth_cruty_cn.sh
+  scripts/configure_s3_and_deploy_auth_cruty_cn.sh
   scripts/local-down.sh
   scripts/local-up.sh
   ops/deploy/auth_cruty_cn/deploy.sh
   ops/deploy/auth_cruty_cn/check_disk_capacity.sh
   ops/deploy/auth_cruty_cn/check_host_capacity.sh
   ops/deploy/auth_cruty_cn/check_s3_storage.sh
+  ops/deploy/auth_cruty_cn/configure_s3_credentials.sh
+  ops/deploy/auth_cruty_cn/s3_key.sh
   ops/deploy/auth_cruty_cn/upload_s3_verified.sh
   ops/deploy/auth_cruty_cn/archive_audit_to_s3.sh
   ops/deploy/auth_cruty_cn/backup_to_s3.sh
@@ -85,6 +88,7 @@ required_executables=(
   ops/tests/pitr_drill_safety_test.sh
   ops/tests/s3_storage_preflight_test.sh
   ops/tests/s3_upload_integrity_test.sh
+  ops/tests/s3_prefix_test.sh
   ops/tests/legacy_refresh_sunset_test.sh
   ops/tests/legacy_env_transition_test.sh
   ops/tests/legacy_cutover_layout_test.sh

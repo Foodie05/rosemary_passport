@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
+source "$script_dir/s3_key.sh"
+
 TARGET_DIR="${1:?target directory required}"
 RUNTIME_ENV_FILE="${2:?runtime env required}"
 SECRETS_DIR="${3:?secrets directory required}"
@@ -12,6 +16,7 @@ read_env() { sed -n "s/^$1=//p" "$RUNTIME_ENV_FILE" | tail -n 1; }
 S3_ENDPOINT="$(read_env S3_ENDPOINT)"
 S3_BUCKET="$(read_env S3_BUCKET)"
 S3_REGION="$(read_env S3_REGION)"
+S3_PREFIX="$(read_env S3_PREFIX)"
 POSTGRES_USER="$(read_env POSTGRES_USER)"
 POSTGRES_DB="$(read_env POSTGRES_DB)"
 AWS_ACCESS_KEY_ID="$(<"$SECRETS_DIR/s3_access_key_id")"
@@ -49,7 +54,8 @@ openssl pkeyutl -sign -rawin \
 openssl pkeyutl -verify -rawin \
   -pubin -inkey "$SECRETS_DIR/audit_signing.public.pem" \
   -in "$archive" -sigfile "$archive.sig" >/dev/null
-object_prefix="audit/$TIMESTAMP"
+validate_s3_prefix "$S3_PREFIX" || { echo 'S3_PREFIX is invalid' >&2; exit 78; }
+object_prefix="$(s3_key "$S3_PREFIX" "audit/$TIMESTAMP")"
 uploader="$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh"
 "$uploader" "$archive" "$S3_ENDPOINT" "$S3_BUCKET" \
   "$object_prefix/audit.jsonl"

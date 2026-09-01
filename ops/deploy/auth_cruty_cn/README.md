@@ -10,6 +10,8 @@ Docker Compose 管理，Apache 只代理 `127.0.0.1:8091` 并托管原子切换�
    `POSTGRES_IMAGE` 和 `NODE_IMAGE` 必须包含已经核验的 `@sha256:` digest。
 2. 运行 `sudo ./provision_secrets.sh /etc/rosm-passport/secrets [legacy.env]`。旧环境文件只用于一次性迁移，随后应移出发布目录并安全销毁。
 3. 填写 S3 凭据，确保所有秘密文件和目录分别保持 `0400`、`0700`。
+   `S3_PREFIX` 必须使用不含首尾斜杠的安全前缀，例如
+   `rosemary-passport/production`；所有备份、WAL 和审计对象都会写入该前缀下。
 4. 为备份桶启用版本控制和至少 30 天的 Object Lock 默认保留策略。部署预检会拒绝未启用版本控制、Object Lock 或保留期不足的桶。仅当对象存储确实不支持 Object Lock 且已有书面风险例外时，才可将 `S3_REQUIRE_OBJECT_LOCK=false`。
 5. 执行：
 
@@ -45,7 +47,7 @@ CI 会直接执行完整发布事务夹具，覆盖正常切换、启动前失�
 
 ## 备份、审计与恢复
 
-- `archive_timeout=300s`，WAL 加密后连续写入 `s3://BUCKET/wal/`。
+- `archive_timeout=300s`，WAL 加密后连续写入 `s3://BUCKET/S3_PREFIX/wal/`。
 - `backup_to_s3.sh` 创建可逐表恢复的加密逻辑备份。
 - `physical_backup_to_s3.sh` 创建含起始 WAL 的加密物理基线，用于 PITR。
 - 所有备份和签名证据在上传后都会通过 `head-object` 核对 SHA-256 元数据与对象长度；
