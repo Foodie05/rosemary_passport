@@ -260,6 +260,21 @@ class AuthThrottleService {
         Future.value();
   }
 
+  Future<bool> consumeOneTimeProof(String proofId) async {
+    final security = _security;
+    if (security == null) {
+      return true;
+    }
+    final decision = await security.enforce(
+      scope: 'auth:one-time-proof',
+      subject: proofId,
+      limit: 1,
+      window: const Duration(minutes: 15),
+      blockDuration: const Duration(minutes: 15),
+    );
+    return decision.allowed;
+  }
+
   int? maxRetryAfter(int? left, int? right) {
     if (left == null) {
       return right;

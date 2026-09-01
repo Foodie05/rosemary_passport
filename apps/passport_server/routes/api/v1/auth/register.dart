@@ -19,8 +19,9 @@ Future<Response> onRequest(RequestContext context) async {
       payload.email.trim().isEmpty ||
       payload.nickname.trim().isEmpty ||
       payload.password.isEmpty ||
-      payload.emailCode.trim().isEmpty) {
-    return errorResponse('invalid_request', '请输入邮箱、昵称、密码和邮箱验证码。');
+      ((payload.emailCode?.trim().isEmpty ?? true) &&
+          (payload.registrationHandoff?.trim().isEmpty ?? true))) {
+    return errorResponse('invalid_request', '请输入邮箱、昵称、密码并完成邮箱验证。');
   }
 
   final result = await context.read<AuthService>().register(
@@ -28,6 +29,7 @@ Future<Response> onRequest(RequestContext context) async {
     nickname: payload.nickname,
     password: payload.password,
     emailCode: payload.emailCode,
+    registrationHandoff: payload.registrationHandoff,
     requestIp: clientIpFromRequest(
       context.request,
       config: context.read<AppConfig>(),

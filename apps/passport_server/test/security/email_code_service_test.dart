@@ -42,7 +42,7 @@ void main() {
         expiresAt: any(named: 'expiresAt'),
         purpose: any(named: 'purpose'),
       ),
-    ).thenAnswer((_) async {});
+    ).thenAnswer((_) async => 'code-id');
     when(
       () => email.sendVerificationCode(
         email: any(named: 'email'),
@@ -166,6 +166,7 @@ void main() {
       ),
     ).thenAnswer((invocation) async {
       digest = invocation.namedArguments[#codeHash] as String;
+      return 'code-id';
     });
     when(
       () => email.sendVerificationCode(
@@ -202,6 +203,20 @@ void main() {
     expect(await service.verifyLoginCode(address, code!), isTrue);
     expect(await service.validateLoginCode(address, code!), 'code-id');
     expect(await service.consumeCode('code-id'), isTrue);
+  });
+
+  test('failed SMTP delivery invalidates the newly stored code', () async {
+    when(() => repository.markUsed('code-id')).thenAnswer((_) async {});
+    when(
+      () => email.sendVerificationCode(
+        email: any(named: 'email'),
+        code: any(named: 'code'),
+        templateName: any(named: 'templateName'),
+      ),
+    ).thenThrow(StateError('smtp unavailable'));
+
+    await expectLater(service.issueLoginCode(address), throwsStateError);
+    verify(() => repository.markUsed('code-id')).called(1);
   });
 
   test('loads the dynamic attempt policy when configured', () async {

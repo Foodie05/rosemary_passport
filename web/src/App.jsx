@@ -51,6 +51,9 @@ function AppRoutes({
   completeEmailCodeLogin,
   preparePhoneCodeLogin,
   completePhoneCodeLogin,
+  selectDirectLoginStepUpFactor,
+  completeDirectLoginStepUp,
+  beginDirectLoginStepUpPasskey,
   requestPasswordLoginCode,
   requestPasswordPhoneCode,
   requestEmailCodeLogin,
@@ -160,6 +163,9 @@ function AppRoutes({
                 completeEmailCodeLogin={completeEmailCodeLogin}
                 preparePhoneCodeLogin={preparePhoneCodeLogin}
                 completePhoneCodeLogin={completePhoneCodeLogin}
+                selectDirectLoginStepUpFactor={selectDirectLoginStepUpFactor}
+                completeDirectLoginStepUp={completeDirectLoginStepUp}
+                beginDirectLoginStepUpPasskey={beginDirectLoginStepUpPasskey}
                 resendPasswordLoginCode={requestPasswordLoginCode}
                 resendPasswordPhoneCode={requestPasswordPhoneCode}
                 resendEmailCodeLogin={requestEmailCodeLogin}
@@ -407,6 +413,7 @@ function App() {
   const [loginCodeCooldownRemaining, setLoginCodeCooldownRemaining] = useState(0);
   const [passwordLoginFactors, setPasswordLoginFactors] = useState([]);
   const [selectedPasswordFactor, setSelectedPasswordFactor] = useState('phone_code');
+  const [loginStepUpChallenge, setLoginStepUpChallenge] = useState('');
   const [postRegisterPasskeyPromptOpen, setPostRegisterPasskeyPromptOpen] = useState(false);
   const [postRegisterPasskeySaving, setPostRegisterPasskeySaving] = useState(false);
   const [postRegisterPasskeyError, setPostRegisterPasskeyError] = useState('');
@@ -431,6 +438,7 @@ function App() {
     phone_code: '',
     nickname: '',
     password: '',
+    registration_handoff: '',
   });
   const [registerMethod, setRegisterMethod] = useState('email');
   const [systemForm, setSystemForm] = useState({});
@@ -640,6 +648,7 @@ function App() {
       error.code = data.error || data.code || 'request_failed';
       error.status = response.status;
       error.serverMessage = typeof data.message === 'string' ? data.message : '';
+      error.details = data;
       error.message = getUserErrorMessage(error);
       throw error;
     }
@@ -1164,7 +1173,7 @@ function App() {
       });
       setLoginStep('code');
       setLoginCodeCooldownRemaining(Number(data.retry_after || 0));
-      showToast('请求已受理。若邮箱已绑定账号，将收到登录验证码。', 'success');
+      showToast('登录验证码已发送，请检查邮箱。', 'success');
     } catch (error) {
       showToast(getAuthErrorMessage(error, 'email_code_send'), 'error');
     } finally {
@@ -1186,7 +1195,7 @@ function App() {
       });
       setLoginStep('code');
       setLoginCodeCooldownRemaining(Math.max(60, Number(data.retry_after || 0)));
-      showToast('请求已受理。若该手机号已绑定账号，将收到短信验证码。', 'success');
+      showToast('登录验证码已发送，请检查短信。', 'success');
     } catch (error) {
       showToast(error.message || '登录验证码发送失败，请稍后重试。', 'error');
     } finally {
@@ -1219,6 +1228,9 @@ function App() {
       });
       onLoginSuccess(payload);
     } catch (error) {
+      if (handleCodeLoginContinuation(error, 'phone', loginForm.phone_number.trim())) {
+        return;
+      }
       showToast(error.message || '登录失败，请检查验证码后重试。', 'error');
     } finally {
       setLoading(false);
@@ -1244,16 +1256,98 @@ function App() {
         body: {
           email: loginForm.email.trim(),
           email_code: loginForm.email_code.trim(),
-          ...(loginForm.password ? { password: loginForm.password } : {}),
           remember_me: rememberMe,
         },
       });
       onLoginSuccess(payload);
     } catch (error) {
+      if (handleCodeLoginContinuation(error, 'email', loginForm.email.trim())) {
+        return;
+      }
       showToast(getAuthErrorMessage(error, 'email_code_login'), 'error');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleCodeLoginContinuation(error, method, identifier) {
+    const details = error?.details || {};
+    if (error?.code === 'registration_required' && details.registration_handoff) {
+      const next = normalizeInternalRedirect(new URLSearchParams(location.search).get('next'));
+      setRegisterMethod(method);
+      setRegisterForm((current) => ({
+        ...current,
+        email: method === 'email' ? identifier : '',
+        phone_number: method === 'phone' ? identifier : '',
+        email_code: '',
+        phone_code: '',
+        registration_handoff: details.registration_handoff,
+      }));
+      setLoginStep('credentials');
+      setLoginCodeCooldownRemaining(0);
+      navigate(next ? `/register?next=${encodeURIComponent(next)}` : '/register');
+      showToast('验证码已通过，请填写资料完成注册。', 'success');
+      return true;
+    }
+    if (error?.code === 'mfa_required' && details.step_up_challenge) {
+      setLoginStepUpChallenge(details.step_up_challenge);
+      setPasswordLoginFactors(Array.isArray(details.factors) ? details.factors : ['password']);
+      setSelectedPasswordFactor('');
+      setLoginStep('step_up');
+      showToast('请选择另一种方式完成二次验证。', 'success');
+      return true;
+    }
+    return false;
+  }
+
+  async function selectDirectLoginStepUpFactor(factor) {
+    setSelectedPasswordFactor(factor);
+    if (!['email_code', 'phone_code'].includes(factor)) return;
+    setLoginCodeSending(true);
+    try {
+      await api('/api/v1/auth/login-step-up-code', {
+        method: 'POST',
+        body: { step_up_challenge: loginStepUpChallenge, factor },
+      });
+      setLoginCodeCooldownRemaining(60);
+      showToast('验证码已发送。', 'success');
+    } catch (error) {
+      setSelectedPasswordFactor('');
+      showToast(getUserErrorMessage(error, '验证码发送失败，请稍后重试。'), 'error');
+    } finally {
+      setLoginCodeSending(false);
+    }
+  }
+
+  async function completeDirectLoginStepUp(event, response) {
+    event?.preventDefault?.();
+    setLoading(true);
+    try {
+      const factor = selectedPasswordFactor;
+      const payload = await api('/api/v1/auth/login-step-up', {
+        method: 'POST',
+        body: {
+          step_up_challenge: loginStepUpChallenge,
+          factor,
+          password: factor === 'password' ? loginForm.password : undefined,
+          code: factor === 'phone_code' ? loginForm.phone_code : loginForm.authenticator_code || loginForm.email_code,
+          ...(response ? { response } : {}),
+          remember_me: rememberMe,
+        },
+      });
+      onLoginSuccess(payload);
+    } catch (error) {
+      showToast(getUserErrorMessage(error, '二次验证失败，请重试。'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function beginDirectLoginStepUpPasskey() {
+    return api('/api/v1/auth/login-step-up-passkey-options', {
+      method: 'POST',
+      body: { step_up_challenge: loginStepUpChallenge },
+    });
   }
 
   const loadLoginCodeCooldown = useCallback(async () => {
@@ -1310,6 +1404,7 @@ function App() {
             body: {
               phone_number: registerForm.phone_number.trim(),
               verify_code: registerForm.phone_code.trim(),
+              registration_handoff: registerForm.registration_handoff || undefined,
               nickname: registerForm.nickname.trim(),
               password: registerForm.password,
             },
@@ -1319,6 +1414,7 @@ function App() {
             body: {
               email: registerForm.email.trim(),
               email_code: registerForm.email_code.trim(),
+              registration_handoff: registerForm.registration_handoff || undefined,
               nickname: registerForm.nickname.trim(),
               password: registerForm.password,
             },
@@ -1332,6 +1428,7 @@ function App() {
         phone_code: '',
         nickname: '',
         password: '',
+        registration_handoff: '',
       });
       setPostRegisterPasskeyError('');
       setPostRegisterMethod(registerMethod);
@@ -2101,6 +2198,9 @@ function App() {
         completeEmailCodeLogin={completeEmailCodeLogin}
         preparePhoneCodeLogin={preparePhoneCodeLogin}
         completePhoneCodeLogin={completePhoneCodeLogin}
+        selectDirectLoginStepUpFactor={selectDirectLoginStepUpFactor}
+        completeDirectLoginStepUp={completeDirectLoginStepUp}
+        beginDirectLoginStepUpPasskey={beginDirectLoginStepUpPasskey}
         requestPasswordLoginCode={requestPasswordLoginCode}
         requestPasswordPhoneCode={requestPasswordPhoneCode}
         requestEmailCodeLogin={requestEmailCodeLogin}

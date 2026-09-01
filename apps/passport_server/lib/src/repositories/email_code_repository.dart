@@ -5,16 +5,17 @@ class EmailCodeRepository {
 
   final Database _db;
 
-  Future<void> storeCode({
+  Future<String> storeCode({
     required String email,
     required String codeHash,
     required DateTime expiresAt,
     required String purpose,
   }) async {
-    await _db.execute(
+    final result = await _db.execute(
       '''
       insert into email_verification_codes(email, code_hash, purpose, expires_at)
       values (lower(@email), @code_hash, @purpose, @expires_at)
+      returning id
       ''',
       params: {
         'email': email,
@@ -23,6 +24,7 @@ class EmailCodeRepository {
         'expires_at': expiresAt,
       },
     );
+    return result.single[0].toString();
   }
 
   Future<Map<String, dynamic>?> findLatestCode({

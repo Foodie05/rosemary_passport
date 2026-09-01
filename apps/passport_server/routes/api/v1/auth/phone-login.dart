@@ -32,6 +32,23 @@ Future<Response> onRequest(RequestContext context) async {
     requestIp: requestIp,
     rememberMe: rememberMe,
   );
+  if (attempt.registrationToken != null) {
+    return jsonResponse({
+      'error': 'registration_required',
+      'message': attempt.message,
+      'registration_handoff': attempt.registrationToken,
+      'method': 'phone',
+      'identifier': phoneNumber,
+    }, statusCode: 409);
+  }
+  if (attempt.stepUpChallenge != null) {
+    return jsonResponse({
+      'error': 'mfa_required',
+      'message': attempt.message,
+      'step_up_challenge': attempt.stepUpChallenge,
+      'factors': attempt.factors,
+    }, statusCode: 401);
+  }
   if (!attempt.ok) {
     return errorResponse(
       attempt.code ?? 'login_failed',

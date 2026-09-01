@@ -67,6 +67,41 @@ class TokenService {
       ? _config.firstPartyRememberedRefreshTokenTtlSeconds
       : _config.firstPartyRefreshTokenTtlSeconds;
 
+  String issueRegistrationHandoff({
+    required String method,
+    required String subject,
+  }) => _issueShortLivedProof(
+    type: 'registration_handoff',
+    subject: subject.trim().toLowerCase(),
+    claims: {'method': method},
+  );
+
+  VerifiedToken? verifyRegistrationHandoff(
+    String token, {
+    required String method,
+    required String subject,
+  }) {
+    final verified = verify(token, expectedType: 'registration_handoff');
+    if (verified == null ||
+        verified.payload['method'] != method ||
+        verified.payload['sub'] != subject.trim().toLowerCase()) {
+      return null;
+    }
+    return verified;
+  }
+
+  String issueLoginStepUpChallenge({
+    required String userId,
+    required String primaryMethod,
+  }) => _issueShortLivedProof(
+    type: 'login_step_up',
+    subject: userId,
+    claims: {'primary_method': primaryMethod},
+  );
+
+  VerifiedToken? verifyLoginStepUpChallenge(String token) =>
+      verify(token, expectedType: 'login_step_up');
+
   TokenPair issueTokenPair(
     AuthenticatedUser user, {
     List<String> scopes = const ['openid', 'profile', 'email', 'phone'],
@@ -211,6 +246,30 @@ class TokenService {
     } catch (_) {
       return null;
     }
+  }
+
+  String _issueShortLivedProof({
+    required String type,
+    required String subject,
+    required Map<String, dynamic> claims,
+  }) {
+    final jti = _uuid.v4();
+    return JWT(
+      {
+        'sub': subject,
+        'jti': jti,
+        'typ': type,
+        'sig2': _secondFactorDigest(subject: subject, jti: jti),
+        ...claims,
+      },
+      issuer: _config.jwtIssuer,
+      audience: Audience([_config.jwtAudience]),
+      header: {'kid': _config.jwtActiveKid},
+    ).sign(
+      _privateKey,
+      algorithm: JWTAlgorithm.RS256,
+      expiresIn: Duration(seconds: _config.emailCodeTtlSeconds),
+    );
   }
 
   Map<String, dynamic> jwkSet() {

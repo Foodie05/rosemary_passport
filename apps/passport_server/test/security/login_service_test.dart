@@ -22,6 +22,8 @@ class _MockSettings extends Mock implements SettingsRepository {}
 
 class _MockPasswords extends Mock implements PasswordHasher {}
 
+class _MockTokens extends Mock implements TokenService {}
+
 class _MockEmailCodes extends Mock implements EmailCodeService {}
 
 class _MockThrottles extends Mock implements AuthThrottleService {}
@@ -102,6 +104,7 @@ void main() {
   late _MockUsers users;
   late _MockSettings settings;
   late _MockPasswords passwords;
+  late _MockTokens tokens;
   late _MockEmailCodes emailCodes;
   late _MockThrottles throttles;
   late _MockSessions sessions;
@@ -120,6 +123,7 @@ void main() {
     users = _MockUsers();
     settings = _MockSettings();
     passwords = _MockPasswords();
+    tokens = _MockTokens();
     emailCodes = _MockEmailCodes();
     throttles = _MockThrottles();
     sessions = _MockSessions();
@@ -131,6 +135,7 @@ void main() {
       userRepository: users,
       settingsRepository: settings,
       passwordHasher: passwords,
+      tokenService: tokens,
       emailCodeService: emailCodes,
       throttleService: throttles,
       sessionService: sessions,
@@ -277,6 +282,7 @@ void main() {
       userRepository: users,
       settingsRepository: settings,
       passwordHasher: passwords,
+      tokenService: tokens,
       emailCodeService: emailCodes,
       throttleService: throttles,
       sessionService: sessions,
@@ -395,59 +401,62 @@ void main() {
     );
   });
 
-  test(
-    'email-code send returns a uniform response for missing accounts',
-    () async {
-      stubAllowedGuards();
-      when(() => users.findByEmail(any())).thenAnswer((_) async => null);
-      when(
-        () => throttles.startVerificationCodeCooldown(
-          email: any(named: 'email'),
-          seconds: any(named: 'seconds'),
-          cooldownScope: any(named: 'cooldownScope'),
-        ),
-      ).thenAnswer((_) async {});
-      final missing = await service.sendEmailCode(email: user.email);
-      expect(missing.ok, isTrue);
-      when(() => users.findByEmail(any())).thenAnswer((_) async => user);
-      when(
-        () => emailCodes.issueLoginCode(
-          user.email,
-          templateName: any(named: 'templateName'),
-        ),
-      ).thenAnswer((_) async => 'code-id');
-      final existing = await service.sendEmailCode(email: user.email);
-      expect(existing.ok, isTrue);
-      expect(existing.message, missing.message);
+  test('email-code send delivers for every account state', () async {
+    stubAllowedGuards();
+    when(() => users.findByEmail(any())).thenAnswer((_) async => null);
+    when(
+      () => emailCodes.issueLoginCode(
+        any(),
+        templateName: any(named: 'templateName'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => throttles.startVerificationCodeCooldown(
+        email: any(named: 'email'),
+        seconds: any(named: 'seconds'),
+        cooldownScope: any(named: 'cooldownScope'),
+      ),
+    ).thenAnswer((_) async {});
+    final missing = await service.sendEmailCode(email: user.email);
+    expect(missing.ok, isTrue);
+    when(() => users.findByEmail(any())).thenAnswer((_) async => user);
+    when(
+      () => emailCodes.issueLoginCode(
+        user.email,
+        templateName: any(named: 'templateName'),
+      ),
+    ).thenAnswer((_) async => 'code-id');
+    final existing = await service.sendEmailCode(email: user.email);
+    expect(existing.ok, isTrue);
+    expect(existing.message, missing.message);
 
-      when(() => users.findByEmail(any())).thenAnswer((_) async => boundAdmin);
-      when(
-        () => emailCodes.issueLoginCode(
-          boundAdmin.email,
-          templateName: any(named: 'templateName'),
-        ),
-      ).thenAnswer((_) async => 'admin-code-id');
-      final admin = await service.sendEmailCode(email: boundAdmin.email);
-      expect(admin.ok, isTrue);
-      verify(
-        () => emailCodes.issueLoginCode(
-          boundAdmin.email,
-          templateName: 'login_verification',
-        ),
-      ).called(1);
+    when(() => users.findByEmail(any())).thenAnswer((_) async => boundAdmin);
+    when(
+      () => emailCodes.issueLoginCode(
+        boundAdmin.email,
+        templateName: any(named: 'templateName'),
+      ),
+    ).thenAnswer((_) async => 'admin-code-id');
+    final admin = await service.sendEmailCode(email: boundAdmin.email);
+    expect(admin.ok, isTrue);
+    verify(
+      () => emailCodes.issueLoginCode(
+        boundAdmin.email,
+        templateName: 'admin_login_verification',
+      ),
+    ).called(1);
 
-      when(() => users.findByEmail(any())).thenAnswer((_) async => user);
-      when(
-        () => emailCodes.issueLoginCode(
-          user.email,
-          templateName: any(named: 'templateName'),
-        ),
-      ).thenThrow(StateError('provider unavailable'));
-      final unavailable = await service.sendEmailCode(email: user.email);
-      expect(unavailable.ok, isTrue);
-      expect(unavailable.message, missing.message);
-    },
-  );
+    when(() => users.findByEmail(any())).thenAnswer((_) async => user);
+    when(
+      () => emailCodes.issueLoginCode(
+        user.email,
+        templateName: any(named: 'templateName'),
+      ),
+    ).thenThrow(StateError('provider unavailable'));
+    final unavailable = await service.sendEmailCode(email: user.email);
+    expect(unavailable.ok, isFalse);
+    expect(unavailable.statusCode, 503);
+  });
 
   test('email-code send propagates throttling', () async {
     stubPolicy();
@@ -588,6 +597,7 @@ void main() {
       userRepository: users,
       settingsRepository: settings,
       passwordHasher: passwords,
+      tokenService: tokens,
       emailCodeService: emailCodes,
       throttleService: throttles,
       sessionService: sessions,
@@ -720,13 +730,47 @@ void main() {
   });
 
   test(
-    'direct email-code login requires admin password and consumes once',
+    'direct email-code login guides registration and requires admin step-up',
     () async {
       stubAllowedGuards();
+      when(() => users.findByEmail(any())).thenAnswer((_) async => null);
+      when(
+        () => emailCodes.validateLoginCode(any(), any()),
+      ).thenAnswer((_) async => 'new-code-id');
+      when(
+        () => emailCodes.consumeCode('new-code-id'),
+      ).thenAnswer((_) async => false);
+      expect(
+        (await service.loginWithEmailCode(
+          email: 'new@example.invalid',
+          emailCode: '123456',
+        )).code,
+        'mfa_required',
+      );
+      when(
+        () => emailCodes.consumeCode('new-code-id'),
+      ).thenAnswer((_) async => true);
+      when(
+        () => tokens.issueRegistrationHandoff(
+          method: 'email',
+          subject: 'new@example.invalid',
+        ),
+      ).thenReturn('registration-handoff');
+      expect(
+        (await service.loginWithEmailCode(
+          email: 'new@example.invalid',
+          emailCode: '123456',
+        )).registrationToken,
+        'registration-handoff',
+      );
+
       when(
         () => settings.isBootstrapLoginEnabled(),
       ).thenAnswer((_) async => true);
       when(() => users.findByEmail(any())).thenAnswer((_) async => bootstrap);
+      when(
+        () => emailCodes.validateLoginCode(any(), any()),
+      ).thenAnswer((_) async => 'bootstrap-code-id');
       expect(
         (await service.loginWithEmailCode(
           email: bootstrap.email,
@@ -743,19 +787,36 @@ void main() {
         (invocation) async =>
             invocation.positionalArguments[1] == 'correct-password',
       );
-      expect(
-        (await service.loginWithEmailCode(
-          email: boundAdmin.email,
-          emailCode: '123456',
-        )).code,
-        'login_failed',
-      );
       when(
         () => emailCodes.validateLoginCode(boundAdmin.email, any()),
       ).thenAnswer((_) async => 'admin-code-id');
       when(
         () => emailCodes.consumeCode('admin-code-id'),
       ).thenAnswer((_) async => true);
+      when(
+        () => webAuthn.hasCredentials(boundAdmin.id),
+      ).thenAnswer((_) async => false);
+      when(
+        () => tokens.issueLoginStepUpChallenge(
+          userId: boundAdmin.id,
+          primaryMethod: 'email_code',
+        ),
+      ).thenReturn('step-up-challenge');
+      expect(
+        (await service.loginWithEmailCode(
+          email: boundAdmin.email,
+          emailCode: '123456',
+        )).code,
+        'mfa_required',
+      );
+      expect(
+        (await service.loginWithEmailCode(
+          email: boundAdmin.email,
+          emailCode: '123456',
+          password: 'wrong-password',
+        )).code,
+        'login_failed',
+      );
       stubLoginCompletion(boundAdmin);
       expect(
         (await service.loginWithEmailCode(
@@ -822,12 +883,224 @@ void main() {
   });
 
   test(
+    'direct login step-up excludes the primary factor and is one-time',
+    () async {
+      when(
+        () => tokens.verifyLoginStepUpChallenge('step-up-challenge'),
+      ).thenReturn(
+        const VerifiedToken(
+          payload: {
+            'sub': 'bound-admin-id',
+            'primary_method': 'email_code',
+            'jti': 'step-up-id',
+          },
+        ),
+      );
+      when(
+        () => users.findById(boundAdmin.id),
+      ).thenAnswer((_) async => boundAdmin);
+      when(
+        () => webAuthn.hasCredentials(boundAdmin.id),
+      ).thenAnswer((_) async => false);
+      when(
+        () => passwords.verify(boundAdmin.passwordHash, 'correct-password'),
+      ).thenAnswer((_) async => true);
+      var proofConsumed = false;
+      when(() => throttles.consumeOneTimeProof('step-up-id')).thenAnswer((
+        _,
+      ) async {
+        if (proofConsumed) return false;
+        proofConsumed = true;
+        return true;
+      });
+      stubLoginCompletion(boundAdmin);
+
+      expect(
+        (await service.completeLoginStepUp(
+          challenge: 'step-up-challenge',
+          factor: 'email_code',
+          proof: const {'code': '123456'},
+        )).ok,
+        isFalse,
+      );
+      expect(
+        (await service.completeLoginStepUp(
+          challenge: 'step-up-challenge',
+          factor: 'password',
+          proof: const {'password': 'correct-password'},
+        )).ok,
+        isTrue,
+      );
+      expect(
+        (await service.completeLoginStepUp(
+          challenge: 'step-up-challenge',
+          factor: 'password',
+          proof: const {'password': 'correct-password'},
+        )).code,
+        'verification_failed',
+      );
+      verify(() => throttles.consumeOneTimeProof('step-up-id')).called(2);
+    },
+  );
+
+  test('direct login step-up supports every bound secondary factor', () async {
+    when(() => tokens.verifyLoginStepUpChallenge('invalid')).thenReturn(null);
+    expect(
+      (await service.sendLoginStepUpCode(
+        challenge: 'invalid',
+        factor: 'email_code',
+      )).code,
+      'invalid_challenge',
+    );
+    expect(
+      await service.beginLoginStepUpPasskey(
+        challenge: 'invalid',
+        origin: 'https://passport.example.invalid',
+      ),
+      isNull,
+    );
+
+    when(() => tokens.verifyLoginStepUpChallenge('all-factors')).thenReturn(
+      const VerifiedToken(
+        payload: {
+          'sub': 'user-id',
+          'primary_method': 'password',
+          'jti': 'all-factors-id',
+        },
+      ),
+    );
+    when(() => users.findById(user.id)).thenAnswer((_) async => user);
+    when(() => webAuthn.hasCredentials(user.id)).thenAnswer((_) async => true);
+    stubPolicy();
+    when(
+      () => throttles.enforceVerificationCodeSendGuards(
+        email: any(named: 'email'),
+        requestIp: any(named: 'requestIp'),
+        policy: any(named: 'policy'),
+        emailScope: any(named: 'emailScope'),
+        ipScope: any(named: 'ipScope'),
+        cooldownScope: any(named: 'cooldownScope'),
+        emailLimit: any(named: 'emailLimit'),
+        ipLimit: any(named: 'ipLimit'),
+      ),
+    ).thenAnswer((_) async => null);
+    when(() => emailCodes.issueStepUpCode(user.email)).thenAnswer((_) async {});
+    when(
+      () => throttles.startVerificationCodeCooldown(
+        email: any(named: 'email'),
+        seconds: any(named: 'seconds'),
+        cooldownScope: any(named: 'cooldownScope'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => phones.sendCode(
+        phoneNumber: user.phoneNumber!,
+        requestIp: any(named: 'requestIp'),
+      ),
+    ).thenAnswer(
+      (_) async =>
+          const PhoneVerificationAttempt.success(retryAfterSeconds: 60),
+    );
+    expect(
+      (await service.sendLoginStepUpCode(
+        challenge: 'all-factors',
+        factor: 'email_code',
+      )).ok,
+      isTrue,
+    );
+    expect(
+      (await service.sendLoginStepUpCode(
+        challenge: 'all-factors',
+        factor: 'phone_code',
+      )).ok,
+      isTrue,
+    );
+    expect(
+      (await service.sendLoginStepUpCode(
+        challenge: 'all-factors',
+        factor: 'password',
+      )).code,
+      'invalid_factor',
+    );
+
+    when(
+      () => webAuthn.generateAuthenticationOptions(
+        email: user.email,
+        userId: user.id,
+        origin: 'https://passport.example.invalid',
+        requireUserVerification: true,
+      ),
+    ).thenAnswer((_) async => {'challenge': 'webauthn-challenge'});
+    expect(
+      await service.beginLoginStepUpPasskey(
+        challenge: 'all-factors',
+        origin: 'https://passport.example.invalid',
+      ),
+      containsPair('challenge', 'webauthn-challenge'),
+    );
+
+    when(
+      () => throttles.consumeOneTimeProof('all-factors-id'),
+    ).thenAnswer((_) async => true);
+    when(
+      () => emailCodes.verifyStepUpCode(user.email, '123456'),
+    ).thenAnswer((_) async => true);
+    when(
+      () => phones.verifyCode(
+        phoneNumber: user.phoneNumber!,
+        verifyCode: '123456',
+        requestIp: any(named: 'requestIp'),
+      ),
+    ).thenAnswer((_) async => const PhoneVerifyCheckAttempt.success());
+    when(
+      () => users.findAuthenticatorSecretByUserId(user.id),
+    ).thenAnswer((_) async => user.authenticatorSecret);
+    when(
+      () => authenticator.verifyCode(
+        secret: user.authenticatorSecret!,
+        code: '123456',
+      ),
+    ).thenReturn(true);
+    when(
+      () => webAuthn.verifyAuthentication(
+        userId: user.id,
+        email: user.email,
+        response: any(named: 'response'),
+        forceUserVerification: true,
+      ),
+    ).thenAnswer((_) async => true);
+    stubLoginCompletion();
+
+    for (final factor in ['email_code', 'phone_code', 'authenticator']) {
+      expect(
+        (await service.completeLoginStepUp(
+          challenge: 'all-factors',
+          factor: factor,
+          proof: const {'code': '123456'},
+        )).ok,
+        isTrue,
+      );
+    }
+    expect(
+      (await service.completeLoginStepUp(
+        challenge: 'all-factors',
+        factor: 'webauthn',
+        proof: const {
+          'response': {'id': 'credential'},
+        },
+      )).ok,
+      isTrue,
+    );
+  });
+
+  test(
     'phone login remains non-enumerating and verifies valid codes',
     () async {
       final disabled = LoginService(
         userRepository: users,
         settingsRepository: settings,
         passwordHasher: passwords,
+        tokenService: tokens,
         emailCodeService: emailCodes,
         throttleService: throttles,
         sessionService: sessions,
@@ -858,16 +1131,38 @@ void main() {
       );
       when(() => phones.normalizePhone(any())).thenReturn('+8613800000000');
       when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
+      when(
+        () => phones.sendCode(
+          phoneNumber: any(named: 'phoneNumber'),
+          requestIp: any(named: 'requestIp'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const PhoneVerificationAttempt.success(retryAfterSeconds: 60),
+      );
       final missingPhone = await service.sendPhoneCode(
         phoneNumber: '13800000000',
       );
       expect(missingPhone.ok, isTrue);
+      when(
+        () => phones.verifyCode(
+          phoneNumber: any(named: 'phoneNumber'),
+          verifyCode: any(named: 'verifyCode'),
+          requestIp: any(named: 'requestIp'),
+        ),
+      ).thenAnswer((_) async => const PhoneVerifyCheckAttempt.success());
+      when(
+        () => tokens.issueRegistrationHandoff(
+          method: 'phone',
+          subject: '+8613800000000',
+        ),
+      ).thenReturn('registration-handoff');
       expect(
         (await service.loginWithPhoneCode(
           phoneNumber: '13800000000',
           verifyCode: '123456',
-        )).code,
-        'login_failed',
+        )).registrationToken,
+        'registration-handoff',
       );
       when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
       when(
@@ -885,8 +1180,8 @@ void main() {
       final unavailablePhone = await service.sendPhoneCode(
         phoneNumber: '13800000000',
       );
-      expect(unavailablePhone.ok, isTrue);
-      expect(unavailablePhone.message, missingPhone.message);
+      expect(unavailablePhone.ok, isFalse);
+      expect(unavailablePhone.statusCode, 503);
       when(
         () => phones.verifyCode(
           phoneNumber: any(named: 'phoneNumber'),

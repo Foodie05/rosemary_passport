@@ -99,7 +99,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   final _phone = TextEditingController();
   final _passwordEmail = TextEditingController();
   final _password = TextEditingController();
-  final _emailCodePassword = TextEditingController();
   final _mfaCode = TextEditingController();
   final _code = TextEditingController();
   final _recoveryAccount = TextEditingController();
@@ -109,6 +108,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   final _registerNickname = TextEditingController();
   final _registerPassword = TextEditingController();
   final _registerCode = TextEditingController();
+  var _registerMethod = 'email';
+  String? _registrationHandoff;
   var _recoveryMode = false;
   var _registerMode = false;
   var _registerCodeSent = false;
@@ -116,6 +117,10 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   var _passwordMfaCodeSent = false;
   List<String> _passwordMfaFactors = const [];
   String? _selectedPasswordMfaFactor;
+  String? _directStepUpChallenge;
+  List<String> _directStepUpFactors = const [];
+  String? _selectedDirectStepUpFactor;
+  var _directStepUpCodeSent = false;
   final _cooldowns = <_CooldownKind, int>{};
   Timer? _cooldownTimer;
 
@@ -155,7 +160,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     _phone.dispose();
     _passwordEmail.dispose();
     _password.dispose();
-    _emailCodePassword.dispose();
     _mfaCode.dispose();
     _code.dispose();
     _recoveryAccount.dispose();
@@ -240,16 +244,102 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _loginWithCode() async {
     await _run(() async {
-      final auth = _mode == _SignInMode.email
-          ? await widget.client.loginWithEmailCode(
-              email: _email.text.trim(),
-              emailCode: _code.text.trim(),
-              password: _emailCodePassword.text,
-            )
-          : await widget.client.loginWithPhoneCode(
-              phoneNumber: _phone.text.trim(),
-              verifyCode: _code.text.trim(),
-            );
+      try {
+        final auth = _mode == _SignInMode.email
+            ? await widget.client.loginWithEmailCode(
+                email: _email.text.trim(),
+                emailCode: _code.text.trim(),
+              )
+            : await widget.client.loginWithPhoneCode(
+                phoneNumber: _phone.text.trim(),
+                verifyCode: _code.text.trim(),
+              );
+        _showConsent(auth);
+      } on RosmApiException catch (error) {
+        if (error.code == 'registration_required' &&
+            error.details['registration_handoff'] is String) {
+          final identifier = _mode == _SignInMode.email
+              ? _email.text.trim()
+              : _phone.text.trim();
+          _registerEmail.text = identifier;
+          _registerCode.clear();
+          setState(() {
+            _registerMethod = _mode == _SignInMode.email ? 'email' : 'phone';
+            _registrationHandoff =
+                error.details['registration_handoff'] as String;
+            _registerMode = true;
+            _registerCodeSent = true;
+            _sent = false;
+          });
+          return;
+        }
+        if (error.code == 'mfa_required' &&
+            error.details['step_up_challenge'] is String) {
+          final factors = error.details['factors'];
+          setState(() {
+            _directStepUpChallenge =
+                error.details['step_up_challenge'] as String;
+            _directStepUpFactors = factors is List
+                ? factors
+                      .map((item) => item.toString())
+                      .where(
+                        const {
+                          'password',
+                          'email_code',
+                          'phone_code',
+                          'authenticator',
+                        }.contains,
+                      )
+                      .toList(growable: false)
+                : const ['password'];
+            _selectedDirectStepUpFactor = null;
+            _directStepUpCodeSent = false;
+            _mfaCode.clear();
+          });
+          return;
+        }
+        rethrow;
+      }
+    });
+  }
+
+  Future<void> _selectDirectStepUpFactor(String factor) async {
+    setState(() {
+      _selectedDirectStepUpFactor = factor;
+      _directStepUpCodeSent = false;
+      _mfaCode.clear();
+    });
+    if (factor == 'email_code' || factor == 'phone_code') {
+      await _sendDirectStepUpCode();
+    }
+  }
+
+  Future<void> _sendDirectStepUpCode() async {
+    final challenge = _directStepUpChallenge;
+    final factor = _selectedDirectStepUpFactor;
+    if (challenge == null || (factor != 'email_code' && factor != 'phone_code'))
+      return;
+    await _run(() async {
+      final result = await widget.client.sendLoginStepUpCode(
+        challenge: challenge,
+        factor: factor!,
+      );
+      _startCooldown(_CooldownKind.passwordMfa, result.retryAfter ?? 60);
+      setState(() => _directStepUpCodeSent = true);
+    });
+  }
+
+  Future<void> _completeDirectStepUp() async {
+    final challenge = _directStepUpChallenge;
+    final factor = _selectedDirectStepUpFactor;
+    if (challenge == null || factor == null) return;
+    await _run(() async {
+      final auth = await widget.client.completeLoginStepUp(
+        challenge: challenge,
+        factor: factor,
+        password: factor == 'password' ? _password.text : null,
+        code: factor == 'password' ? null : _mfaCode.text.trim(),
+      );
       _showConsent(auth);
     });
   }
@@ -386,14 +476,27 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     });
   }
 
-  Future<void> _registerWithEmail() async {
+  Future<void> _registerAccount() async {
     await _run(() async {
-      final auth = await widget.client.registerWithEmail(
-        email: _registerEmail.text.trim(),
-        nickname: _registerNickname.text.trim(),
-        password: _registerPassword.text,
-        emailCode: _registerCode.text.trim(),
-      );
+      final auth = _registerMethod == 'phone'
+          ? await widget.client.registerWithPhone(
+              phoneNumber: _registerEmail.text.trim(),
+              nickname: _registerNickname.text.trim(),
+              password: _registerPassword.text,
+              verifyCode: _registrationHandoff == null
+                  ? _registerCode.text.trim()
+                  : null,
+              registrationHandoff: _registrationHandoff,
+            )
+          : await widget.client.registerWithEmail(
+              email: _registerEmail.text.trim(),
+              nickname: _registerNickname.text.trim(),
+              password: _registerPassword.text,
+              emailCode: _registrationHandoff == null
+                  ? _registerCode.text.trim()
+                  : null,
+              registrationHandoff: _registrationHandoff,
+            );
       _showConsent(auth);
     });
   }
@@ -412,6 +515,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       _sent = false;
       _recoveryMode = false;
       _registerMode = false;
+      _directStepUpChallenge = null;
       _passwordMfaMode = false;
     });
   }
@@ -613,6 +717,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                           _Card(child: _buildRecovery())
                         else if (_passwordMfaMode)
                           _Card(child: _buildPasswordMfa(colors))
+                        else if (_directStepUpChallenge != null)
+                          _Card(child: _buildDirectStepUp(colors))
                         else
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -791,17 +897,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               ),
             ],
           ),
-          if (isEmail) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _emailCodePassword,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '管理员密码（普通账号可留空）',
-                prefixIcon: Icon(Icons.lock_outline_rounded),
-              ),
-            ),
-          ],
         ],
         const SizedBox(height: 24),
         FilledButton(
@@ -934,8 +1029,117 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     );
   }
 
+  Widget _buildDirectStepUp(ColorScheme colors) {
+    final factor = _selectedDirectStepUpFactor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '完成双因素认证',
+          style: TextStyle(
+            color: colors.onSurface,
+            fontSize: 21,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          factor == null ? '请选择一种不同于刚才验证码的方式完成验证。' : _passwordMfaIntro(factor),
+          style: TextStyle(
+            color: colors.onSurfaceVariant,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (factor == null)
+          for (final item in _directStepUpFactors)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _FactorButton(
+                icon: _passwordMfaIcon(item),
+                title: _passwordMfaTitle(item),
+                subtitle: _passwordMfaIntro(item),
+                onTap: _busy ? null : () => _selectDirectStepUpFactor(item),
+              ),
+            )
+        else ...[
+          if (factor == 'password')
+            TextField(
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: '密码',
+                prefixIcon: Icon(Icons.lock_outline_rounded),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _mfaCode,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: factor == 'authenticator'
+                          ? 'Authenticator 动态码'
+                          : '验证码',
+                      prefixIcon: const Icon(Icons.shield_outlined),
+                    ),
+                  ),
+                ),
+                if (factor == 'email_code' || factor == 'phone_code') ...[
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: _busy || _coolingDown(_CooldownKind.passwordMfa)
+                        ? null
+                        : _sendDirectStepUpCode,
+                    child: Text(
+                      _codeButtonLabel(
+                        _CooldownKind.passwordMfa,
+                        _directStepUpCodeSent ? '重发' : '发送',
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          const SizedBox(height: 22),
+          FilledButton(
+            onPressed: _busy ? null : _completeDirectStepUp,
+            child: _ButtonContent(busy: _busy, label: '完成登录  →', light: true),
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _selectedDirectStepUpFactor = null;
+                    _directStepUpCodeSent = false;
+                    _mfaCode.clear();
+                    _error = null;
+                  }),
+            child: const Text('更换验证方式'),
+          ),
+        ],
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () => setState(() {
+                  _directStepUpChallenge = null;
+                  _selectedDirectStepUpFactor = null;
+                  _error = null;
+                }),
+          child: const Text('返回登录'),
+        ),
+      ],
+    );
+  }
+
   void _openRegister() {
     setState(() {
+      _registerMethod = 'email';
+      _registrationHandoff = null;
       _registerMode = true;
       _recoveryMode = false;
       _passwordMfaMode = false;
@@ -960,7 +1164,9 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '使用邮箱验证码完成注册，随后继续确认授权。',
+            _registrationHandoff != null
+                ? '验证码已通过，请填写昵称和密码完成注册。'
+                : '使用邮箱验证码完成注册，随后继续确认授权。',
             style: TextStyle(
               color: colors.onSurfaceVariant,
               fontSize: 14,
@@ -971,43 +1177,52 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           const SizedBox(height: 18),
           TextField(
             controller: _registerEmail,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: '邮箱',
-              prefixIcon: Icon(Icons.mail_outline_rounded),
+            keyboardType: _registerMethod == 'phone'
+                ? TextInputType.phone
+                : TextInputType.emailAddress,
+            readOnly: _registrationHandoff != null,
+            decoration: InputDecoration(
+              labelText: _registerMethod == 'phone' ? '手机号' : '邮箱',
+              prefixIcon: Icon(
+                _registerMethod == 'phone'
+                    ? Icons.phone_iphone_rounded
+                    : Icons.mail_outline_rounded,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _registerCode,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '验证码',
-                    prefixIcon: Icon(Icons.pin_outlined),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 106,
-                child: OutlinedButton(
-                  onPressed: _busy || _coolingDown(_CooldownKind.register)
-                      ? null
-                      : _sendRegisterCode,
-                  child: _ButtonContent(
-                    busy: _busy,
-                    label: _codeButtonLabel(
-                      _CooldownKind.register,
-                      _registerCodeSent ? '重发' : '发送',
+          if (_registrationHandoff == null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _registerCode,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '验证码',
+                      prefixIcon: Icon(Icons.pin_outlined),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 106,
+                  child: OutlinedButton(
+                    onPressed: _busy || _coolingDown(_CooldownKind.register)
+                        ? null
+                        : _sendRegisterCode,
+                    child: _ButtonContent(
+                      busy: _busy,
+                      label: _codeButtonLabel(
+                        _CooldownKind.register,
+                        _registerCodeSent ? '重发' : '发送',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           TextField(
             controller: _registerNickname,
@@ -1027,7 +1242,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           ),
           const SizedBox(height: 22),
           FilledButton(
-            onPressed: _busy ? null : _registerWithEmail,
+            onPressed: _busy ? null : _registerAccount,
             child: _ButtonContent(busy: _busy, label: '注册并继续  →', light: true),
           ),
           TextButton(
@@ -1036,6 +1251,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 : () => setState(() {
                     _registerMode = false;
                     _registerCodeSent = false;
+                    _registrationHandoff = null;
                     _error = null;
                   }),
             child: const Text('已有账号，返回登录'),

@@ -38,7 +38,7 @@ function AuthPageFrame({ children }) {
   );
 }
 
-function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onChange }) {
+function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onChange, ...inputProps }) {
   return (
     <div className="space-y-2">
       <label className="ml-1 text-sm font-bold text-sage-700">{label}</label>
@@ -52,6 +52,7 @@ function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onCha
           className="w-full rounded-2xl border border-sage-200 bg-sage-50/50 py-3 pl-12 pr-4 transition-all duration-300 placeholder:text-sage-300 focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-400/10"
           value={value}
           onChange={onChange}
+          {...inputProps}
         />
       </div>
     </div>
@@ -210,6 +211,9 @@ export function LoginPage({
   completeEmailCodeLogin,
   preparePhoneCodeLogin,
   completePhoneCodeLogin,
+  selectDirectLoginStepUpFactor,
+  completeDirectLoginStepUp,
+  beginDirectLoginStepUpPasskey,
   resendPasswordLoginCode,
   resendPasswordPhoneCode,
   resendEmailCodeLogin,
@@ -263,6 +267,77 @@ export function LoginPage({
   }
 
   function renderPanel(view) {
+    if (view.step === 'step_up') {
+      return (
+        <form className="space-y-6" onSubmit={completeDirectLoginStepUp}>
+          {!view.selectedPasswordFactor ? (
+            <div className="space-y-4">
+              {passwordLoginFactors.includes('password') ? (
+                <FactorListItem title="账户密码" subtitle="使用当前账户密码完成二次验证" onClick={() => void selectDirectLoginStepUpFactor('password')} />
+              ) : null}
+              {passwordLoginFactors.includes('email_code') ? (
+                <FactorListItem title="邮箱验证码" subtitle="发送验证码到已绑定邮箱" onClick={() => void selectDirectLoginStepUpFactor('email_code')} />
+              ) : null}
+              {passwordLoginFactors.includes('phone_code') ? (
+                <FactorListItem title="手机验证码" subtitle="发送验证码到已绑定手机号" onClick={() => void selectDirectLoginStepUpFactor('phone_code')} />
+              ) : null}
+              {passwordLoginFactors.includes('authenticator') ? (
+                <FactorListItem title="Authenticator 验证器" subtitle="输入验证器当前显示的动态验证码" onClick={() => void selectDirectLoginStepUpFactor('authenticator')} />
+              ) : null}
+              {passwordLoginFactors.includes('webauthn') ? (
+                <FactorListItem title="系统通行密钥" subtitle="使用另一把已绑定的通行密钥验证" onClick={() => void selectDirectLoginStepUpFactor('webauthn')} />
+              ) : null}
+            </div>
+          ) : null}
+
+          {view.selectedPasswordFactor === 'password' ? (
+            <AuthInput icon={Lock} label="账户密码" type="password" autoComplete="current-password" value={loginForm.password} onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))} />
+          ) : null}
+          {view.selectedPasswordFactor === 'email_code' ? (
+            <CodeInputWithAction icon={ShieldCheck} label="邮箱验证码" value={loginForm.email_code} onChange={(event) => setLoginForm((current) => ({ ...current, email_code: event.target.value }))} actionLabel={loginCodeSending ? '发送中...' : '重新发送'} onAction={() => void selectDirectLoginStepUpFactor('email_code')} actionDisabled={loginCodeSending} />
+          ) : null}
+          {view.selectedPasswordFactor === 'phone_code' ? (
+            <CodeInputWithAction icon={ShieldCheck} label="手机验证码" value={loginForm.phone_code} onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value.replace(/\D/g, '') }))} actionLabel={loginCodeSending ? '发送中...' : '重新发送'} onAction={() => void selectDirectLoginStepUpFactor('phone_code')} actionDisabled={loginCodeSending} />
+          ) : null}
+          {view.selectedPasswordFactor === 'authenticator' ? (
+            <AuthInput icon={ShieldCheck} label="Authenticator 动态验证码" value={loginForm.authenticator_code} onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value.replace(/\D/g, '') }))} />
+          ) : null}
+          {view.selectedPasswordFactor === 'webauthn' ? (
+            <button
+              type="button"
+              disabled={webauthnLoading}
+              className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold"
+              onClick={async () => {
+                setWebauthnLoading(true);
+                setWebauthnError('');
+                try {
+                  const options = await beginDirectLoginStepUpPasskey();
+                  const credential = await navigator.credentials.get({ publicKey: preparePublicKeyRequestOptions(options) });
+                  if (!credential) throw new Error('未获取到系统通行密钥响应');
+                  await completeDirectLoginStepUp(null, serializeAuthenticationCredential(credential));
+                } catch (error) {
+                  setWebauthnError(getPasskeyErrorMessage(error));
+                } finally {
+                  setWebauthnLoading(false);
+                }
+              }}
+            >
+              <LoadingButtonText loading={webauthnLoading} loadingText="等待系统验证..." idleText="使用系统通行密钥验证" icon={Fingerprint} />
+            </button>
+          ) : null}
+          {webauthnError ? <p className="text-sm text-red-600">{webauthnError}</p> : null}
+          {view.selectedPasswordFactor && view.selectedPasswordFactor !== 'webauthn' ? (
+            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+              <LoadingButtonText loading={loading} loadingText="验证中..." idleText="完成二次验证" />
+            </button>
+          ) : null}
+          <button type="button" onClick={() => setSelectedPasswordFactor('')} className="flex w-full items-center justify-center gap-2 text-sm font-bold text-sage-500 hover:text-sage-700">
+            <ChevronLeft size={18} />返回验证方式
+          </button>
+        </form>
+      );
+    }
+
     if (view.method === 'phone_code') {
       if (view.step === 'credentials') {
         return (
@@ -330,15 +405,6 @@ export function LoginPage({
             actionLabel={loginCodeSending ? '发送中...' : loginCodeCooldownRemaining > 0 ? `${loginCodeCooldownRemaining} 秒后重发` : '发送验证码'}
             onAction={() => void resendEmailCodeLogin()}
             actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
-          />
-          <AuthInput
-            icon={Lock}
-            label="管理员密码（普通账号可留空）"
-            type="password"
-            autoComplete="current-password"
-            placeholder="管理员需完成双因素验证"
-            value={loginForm.password}
-            onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
           />
           <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
@@ -747,6 +813,7 @@ export function RegisterPage({
     registerCodeCooldownRemaining > 0 ||
     !(registerMethod === 'phone' ? registerForm.phone_number.trim() : registerForm.email.trim()) ||
     !captchaConfigured;
+  const verificationComplete = Boolean(registerForm.registration_handoff);
 
   return (
     <AuthPageFrame>
@@ -763,6 +830,7 @@ export function RegisterPage({
           <div className="relative grid grid-cols-2 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
             <button
               type="button"
+              disabled={verificationComplete}
               onClick={() => setRegisterMethod('email')}
               className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${registerMethod === 'email' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
             >
@@ -770,6 +838,7 @@ export function RegisterPage({
             </button>
             <button
               type="button"
+              disabled={verificationComplete}
               onClick={() => setRegisterMethod('phone')}
               className={`relative z-10 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${registerMethod === 'phone' ? 'text-sage-900' : 'text-sage-500 hover:text-sage-700'}`}
             >
@@ -791,6 +860,7 @@ export function RegisterPage({
                 label="邮箱地址"
                 placeholder="name@example.com"
                 value={registerForm.email}
+                disabled={verificationComplete}
                 onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
               />
             ) : (
@@ -799,9 +869,15 @@ export function RegisterPage({
                 label="手机号码"
                 placeholder="13800138000"
                 value={registerForm.phone_number}
+                disabled={verificationComplete}
                 onChange={(event) => setRegisterForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
               />
             )}
+            {verificationComplete ? (
+              <div className="rounded-2xl border border-sage-200 bg-sage-50 px-4 py-3 text-sm font-bold text-sage-700">
+                验证码已通过，请填写昵称和密码完成注册。
+              </div>
+            ) : (
             <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_auto]">
               <AuthInput
                 icon={ShieldCheck}
@@ -818,6 +894,7 @@ export function RegisterPage({
                 />
               </button>
             </div>
+            )}
             <AuthInput
               icon={Lock}
               label="设置密码"

@@ -201,7 +201,8 @@ Map<String, dynamic> _$RosmEmailRegisterRequestToJson(
   'email': instance.email,
   'nickname': instance.nickname,
   'password': instance.password,
-  'email_code': instance.emailCode,
+  'email_code': ?instance.emailCode,
+  'registration_handoff': ?instance.registrationHandoff,
 };
 
 Map<String, dynamic> _$RosmPasswordRecoveryCodeRequestToJson(

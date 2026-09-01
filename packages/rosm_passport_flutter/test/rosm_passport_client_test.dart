@@ -93,6 +93,126 @@ void main() {
     });
   });
 
+  test(
+    'exposes a verified registration handoff after email-code login',
+    () async {
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://api.example.com'),
+        clientId: 'app',
+        redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+        tokenStore: _MemoryTokenStore(),
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/api/v1/auth/email-login');
+          return http.Response(
+            jsonEncode({
+              'error': 'registration_required',
+              'message': 'complete registration',
+              'registration_handoff': 'signed-handoff',
+            }),
+            409,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      await expectLater(
+        client.loginWithEmailCode(
+          email: 'new@example.com',
+          emailCode: '123456',
+        ),
+        throwsA(
+          isA<RosmApiException>()
+              .having((error) => error.code, 'code', 'registration_required')
+              .having(
+                (error) => error.details['registration_handoff'],
+                'handoff',
+                'signed-handoff',
+              ),
+        ),
+      );
+    },
+  );
+
+  test('registers with a verified handoff without a second code', () async {
+    late http.Request captured;
+    final client = RosmPassportClient(
+      issuer: Uri.parse('https://api.example.com'),
+      clientId: 'app',
+      redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+      tokenStore: _MemoryTokenStore(),
+      httpClient: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'user': {
+              'id': 'user-1',
+              'email': 'new@example.com',
+              'nickname': 'New User',
+              'roles': ['user'],
+            },
+            'security': {},
+          }),
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    await client.registerWithEmail(
+      email: 'new@example.com',
+      nickname: 'New User',
+      password: 'a secure passphrase',
+      registrationHandoff: 'signed-handoff',
+    );
+
+    expect(captured.url.path, '/api/v1/auth/register');
+    expect(jsonDecode(captured.body), {
+      'email': 'new@example.com',
+      'nickname': 'New User',
+      'password': 'a secure passphrase',
+      'registration_handoff': 'signed-handoff',
+    });
+  });
+
+  test('completes a dedicated direct-login step-up challenge', () async {
+    late http.Request captured;
+    final client = RosmPassportClient(
+      issuer: Uri.parse('https://api.example.com'),
+      clientId: 'app',
+      redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+      tokenStore: _MemoryTokenStore(),
+      httpClient: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'user': {
+              'id': 'admin-1',
+              'email': 'admin@example.com',
+              'nickname': 'Admin',
+              'roles': ['admin'],
+            },
+            'security': {},
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    await client.completeLoginStepUp(
+      challenge: 'signed-challenge',
+      factor: 'authenticator',
+      code: '123456',
+    );
+
+    expect(captured.url.path, '/api/v1/auth/login-step-up');
+    expect(jsonDecode(captured.body), {
+      'step_up_challenge': 'signed-challenge',
+      'factor': 'authenticator',
+      'code': '123456',
+    });
+  });
+
   test('resets password by code with typed request body', () async {
     late http.Request captured;
     final client = RosmPassportClient(

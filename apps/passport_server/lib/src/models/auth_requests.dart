@@ -105,7 +105,8 @@ class RegisterRequest {
     required this.email,
     required this.nickname,
     required this.password,
-    required this.emailCode,
+    this.emailCode,
+    this.registrationHandoff,
   });
 
   factory RegisterRequest.fromJson(Map<String, dynamic> json) =>
@@ -114,7 +115,8 @@ class RegisterRequest {
   final String email;
   final String nickname;
   final String password;
-  final String emailCode;
+  final String? emailCode;
+  final String? registrationHandoff;
 
   Map<String, dynamic> toJson() => _$RegisterRequestToJson(this);
 }

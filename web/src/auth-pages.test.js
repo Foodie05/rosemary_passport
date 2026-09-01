@@ -29,17 +29,14 @@ test('password recovery uses the shared ROSM Pass authentication frame', () => {
   assert.match(recoveryPage, /grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-2/);
 });
 
-test('administrator password is requested only in direct email-code login', () => {
-  const phonePanel = source.slice(
-    source.indexOf("if (view.method === 'phone_code')"),
-    source.indexOf("if (view.method === 'email_code')"),
-  );
-  const emailPanel = source.slice(
-    source.indexOf("if (view.method === 'email_code')"),
-    source.indexOf("if (view.method === 'password')"),
+test('direct code login uses a dedicated factor-choice step-up page', () => {
+  const loginPage = source.slice(
+    source.indexOf('export function LoginPage'),
+    source.indexOf('export function RegisterPage'),
   );
 
-  assert.doesNotMatch(phonePanel, /管理员密码/);
-  assert.match(emailPanel, /管理员密码（普通账号可留空）/);
-  assert.match(emailPanel, /autoComplete="current-password"/);
+  assert.doesNotMatch(loginPage, /管理员密码（普通账号可留空）/);
+  assert.match(loginPage, /使用当前账户密码完成二次验证/);
+  assert.match(loginPage, /selectedPasswordFactor === 'password'/);
+  assert.match(loginPage, /返回验证方式/);
 });

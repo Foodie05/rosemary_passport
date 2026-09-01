@@ -32,6 +32,23 @@ Future<Response> onRequest(RequestContext context) async {
     requestIp: requestIp,
     rememberMe: payload.rememberMe,
   );
+  if (attempt.registrationToken != null) {
+    return jsonResponse({
+      'error': 'registration_required',
+      'message': attempt.message,
+      'registration_handoff': attempt.registrationToken,
+      'method': 'email',
+      'identifier': payload.email.trim(),
+    }, statusCode: 409);
+  }
+  if (attempt.stepUpChallenge != null) {
+    return jsonResponse({
+      'error': 'mfa_required',
+      'message': attempt.message,
+      'step_up_challenge': attempt.stepUpChallenge,
+      'factors': attempt.factors,
+    }, statusCode: 401);
+  }
   if (!attempt.ok) {
     var response = errorResponse(
       attempt.code ?? 'login_failed',
