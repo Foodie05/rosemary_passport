@@ -22,6 +22,10 @@ make_executable_stub "$fake_bin/aws" 'exit 0'
 make_executable_stub "$fake_bin/pg_restore" 'exit 0'
 make_executable_stub "$fake_bin/sleep" 'exit 0'
 make_executable_stub "$fake_bin/curl" \
+  'if [[ "$*" == *"https://frontend.invalid/"* ]]; then' \
+  '  [[ "${FAKE_FRONTEND_CURL_SUCCESS:-${FAKE_CURL_SUCCESS:-false}}" == true ]] && exit 0' \
+  '  exit 22' \
+  'fi' \
   '[[ "${FAKE_CURL_SUCCESS:-false}" == true ]] && exit 0' \
   'exit 22'
 make_executable_stub "$fake_bin/mv" \
@@ -115,6 +119,7 @@ prepare_case() {
       "NODE_IMAGE=node@sha256:$(printf 'b%.0s' {1..64})" \
       'POSTGRES_USER=fixture' \
       'POSTGRES_DB=fixture' \
+      'WEB_BASE_URL=https://frontend.invalid' \
       'LEGACY_JSON_REFRESH_SUNSET_AT=PENDING_FIRST_HARDENED_DEPLOYMENT_PLUS_14_DAYS'
   } >"$runtime_env"
   chmod 0600 "$runtime_env"
@@ -176,6 +181,20 @@ assert_predeployment_state_restored
 grep -qx 'up:new' "$docker_log"
 grep -qx 'up:old' "$docker_log"
 grep -q 'restoring the pre-deployment application state' "$case_dir/output.log"
+
+prepare_case frontend_smoke_failure
+set +e
+PATH="$fake_bin:$PATH" FAKE_DOCKER_LOG="$docker_log" \
+  FAKE_CURL_SUCCESS=true FAKE_FRONTEND_CURL_SUCCESS=false \
+  "$source_dir/deploy.sh" "$target_dir" "$frontend_dir" \
+    "$runtime_env" "$secrets_dir" >"$case_dir/output.log" 2>&1
+frontend_status=$?
+set -e
+[[ "$frontend_status" -eq 1 ]]
+assert_predeployment_state_restored
+grep -qx 'up:new' "$docker_log"
+grep -qx 'up:old' "$docker_log"
+grep -q 'frontend smoke test failed after atomic switch' "$case_dir/output.log"
 
 prepare_case successful_cutover
 PATH="$fake_bin:$PATH" FAKE_DOCKER_LOG="$docker_log" FAKE_CURL_SUCCESS=true \
