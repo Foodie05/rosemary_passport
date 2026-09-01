@@ -28,4 +28,26 @@ void main() {
     );
     expect(selection['userVerification'], 'required');
   });
+
+  test(
+    'discoverable authentication options require user verification',
+    () async {
+      final process = await Process.start('node', [
+        'scripts/webauthn-auth-options.mjs',
+      ]);
+      process.stdin.writeln(
+        jsonEncode({
+          'rpID': 'passport.example.com',
+          'allowCredentials': <dynamic>[],
+          'requireUserVerification': true,
+        }),
+      );
+      await process.stdin.close();
+      final output = await process.stdout.transform(utf8.decoder).join();
+      final error = await process.stderr.transform(utf8.decoder).join();
+      expect(await process.exitCode, 0, reason: error);
+      final body = Map<String, dynamic>.from(jsonDecode(output) as Map);
+      expect(body['userVerification'], 'required');
+    },
+  );
 }
