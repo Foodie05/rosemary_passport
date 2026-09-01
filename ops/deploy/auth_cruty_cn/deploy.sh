@@ -47,7 +47,23 @@ restore_cutover() {
       --exclude='.deploy_backups/' --exclude='.user.ini' \
       "$rollback_dir/" "$TARGET_DIR/"
   fi
-  if [[ "${LEGACY_FRONTEND_MOVED:-false}" == true ]]; then
+  if [[ "${FRONTEND_SWITCHED:-false}" == true ]]; then
+    if [[ -L "$FRONTEND_TARGET_DIR" ]] && \
+      [[ "$(readlink "$FRONTEND_TARGET_DIR")" == "$FRONTEND_STAGE_DIR" ]]; then
+      unlink "$FRONTEND_TARGET_DIR"
+      if [[ "${LEGACY_FRONTEND_MOVED:-false}" == true ]] && \
+        [[ -d "$LEGACY_FRONTEND_PATH" && ! -L "$LEGACY_FRONTEND_PATH" ]]; then
+        mv "$LEGACY_FRONTEND_PATH" "$FRONTEND_TARGET_DIR"
+        LEGACY_FRONTEND_MOVED=false
+      elif [[ -n "${previous_frontend:-}" ]]; then
+        ln -s "$previous_frontend" "$FRONTEND_TARGET_DIR"
+      fi
+      FRONTEND_SWITCHED=false
+    else
+      error "switched frontend rollback state is unsafe; refusing an ambiguous move"
+      return 78
+    fi
+  elif [[ "${LEGACY_FRONTEND_MOVED:-false}" == true ]]; then
     if [[ -L "$FRONTEND_TARGET_DIR" ]] && \
       [[ "$(readlink "$FRONTEND_TARGET_DIR")" == "$LEGACY_FRONTEND_PATH" ]] && \
       [[ -d "$LEGACY_FRONTEND_PATH" && ! -L "$LEGACY_FRONTEND_PATH" ]]; then
@@ -199,8 +215,10 @@ NEW_STACK_STARTED=false
 RUNTIME_ENV_BACKUP=""
 LEGACY_FRONTEND_MOVED=false
 LEGACY_FRONTEND_PATH=""
+FRONTEND_SWITCHED=false
 
 mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_RELEASES_DIR"
+chmod 0755 "$FRONTEND_RELEASES_DIR"
 "$SOURCE_DIR/check_disk_capacity.sh" "$TARGET_DIR" "$FRONTEND_RELEASES_DIR"
 previous_frontend=""
 if [[ -L "$FRONTEND_TARGET_DIR" ]]; then
@@ -306,12 +324,27 @@ fi
 info "atomically switching frontend and restoring traffic"
 ln -sfn "$FRONTEND_STAGE_DIR" "$FRONTEND_TARGET_DIR.next"
 mv -Tf "$FRONTEND_TARGET_DIR.next" "$FRONTEND_TARGET_DIR"
+FRONTEND_SWITCHED=true
+web_base_url="$(sed -n 's/^WEB_BASE_URL=//p' "$RUNTIME_ENV_FILE" | tail -n 1)"
+[[ "$web_base_url" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] \
+  || die 'WEB_BASE_URL must be a safe HTTPS origin'
+frontend_ready=false
+for _ in {1..10}; do
+  if curl --fail --silent --max-time 5 "$web_base_url/" >/dev/null; then
+    frontend_ready=true
+    break
+  fi
+  sleep 1
+done
+[[ "$frontend_ready" == true ]] \
+  || die 'frontend smoke test failed after atomic switch'
 if [[ "$MAINTENANCE_ENABLED" == true && -n "$previous_frontend" && -e "$previous_frontend/.maintenance" ]]; then
   unlink "$previous_frontend/.maintenance"
 fi
 MAINTENANCE_ENABLED=false
 DEPLOYMENT_SUCCEEDED=true
 CUTOVER_STARTED=false
+FRONTEND_SWITCHED=false
 RUNTIME_ENV_BACKUP=""
 
 info "deployment completed and readiness passed"
