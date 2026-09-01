@@ -80,6 +80,10 @@ grep -q 'chmod 0755 "$FRONTEND_RELEASES_DIR"' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 grep -q 'frontend smoke test failed after atomic switch' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
+grep -q 'ROSM_DEPLOY_ROOT:-\$script_dir' \
+  "$repo_root/ops/deploy/auth_cruty_cn/install_systemd_units.sh"
+grep -q 's#/srv/rosm-passport/current#\$deploy_root#g' \
+  "$repo_root/ops/deploy/auth_cruty_cn/install_systemd_units.sh"
 grep -q 'NEW_RELEASE_TAG="release-\$TIMESTAMP"' \
   "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
 grep -q 'restore_cutover' "$repo_root/ops/deploy/auth_cruty_cn/deploy.sh"
