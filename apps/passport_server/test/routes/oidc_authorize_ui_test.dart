@@ -40,7 +40,9 @@ void main() {
           Uri.parse(
             'https://apiauth.example.test/oidc/authorize'
             '?client_id=test&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback'
-            '&response_type=code&state=state-value',
+            '&response_type=code&scope=openid%20profile%20email%20phone%20accountRule'
+            '&state=state-value&nonce=nonce-value'
+            '&code_challenge=pkce-challenge&code_challenge_method=S256',
           ),
         ),
         config,
@@ -55,7 +57,19 @@ void main() {
       expect(location.path, '/login');
       expect(next.path, '/oidc/continue');
       expect(next.queryParameters['client_id'], 'test');
+      expect(
+        next.queryParameters['redirect_uri'],
+        'https://client.example/callback',
+      );
+      expect(next.queryParameters['response_type'], 'code');
+      expect(
+        next.queryParameters['scope'],
+        'openid profile email phone accountRule',
+      );
       expect(next.queryParameters['state'], 'state-value');
+      expect(next.queryParameters['nonce'], 'nonce-value');
+      expect(next.queryParameters['code_challenge'], 'pkce-challenge');
+      expect(next.queryParameters['code_challenge_method'], 'S256');
     },
   );
 
