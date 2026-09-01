@@ -44,7 +44,20 @@ restore_cutover() {
     mkdir -p "$rollback_dir"
     tar -C "$rollback_dir" -xzf "$BACKUP_ARCHIVE"
     rsync -a --checksum --delete --exclude='.env' --exclude='data/' \
-      --exclude='.deploy_backups/' "$rollback_dir/" "$TARGET_DIR/"
+      --exclude='.deploy_backups/' --exclude='.user.ini' \
+      "$rollback_dir/" "$TARGET_DIR/"
+  fi
+  if [[ "${LEGACY_FRONTEND_MOVED:-false}" == true ]]; then
+    if [[ -L "$FRONTEND_TARGET_DIR" ]] && \
+      [[ "$(readlink "$FRONTEND_TARGET_DIR")" == "$LEGACY_FRONTEND_PATH" ]] && \
+      [[ -d "$LEGACY_FRONTEND_PATH" && ! -L "$LEGACY_FRONTEND_PATH" ]]; then
+      unlink "$FRONTEND_TARGET_DIR"
+      mv "$LEGACY_FRONTEND_PATH" "$FRONTEND_TARGET_DIR"
+      LEGACY_FRONTEND_MOVED=false
+    else
+      error "legacy frontend rollback state is unsafe; refusing an ambiguous move"
+      return 78
+    fi
   fi
   if [[ -n "${LEGACY_ENV_QUARANTINE_PATH:-}" ]]; then
     "$SOURCE_DIR/legacy_env_transition.sh" restore \
@@ -184,6 +197,8 @@ LEGACY_ENV_QUARANTINE_PATH=""
 CUTOVER_STARTED=false
 NEW_STACK_STARTED=false
 RUNTIME_ENV_BACKUP=""
+LEGACY_FRONTEND_MOVED=false
+LEGACY_FRONTEND_PATH=""
 
 mkdir -p "$TARGET_DIR" "$BACKUP_DIR" "$FRONTEND_RELEASES_DIR"
 "$SOURCE_DIR/check_disk_capacity.sh" "$TARGET_DIR" "$FRONTEND_RELEASES_DIR"
@@ -222,6 +237,8 @@ if [[ -d "$FRONTEND_TARGET_DIR" && ! -L "$FRONTEND_TARGET_DIR" ]]; then
   mv "$FRONTEND_TARGET_DIR" "$legacy_frontend"
   previous_frontend="$legacy_frontend"
   ln -s "$legacy_frontend" "$FRONTEND_TARGET_DIR"
+  LEGACY_FRONTEND_PATH="$legacy_frontend"
+  LEGACY_FRONTEND_MOVED=true
 fi
 
 if [[ -e "$TARGET_DIR/.env" ]]; then
@@ -235,7 +252,8 @@ CUTOVER_STARTED=true
 
 info "syncing credential-free release"
 rsync -a --checksum --delete --exclude='.env' --exclude='data/' \
-  --exclude='.deploy_backups/' "$SOURCE_DIR/" "$TARGET_DIR/"
+  --exclude='.deploy_backups/' --exclude='.user.ini' \
+  "$SOURCE_DIR/" "$TARGET_DIR/"
 printf '%s\n' "$NEW_RELEASE_TAG" >"$TARGET_DIR/.release_tag"
 chmod 0644 "$TARGET_DIR/.release_tag"
 chmod +x "$TARGET_DIR/deploy.sh" "$TARGET_DIR/backup_to_s3.sh" \

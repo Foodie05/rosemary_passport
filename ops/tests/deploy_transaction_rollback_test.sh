@@ -105,6 +105,8 @@ prepare_case() {
   printf '%s\n' 'release-20260829-120000' >"$target_dir/.release_tag"
   printf '%s\n' 'DATABASE_SENTINEL' >"$target_dir/data/postgres/sentinel"
   printf '%s\n' 'BACKUP_SENTINEL' >"$target_dir/.deploy_backups/sentinel"
+  mkdir -p "$target_dir/frontend/dist"
+  printf '%s\n' 'HOST_MANAGED_USER_INI' >"$target_dir/frontend/dist/.user.ini"
   printf '%s\n' '<html>old frontend</html>' >"$frontend_dir/index.html"
 
   {
@@ -140,10 +142,12 @@ assert_predeployment_state_restored() {
   [[ ! -e "$target_dir/new-code.txt" ]]
   grep -qx 'DATABASE_SENTINEL' "$target_dir/data/postgres/sentinel"
   grep -qx 'BACKUP_SENTINEL' "$target_dir/.deploy_backups/sentinel"
+  grep -qx 'HOST_MANAGED_USER_INI' "$target_dir/frontend/dist/.user.ini"
   grep -qx \
     'LEGACY_JSON_REFRESH_SUNSET_AT=PENDING_FIRST_HARDENED_DEPLOYMENT_PLUS_14_DAYS' \
     "$runtime_env"
   grep -qx '<html>old frontend</html>' "$frontend_dir/index.html"
+  [[ ! -L "$frontend_dir" ]]
   [[ ! -e "$frontend_dir/.maintenance" ]]
 }
 
@@ -183,8 +187,10 @@ grep -qx 'new code' "$target_dir/new-code.txt"
 grep -qx 'release-20260830-120000' "$target_dir/.release_tag"
 grep -qx 'DATABASE_SENTINEL' "$target_dir/data/postgres/sentinel"
 grep -qx 'BACKUP_SENTINEL' "$target_dir/.deploy_backups/sentinel"
+grep -qx 'HOST_MANAGED_USER_INI' "$target_dir/frontend/dist/.user.ini"
 grep -qx 'LEGACY_JSON_REFRESH_SUNSET_AT=2026-09-13T12:00:00Z' "$runtime_env"
 grep -qx '<html>new frontend</html>' "$frontend_dir/index.html"
+[[ -L "$frontend_dir" ]]
 [[ ! -e "$frontend_dir/.maintenance" ]]
 grep -qx 'up:new' "$docker_log"
 ! grep -qx 'up:old' "$docker_log"
