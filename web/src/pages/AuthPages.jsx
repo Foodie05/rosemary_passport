@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from '../theme';
-import { getUserErrorMessage } from '../lib/errors';
+import { getPasskeyErrorMessage, getUserErrorMessage } from '../lib/errors';
 import {
   preparePublicKeyRequestOptions,
   serializeAuthenticationCredential,
@@ -186,22 +186,6 @@ function FactorListItem({ title, subtitle, onClick }) {
       <ArrowRight size={18} className="text-sage-400" />
     </button>
   );
-}
-
-function getWebAuthnErrorMessage(error) {
-  if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') {
-    return '你已取消本次通行密钥验证，或验证已超时。';
-  }
-  if (error?.name === 'NotSupportedError') {
-    return '当前浏览器或设备不支持通行密钥。';
-  }
-  if (error?.name === 'SecurityError') {
-    return '当前环境不允许使用通行密钥，请检查域名和安全上下文。';
-  }
-  if (error?.name === 'InvalidStateError') {
-    return '当前通行密钥状态异常，请重新尝试。';
-  }
-  return getUserErrorMessage(error, '通行密钥登录失败，请重试。');
 }
 
 export function LoginPage({
@@ -390,7 +374,7 @@ export function LoginPage({
                 rememberMe,
               );
             } catch (error) {
-              setWebauthnError(getWebAuthnErrorMessage(error));
+              setWebauthnError(getPasskeyErrorMessage(error));
             } finally {
               setWebauthnLoading(false);
             }
@@ -548,7 +532,7 @@ export function LoginPage({
                     rememberMe,
                   );
                 } catch (error) {
-                  setWebauthnError(getWebAuthnErrorMessage(error));
+                  setWebauthnError(getPasskeyErrorMessage(error));
                 } finally {
                   setWebauthnLoading(false);
                 }

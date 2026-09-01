@@ -43,3 +43,23 @@ export function getUserMessage(message, fallback = '操作未完成，请稍后�
   const value = String(message || '').trim();
   return isSafeChineseMessage(value) ? value : fallback;
 }
+
+/** Returns a WebAuthn-specific message without disclosing account state. */
+export function getPasskeyErrorMessage(error) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') {
+    return '你已取消本次通行密钥验证，或验证已超时。';
+  }
+  if (error?.name === 'NotSupportedError') {
+    return '当前浏览器或设备不支持通行密钥。';
+  }
+  if (error?.name === 'SecurityError') {
+    return '当前环境不允许使用通行密钥，请检查域名和安全上下文。';
+  }
+  if (error?.name === 'InvalidStateError') {
+    return '当前通行密钥状态异常，请重新尝试。';
+  }
+  if (error?.code === 'login_failed') {
+    return '通行密钥验证失败。请确认使用了正确的通行密钥，并完成设备 PIN、Touch ID 或 Face ID 验证。';
+  }
+  return getUserErrorMessage(error, '通行密钥登录失败，请重试。');
+}
