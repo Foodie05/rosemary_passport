@@ -132,10 +132,10 @@ entry_hash="$(printf '%s' "$payload" | sha256sum | awk '{print $1}')"
 record="$(jq -cS --arg entry_hash "$entry_hash" '. + {entry_hash:$entry_hash}' <<<"$payload")"
 printf '%s\n' "$record" >"$record_file"
 chmod 0600 "$record_file"
-openssl pkeyutl -sign -rawin -inkey "$secrets_dir/audit_signing.private.pem" \
-  -in "$record_file" -out "$signature_file"
-openssl pkeyutl -verify -rawin -pubin -inkey "$secrets_dir/audit_signing.public.pem" \
-  -in "$record_file" -sigfile "$signature_file" >/dev/null
+"$script_dir/ed25519_signature.sh" sign \
+  "$secrets_dir/audit_signing.private.pem" "$record_file" "$signature_file"
+"$script_dir/ed25519_signature.sh" verify \
+  "$secrets_dir/audit_signing.public.pem" "$record_file" "$signature_file"
 chmod 0600 "$signature_file"
 printf '%s\n' "$entry_hash" >"$evidence_dir/latest_hash"
 chmod 0600 "$evidence_dir/latest_hash"
@@ -147,7 +147,7 @@ else
   chmod 0444 "$evidence_dir/audit_signing.public.pem"
 fi
 
-archive_prefix="observation/$observation_date"
+archive_prefix="$(s3_key "$s3_prefix" "observation/$observation_date")"
 uploader="$script_dir/upload_s3_verified.sh"
 "$uploader" "$record_file" "$s3_endpoint" "$s3_bucket" \
   "$archive_prefix/evidence.json"

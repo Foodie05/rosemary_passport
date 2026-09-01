@@ -62,6 +62,7 @@ required_executables=(
   ops/deploy/auth_cruty_cn/check_s3_storage.sh
   ops/deploy/auth_cruty_cn/configure_s3_credentials.sh
   ops/deploy/auth_cruty_cn/s3_key.sh
+  ops/deploy/auth_cruty_cn/ed25519_signature.sh
   ops/deploy/auth_cruty_cn/upload_s3_verified.sh
   ops/deploy/auth_cruty_cn/archive_audit_to_s3.sh
   ops/deploy/auth_cruty_cn/backup_to_s3.sh
@@ -89,6 +90,7 @@ required_executables=(
   ops/tests/s3_storage_preflight_test.sh
   ops/tests/s3_upload_integrity_test.sh
   ops/tests/s3_prefix_test.sh
+  ops/tests/ed25519_signature_test.sh
   ops/tests/legacy_refresh_sunset_test.sh
   ops/tests/legacy_env_transition_test.sh
   ops/tests/legacy_cutover_layout_test.sh

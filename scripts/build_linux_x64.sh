@@ -121,6 +121,7 @@ cp "$TEMPLATE_DIR/check_host_capacity.sh" "$RELEASE_DIR/check_host_capacity.sh"
 cp "$TEMPLATE_DIR/check_s3_storage.sh" "$RELEASE_DIR/check_s3_storage.sh"
 cp "$TEMPLATE_DIR/upload_s3_verified.sh" "$RELEASE_DIR/upload_s3_verified.sh"
 cp "$TEMPLATE_DIR/s3_key.sh" "$RELEASE_DIR/s3_key.sh"
+cp "$TEMPLATE_DIR/ed25519_signature.sh" "$RELEASE_DIR/ed25519_signature.sh"
 cp "$TEMPLATE_DIR/backup_to_s3.sh" "$RELEASE_DIR/backup_to_s3.sh"
 cp "$TEMPLATE_DIR/physical_backup_to_s3.sh" "$RELEASE_DIR/physical_backup_to_s3.sh"
 cp "$TEMPLATE_DIR/archive_audit_to_s3.sh" "$RELEASE_DIR/archive_audit_to_s3.sh"
@@ -147,6 +148,7 @@ chmod +x "$RELEASE_DIR/deploy.sh" "$RELEASE_DIR/backup_to_s3.sh" \
   "$RELEASE_DIR/check_s3_storage.sh" \
   "$RELEASE_DIR/upload_s3_verified.sh" \
   "$RELEASE_DIR/s3_key.sh" \
+  "$RELEASE_DIR/ed25519_signature.sh" \
   "$RELEASE_DIR/physical_backup_to_s3.sh" \
   "$RELEASE_DIR/archive_audit_to_s3.sh" \
   "$RELEASE_DIR/restore_from_s3.sh" "$RELEASE_DIR/postgres/archive-wal.sh" \

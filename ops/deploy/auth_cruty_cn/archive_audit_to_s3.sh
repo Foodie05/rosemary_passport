@@ -48,12 +48,10 @@ archive="$TMP_DIR/audit-$TIMESTAMP.jsonl"
     /app/bin/verify_audit_chain --stdin <"$archive"
 )
 
-openssl pkeyutl -sign -rawin \
-  -inkey "$SECRETS_DIR/audit_signing.private.pem" \
-  -in "$archive" -out "$archive.sig"
-openssl pkeyutl -verify -rawin \
-  -pubin -inkey "$SECRETS_DIR/audit_signing.public.pem" \
-  -in "$archive" -sigfile "$archive.sig" >/dev/null
+"$script_dir/ed25519_signature.sh" sign \
+  "$SECRETS_DIR/audit_signing.private.pem" "$archive" "$archive.sig"
+"$script_dir/ed25519_signature.sh" verify \
+  "$SECRETS_DIR/audit_signing.public.pem" "$archive" "$archive.sig"
 validate_s3_prefix "$S3_PREFIX" || { echo 'S3_PREFIX is invalid' >&2; exit 78; }
 object_prefix="$(s3_key "$S3_PREFIX" "audit/$TIMESTAMP")"
 uploader="$(dirname "${BASH_SOURCE[0]}")/upload_s3_verified.sh"
