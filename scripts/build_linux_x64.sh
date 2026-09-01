@@ -160,7 +160,7 @@ chmod +x "$RELEASE_DIR/deploy.sh" "$RELEASE_DIR/backup_to_s3.sh" \
   "$RELEASE_DIR/provision_secrets.sh" \
   "$RELEASE_DIR/helper-entrypoint.sh" \
   "$RELEASE_DIR/backend/entrypoint.sh"
-tar -C "$RELEASE_DIR" -czf "$ARCHIVE_PATH" .
+COPYFILE_DISABLE=1 tar --no-xattrs -C "$RELEASE_DIR" -czf "$ARCHIVE_PATH" .
 
 echo "[build_linux_x64] release ready"
 echo "  directory: $RELEASE_DIR"

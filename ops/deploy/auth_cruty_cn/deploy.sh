@@ -91,7 +91,7 @@ trap cleanup EXIT
 [[ "$FRONTEND_TARGET_DIR" = /* ]] || die "frontend directory must be absolute"
 
 for command in docker tar rsync curl mkdir ln mv grep readlink aws openssl \
-  sha256sum pg_restore sed tail awk df date cp mktemp; do require_cmd "$command"; done
+  sha256sum sed tail awk df date cp mktemp; do require_cmd "$command"; done
 docker compose version >/dev/null 2>&1 || die "docker compose is unavailable"
 
 TARGET_DIR="${TARGET_DIR%/}"
