@@ -194,22 +194,12 @@ class LoginService {
     if (limited != null) {
       return limited;
     }
-    final user = await _users.findByEmail(email);
     try {
       await _emailCodes.issueLoginCode(
         email,
-        templateName: user?.roles.contains('admin') == true
-            ? 'admin_login_verification'
-            : 'login_verification',
+        templateName: 'login_verification',
       );
     } catch (_) {
-      if (user != null) {
-        await _recordDeliveryFailure(
-          user,
-          channel: 'email',
-          requestIp: requestIp,
-        );
-      }
       return const AdminLoginCodeAttempt.failure(
         code: 'temporary_issue',
         message: '邮件发送失败，请稍后重试。',
@@ -451,14 +441,6 @@ class LoginService {
         requestIp: requestIp?.trim() ?? '',
       );
       if (!sent.ok) {
-        final user = await _users.findByPhoneNumber(normalized);
-        if (user != null) {
-          await _recordDeliveryFailure(
-            user,
-            channel: 'phone',
-            requestIp: requestIp,
-          );
-        }
         return AdminLoginCodeAttempt.failure(
           code: sent.code ?? 'temporary_issue',
           message: sent.message ?? '验证码发送失败，请稍后重试。',
