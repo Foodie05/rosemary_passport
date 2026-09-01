@@ -1,14 +1,17 @@
 import 'package:mocktail/mocktail.dart';
 import 'package:rosm_passport_server/src/repositories/user_repository.dart';
+import 'package:rosm_passport_server/src/repositories/webauthn_repository.dart';
 import 'package:rosm_passport_server/src/security/password_hasher.dart';
 import 'package:rosm_passport_server/src/security/password_policy.dart';
 import 'package:rosm_passport_server/src/services/account_recovery_service.dart';
 import 'package:rosm_passport_server/src/services/auth_attempts.dart';
 import 'package:rosm_passport_server/src/services/auth_throttle_service.dart';
+import 'package:rosm_passport_server/src/services/authenticator_service.dart';
 import 'package:rosm_passport_server/src/services/email_code_service.dart';
 import 'package:rosm_passport_server/src/services/phone_verification_service.dart';
 import 'package:rosm_passport_server/src/services/security_policy_service.dart';
 import 'package:rosm_passport_server/src/services/session_service.dart';
+import 'package:rosm_passport_server/src/services/webauthn_service.dart';
 import 'package:test/test.dart';
 
 class _MockUsers extends Mock implements UserRepository {}
@@ -22,6 +25,10 @@ class _MockThrottles extends Mock implements AuthThrottleService {}
 class _MockSessions extends Mock implements SessionService {}
 
 class _MockPhones extends Mock implements PhoneVerificationService {}
+
+class _MockAuthenticator extends Mock implements AuthenticatorService {}
+
+class _MockWebAuthn extends Mock implements WebAuthnService {}
 
 void main() {
   const user = UserRecord(
@@ -45,10 +52,13 @@ void main() {
   late _MockThrottles throttles;
   late _MockSessions sessions;
   late _MockPhones phones;
+  late _MockAuthenticator authenticator;
+  late _MockWebAuthn webAuthn;
   late AccountRecoveryService service;
 
   setUpAll(() {
     registerFallbackValue(SecurityPolicyService.defaultPolicy);
+    registerFallbackValue(Duration.zero);
   });
 
   setUp(() {
@@ -58,6 +68,8 @@ void main() {
     throttles = _MockThrottles();
     sessions = _MockSessions();
     phones = _MockPhones();
+    authenticator = _MockAuthenticator();
+    webAuthn = _MockWebAuthn();
     service = AccountRecoveryService(
       userRepository: users,
       passwordHasher: passwords,
@@ -66,6 +78,8 @@ void main() {
       throttleService: throttles,
       sessionService: sessions,
       phoneVerificationService: phones,
+      authenticatorService: authenticator,
+      webAuthnService: webAuthn,
     );
   });
 
@@ -438,4 +452,123 @@ void main() {
       );
     },
   );
+
+  test(
+    'authenticator recovery resets password without a login session',
+    () async {
+      when(() => users.findByEmail(user.email)).thenAnswer((_) async => user);
+      when(
+        () => throttles.loadPolicy(),
+      ).thenAnswer((_) async => SecurityPolicyService.defaultPolicy);
+      when(
+        () => throttles.enforceRequestGuards(
+          emailScope: any(named: 'emailScope'),
+          ipScope: any(named: 'ipScope'),
+          email: any(named: 'email'),
+          requestIp: any(named: 'requestIp'),
+          emailLimit: any(named: 'emailLimit'),
+          ipLimit: any(named: 'ipLimit'),
+          window: any(named: 'window'),
+          blockDuration: any(named: 'blockDuration'),
+        ),
+      ).thenAnswer((_) async => null);
+      when(
+        () => users.findAuthenticatorSecretByUserId(user.id),
+      ).thenAnswer((_) async => 'totp-secret');
+      when(
+        () => authenticator.verifyCode(secret: 'totp-secret', code: '123456'),
+      ).thenReturn(true);
+      when(() => passwords.hash(any())).thenAnswer((_) async => 'new-hash');
+      when(
+        () =>
+            users.updatePasswordHash(userId: user.id, passwordHash: 'new-hash'),
+      ).thenAnswer((_) async {});
+      when(
+        () => sessions.revokeAllUserSessions(
+          user.id,
+          preservedAccessTokenId: any(named: 'preservedAccessTokenId'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final result = await service.recoverPassword(
+        account: user.email,
+        method: 'authenticator',
+        code: '123456',
+        newPassword: 'A secure historical-compatible passphrase',
+      );
+
+      expect(result.ok, isTrue);
+    },
+  );
+
+  test('passkey recovery binds the credential to its owning user', () async {
+    final credential = WebAuthnCredentialRecord(
+      userId: user.id,
+      credentialId: 'credential-id',
+      publicKey: 'public-key',
+      counter: 0,
+      transports: const ['internal'],
+      deviceType: 'singleDevice',
+      backedUp: false,
+      uvRequired: true,
+      uvGraceExpiresAt: null,
+      createdAt: DateTime.utc(2026),
+    );
+    when(
+      () => throttles.loadPolicy(),
+    ).thenAnswer((_) async => SecurityPolicyService.defaultPolicy);
+    when(
+      () => throttles.enforceRequestGuards(
+        emailScope: any(named: 'emailScope'),
+        ipScope: any(named: 'ipScope'),
+        email: any(named: 'email'),
+        requestIp: any(named: 'requestIp'),
+        emailLimit: any(named: 'emailLimit'),
+        ipLimit: any(named: 'ipLimit'),
+        window: any(named: 'window'),
+        blockDuration: any(named: 'blockDuration'),
+      ),
+    ).thenAnswer((_) async => null);
+    when(
+      () => webAuthn.findCredential('credential-id'),
+    ).thenAnswer((_) async => credential);
+    when(() => users.findById(user.id)).thenAnswer((_) async => user);
+    when(() => users.findByEmail(user.email)).thenAnswer((_) async => user);
+    when(
+      () => webAuthn.verifyAuthentication(
+        userId: user.id,
+        email: user.email,
+        response: any(named: 'response'),
+        forceUserVerification: true,
+      ),
+    ).thenAnswer((_) async => true);
+    when(() => passwords.hash(any())).thenAnswer((_) async => 'new-hash');
+    when(
+      () => users.updatePasswordHash(userId: user.id, passwordHash: 'new-hash'),
+    ).thenAnswer((_) async {});
+    when(
+      () => sessions.revokeAllUserSessions(
+        user.id,
+        preservedAccessTokenId: any(named: 'preservedAccessTokenId'),
+      ),
+    ).thenAnswer((_) async {});
+
+    final result = await service.recoverPassword(
+      account: user.email,
+      method: 'passkey',
+      code: '',
+      newPassword: 'A secure historical-compatible passphrase',
+      passkeyResponse: const {'id': 'credential-id'},
+    );
+
+    expect(result.ok, isTrue);
+    verify(
+      () => webAuthn.verifyAuthentication(
+        userId: user.id,
+        email: user.email,
+        response: const {'id': 'credential-id'},
+        forceUserVerification: true,
+      ),
+    ).called(1);
+  });
 }

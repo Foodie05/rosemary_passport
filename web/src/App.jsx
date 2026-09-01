@@ -192,7 +192,7 @@ function AppRoutes({
             )
           }
         />
-        <Route path="/forgot-password" element={isLoggedIn ? <Navigate to={defaultAuthedPath} replace /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} authNext={forgotNext} />} />
+        <Route path="/forgot-password" element={isLoggedIn ? <Navigate to={defaultAuthedPath} replace /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} beginWebAuthnLogin={beginWebAuthnLogin} authNext={forgotNext} />} />
 
         <Route path="/docs" element={<Navigate to="/docs/oidc" replace />} />
         <Route path="/docs/oidc" element={<AdminOidcDocsPage discovery={discovery} />} />
@@ -221,6 +221,8 @@ function AppRoutes({
                 verifyWebAuthnRegistration={verifyWebAuthnRegistration}
                 listWebAuthnCredentials={listWebAuthnCredentials}
                 deleteWebAuthnCredential={deleteWebAuthnCredential}
+                sendStepUpCode={sendStepUpCode}
+                beginStepUpPasskey={beginStepUpPasskey}
               />
             }
           />
@@ -275,6 +277,8 @@ function AppRoutes({
                 verifyWebAuthnRegistration={verifyWebAuthnRegistration}
                 listWebAuthnCredentials={listWebAuthnCredentials}
                 deleteWebAuthnCredential={deleteWebAuthnCredential}
+                sendStepUpCode={sendStepUpCode}
+                beginStepUpPasskey={beginStepUpPasskey}
               />
             }
           />
@@ -1388,6 +1392,22 @@ function App() {
     return result;
   }
 
+  async function sendStepUpCode(method, excludedFactor) {
+    return api('/api/v1/me/step-up/send-code', {
+      method: 'POST',
+      auth: true,
+      body: { method, excluded_factor: excludedFactor },
+    });
+  }
+
+  async function beginStepUpPasskey(excludedFactor) {
+    return api('/api/v1/me/step-up/webauthn-options', {
+      method: 'POST',
+      auth: true,
+      body: { excluded_factor: excludedFactor },
+    });
+  }
+
   async function beginAuthenticatorSetup(payload) {
     return api('/api/v1/me/authenticator/setup', {
       method: 'POST',
@@ -1446,12 +1466,13 @@ function App() {
     });
   }
 
-  async function deleteWebAuthnCredential(credentialId) {
+  async function deleteWebAuthnCredential(credentialId, verification) {
     const result = await api(
       `/api/v1/me/webauthn/credentials/${encodeURIComponent(credentialId)}`,
       {
         method: 'DELETE',
         auth: true,
+        body: { verification },
       },
     );
     setSession((current) => ({
@@ -1489,7 +1510,7 @@ function App() {
       method: 'POST',
       body: payload,
     });
-    redirectToLoginWithToast('密码已重置，请使用新密码登录。');
+    showToast('密码已重置，旧会话已失效。', 'success');
     return result;
   }
 
@@ -2026,6 +2047,8 @@ function App() {
         verifyWebAuthnRegistration={verifyWebAuthnRegistration}
         listWebAuthnCredentials={listWebAuthnCredentials}
         deleteWebAuthnCredential={deleteWebAuthnCredential}
+        sendStepUpCode={sendStepUpCode}
+        beginStepUpPasskey={beginStepUpPasskey}
         systemForm={systemForm}
         setSystemForm={setSystemForm}
         saveServiceConfig={saveServiceConfig}

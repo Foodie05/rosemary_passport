@@ -23,6 +23,7 @@ import 'registration_service.dart';
 import 'security_policy_service.dart';
 import 'security_service.dart';
 import 'session_service.dart';
+import 'step_up_service.dart';
 import 'webauthn_service.dart';
 
 class AuthService {
@@ -78,6 +79,8 @@ class AuthService {
            securityPolicyService: securityPolicyService,
          ),
          phoneVerificationService: phoneVerificationService,
+         authenticatorService: authenticatorService,
+         webAuthnService: webAuthnService,
        ),
        _accountManagement = AccountManagementService(
          userRepository: userRepository,
@@ -160,6 +163,18 @@ class AuthService {
          passwordHasher: passwordHasher,
          captchaService: captchaService,
          settingsRepository: settingsRepository,
+       ),
+       _stepUp = StepUpService(
+         userRepository: userRepository,
+         passwordHasher: passwordHasher,
+         emailCodeService: emailCodeService,
+         authenticatorService: authenticatorService,
+         phoneVerificationService: phoneVerificationService,
+         webAuthnService: webAuthnService,
+         throttleService: AuthThrottleService(
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
        );
 
   final SessionService _sessions;
@@ -171,6 +186,46 @@ class AuthService {
   final LoginService _login;
   final PasskeyLoginService _passkeyLogin;
   final BootstrapAccessService _bootstrap;
+  final StepUpService _stepUp;
+
+  Future<List<String>> availableStepUpMethods({
+    required String userId,
+    String? excludedFactor,
+  }) => _stepUp.availableMethods(userId, excludedFactor: excludedFactor);
+
+  Future<CredentialActionAttempt> sendStepUpCode({
+    required String userId,
+    required String method,
+    required String excludedFactor,
+    String? requestIp,
+  }) => _stepUp.sendCode(
+    userId: userId,
+    method: method,
+    excludedFactor: excludedFactor,
+    requestIp: requestIp,
+  );
+
+  Future<Map<String, dynamic>?> beginStepUpPasskey({
+    required String userId,
+    required String excludedFactor,
+    required String origin,
+  }) => _stepUp.beginPasskey(
+    userId: userId,
+    excludedFactor: excludedFactor,
+    origin: origin,
+  );
+
+  Future<CredentialActionAttempt> verifyStepUp({
+    required String userId,
+    required String excludedFactor,
+    required Map<String, dynamic> proof,
+    String? requestIp,
+  }) => _stepUp.verify(
+    userId: userId,
+    excludedFactor: excludedFactor,
+    proof: proof,
+    requestIp: requestIp,
+  );
   static const _verificationCodeRegisterEmailScope =
       'verification-code:register:email';
   static const _verificationCodeRegisterIpScope =
@@ -504,6 +559,7 @@ class AuthService {
     required String code,
     required String newPassword,
     String? requestIp,
+    Map<String, dynamic>? passkeyResponse,
   }) {
     return _accountRecovery.recoverPassword(
       account: account,
@@ -511,6 +567,7 @@ class AuthService {
       code: code,
       newPassword: newPassword,
       requestIp: requestIp,
+      passkeyResponse: passkeyResponse,
     );
   }
 
@@ -577,6 +634,7 @@ class AuthService {
     String? nickname,
     String? newEmail,
     String? newPassword,
+    bool stepUpVerified = false,
   }) {
     return _accountManagement.updateAccount(
       userId: userId,
@@ -584,6 +642,7 @@ class AuthService {
       nickname: nickname,
       newEmail: newEmail,
       newPassword: newPassword,
+      stepUpVerified: stepUpVerified,
     );
   }
 
@@ -592,12 +651,14 @@ class AuthService {
     required String newEmail,
     required String currentPassword,
     String? requestIp,
+    bool skipCurrentPassword = false,
   }) {
     return _accountManagement.sendBindEmailCode(
       userId: userId,
       newEmail: newEmail,
       currentPassword: currentPassword,
       requestIp: requestIp,
+      skipCurrentPassword: skipCurrentPassword,
     );
   }
 
@@ -607,6 +668,7 @@ class AuthService {
     required String currentPassword,
     required String emailCode,
     String? preservedAccessTokenId,
+    bool stepUpVerified = false,
   }) {
     return _accountManagement.bindEmail(
       userId: userId,
@@ -614,6 +676,7 @@ class AuthService {
       currentPassword: currentPassword,
       emailCode: emailCode,
       preservedAccessTokenId: preservedAccessTokenId,
+      stepUpVerified: stepUpVerified,
     );
   }
 
@@ -622,12 +685,14 @@ class AuthService {
     required String phoneNumber,
     required String currentPassword,
     String? requestIp,
+    bool skipCurrentPassword = false,
   }) {
     return _accountManagement.sendBindPhoneCode(
       userId: userId,
       phoneNumber: phoneNumber,
       currentPassword: currentPassword,
       requestIp: requestIp,
+      skipCurrentPassword: skipCurrentPassword,
     );
   }
 
@@ -638,6 +703,7 @@ class AuthService {
     required String verifyCode,
     String? requestIp,
     String? preservedAccessTokenId,
+    bool stepUpVerified = false,
   }) {
     return _accountManagement.bindPhone(
       userId: userId,
@@ -646,6 +712,7 @@ class AuthService {
       verifyCode: verifyCode,
       requestIp: requestIp,
       preservedAccessTokenId: preservedAccessTokenId,
+      stepUpVerified: stepUpVerified,
     );
   }
 
@@ -663,11 +730,13 @@ class AuthService {
     required String userId,
     required String newPassword,
     required String emailCode,
+    bool stepUpVerified = false,
   }) {
     return _accountManagement.resetPassword(
       userId: userId,
       newPassword: newPassword,
       emailCode: emailCode,
+      stepUpVerified: stepUpVerified,
     );
   }
 
@@ -686,10 +755,12 @@ class AuthService {
   Future<Map<String, String>?> beginAuthenticatorSetup({
     required String userId,
     required String currentPassword,
+    bool stepUpVerified = false,
   }) {
     return _credentials.beginAuthenticatorSetup(
       userId: userId,
       currentPassword: currentPassword,
+      stepUpVerified: stepUpVerified,
     );
   }
 
@@ -698,12 +769,14 @@ class AuthService {
     required String currentPassword,
     required String secret,
     required String code,
+    bool stepUpVerified = false,
   }) {
     return _credentials.verifyAuthenticatorSetup(
       userId: userId,
       currentPassword: currentPassword,
       secret: secret,
       code: code,
+      stepUpVerified: stepUpVerified,
     );
   }
 
@@ -712,12 +785,14 @@ class AuthService {
     required String origin,
     String? currentPassword,
     bool allowPostRegistrationBootstrap = false,
+    bool stepUpVerified = false,
   }) {
     return _credentials.beginWebAuthnRegistration(
       userId: userId,
       origin: origin,
       currentPassword: currentPassword,
       allowPostRegistrationBootstrap: allowPostRegistrationBootstrap,
+      stepUpVerified: stepUpVerified,
     );
   }
 

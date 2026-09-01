@@ -1,8 +1,10 @@
 import 'package:dart_frog/dart_frog.dart';
 
 import '../../../../lib/src/models/authenticated_user.dart';
+import '../../../../lib/src/config/app_config.dart';
 import '../../../../lib/src/services/auth_service.dart';
 import '../../../../lib/src/utils/http.dart';
+import '../../../../lib/src/utils/step_up_http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -17,9 +19,7 @@ Future<Response> onRequest(RequestContext context) async {
   final phoneNumber = (body['phone_number'] ?? '').toString();
   final currentPassword = (body['current_password'] ?? '').toString();
   final verifyCode = (body['verify_code'] ?? '').toString();
-  if (phoneNumber.trim().isEmpty ||
-      currentPassword.trim().isEmpty ||
-      verifyCode.trim().isEmpty) {
+  if (phoneNumber.trim().isEmpty || verifyCode.trim().isEmpty) {
     return errorResponse(
       'invalid_request',
       'phone_number, current_password and verify_code are required.',
@@ -27,11 +27,31 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final user = context.read<AuthenticatedUser>();
-  final result = await context.read<AuthService>().bindPhoneWithCode(
+  final authService = context.read<AuthService>();
+  final requestIp = clientIpFromRequest(
+    context.request,
+    config: context.read<AppConfig>(),
+  );
+  final stepUp = await authService.verifyStepUp(
+    userId: user.id,
+    excludedFactor: 'phone',
+    proof: stepUpProofFromBody(body, legacyPassword: currentPassword),
+    requestIp: requestIp,
+  );
+  if (!stepUp.ok) {
+    return errorResponse(
+      stepUp.code ?? 'verification_failed',
+      stepUp.message ?? '二次验证失败。',
+      statusCode: stepUp.statusCode,
+    );
+  }
+  final result = await authService.bindPhoneWithCode(
     userId: user.id,
     phoneNumber: phoneNumber,
     currentPassword: currentPassword,
     verifyCode: verifyCode,
+    requestIp: requestIp,
+    stepUpVerified: true,
     preservedAccessTokenId: user.canBootstrapPasskeyAfterRegistration
         ? user.accessTokenId
         : null,

@@ -852,6 +852,7 @@ export function ForgotPasswordPage({
   loading,
   sendRecoveryCode,
   resetPasswordByCode,
+  beginWebAuthnLogin,
   authNext = '',
 }) {
   const [method, setMethod] = useState('email');
@@ -871,15 +872,17 @@ export function ForgotPasswordPage({
                     <Lock size={32} />
                   </div>
                   <h1 className="text-2xl font-bold text-sage-900">忘记密码了？</h1>
-                  <p className="leading-relaxed text-sage-500">通过邮箱或手机号验证码重置密码。</p>
+                  <p className="leading-relaxed text-sage-500">使用密码以外的已绑定因素完成验证后重置密码。</p>
                 </div>
 
                 <div className="space-y-6">
                   <div className="relative grid grid-cols-2 rounded-2xl border border-sage-200 bg-sage-50/70 p-1">
                     <button type="button" onClick={() => setMethod('email')} className={`rounded-xl px-4 py-2 text-sm font-bold ${method === 'email' ? 'bg-white text-sage-900' : 'text-sage-500'}`}>邮箱</button>
                     <button type="button" onClick={() => setMethod('phone')} className={`rounded-xl px-4 py-2 text-sm font-bold ${method === 'phone' ? 'bg-white text-sage-900' : 'text-sage-500'}`}>手机</button>
+                    <button type="button" onClick={() => setMethod('authenticator')} className={`rounded-xl px-4 py-2 text-sm font-bold ${method === 'authenticator' ? 'bg-white text-sage-900' : 'text-sage-500'}`}>Authenticator</button>
+                    <button type="button" onClick={() => setMethod('passkey')} className={`rounded-xl px-4 py-2 text-sm font-bold ${method === 'passkey' ? 'bg-white text-sage-900' : 'text-sage-500'}`}>通行密钥</button>
                   </div>
-                  <AuthInput icon={method === 'email' ? Mail : Smartphone} label={method === 'email' ? '邮箱地址' : '手机号码'} placeholder={method === 'email' ? 'name@example.com' : '13800138000'} value={form.account} onChange={(event) => setForm((current) => ({ ...current, account: event.target.value }))} />
+                  {method !== 'passkey' ? <AuthInput icon={method === 'phone' ? Smartphone : Mail} label={method === 'phone' ? '手机号码' : '账户邮箱或手机号'} placeholder={method === 'phone' ? '13800138000' : 'name@example.com'} value={form.account} onChange={(event) => setForm((current) => ({ ...current, account: event.target.value }))} /> : null}
                   {error ? <p className="text-sm text-red-600">{error}</p> : null}
                   <button onClick={async () => {
                     setError('');
@@ -890,7 +893,7 @@ export function ForgotPasswordPage({
                       setError(getUserErrorMessage(e, '发送失败，请稍后重试。'));
                     }
                   }} className="btn-primary w-full py-4 font-bold" type="button" disabled={loading}>
-                    发送验证码
+                    {method === 'email' || method === 'phone' ? '发送验证码' : '继续验证'}
                   </button>
                   <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="flex items-center justify-center gap-2 text-sm font-bold text-sage-400 transition-colors hover:text-sage-600">
                     <ChevronLeft size={18} />
@@ -898,8 +901,8 @@ export function ForgotPasswordPage({
                   </Link>
                 </div>
               </motion.div>
-            ) : (
-              <motion.div key="success" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8 py-4 text-center">
+            ) : step === 'verify' ? (
+              <motion.div key="verify" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8 py-4 text-center">
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-green-600">
                   <CheckCircle2 size={48} />
                 </div>
@@ -909,18 +912,26 @@ export function ForgotPasswordPage({
                 </div>
                 <div className="pt-4">
                   <div className="space-y-4 text-left">
-                    <AuthInput icon={ShieldCheck} label="验证码" placeholder="6位验证码" value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} />
+                    {method !== 'passkey' ? <AuthInput icon={ShieldCheck} label={method === 'authenticator' ? 'Authenticator 动态码' : '验证码'} placeholder="6位验证码" value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} /> : <p className="rounded-2xl bg-sage-50 p-4 text-sm text-sage-600">提交时将调用系统通行密钥完成验证。</p>}
                     <AuthInput icon={Lock} label="新密码" type="password" placeholder="••••••••" value={form.new_password} onChange={(event) => setForm((current) => ({ ...current, new_password: event.target.value }))} />
                     {error ? <p className="text-sm text-red-600">{error}</p> : null}
                   </div>
                   <button onClick={async () => {
                     setError('');
                     try {
+                      let passkeyResponse;
+                      if (method === 'passkey') {
+                        const options = await beginWebAuthnLogin();
+                        const credential = await navigator.credentials.get({ publicKey: preparePublicKeyRequestOptions(options) });
+                        if (!credential) throw new Error('未获取到通行密钥响应');
+                        passkeyResponse = serializeAuthenticationCredential(credential);
+                      }
                       await resetPasswordByCode({
                         method,
                         account: form.account,
                         code: form.code,
                         new_password: form.new_password,
+                        ...(passkeyResponse ? { passkey_response: passkeyResponse } : {}),
                       });
                       setStep('done');
                     } catch (e) {
@@ -936,6 +947,19 @@ export function ForgotPasswordPage({
                     返回登录页面
                   </Link>
                 </div>
+              </motion.div>
+            ) : (
+              <motion.div key="done" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 py-6 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-green-600">
+                  <CheckCircle2 size={48} />
+                </div>
+                <div className="space-y-3">
+                  <h1 className="text-2xl font-bold text-sage-900">密码已重置</h1>
+                  <p className="leading-relaxed text-sage-500">旧会话已失效，请使用新密码重新登录。</p>
+                </div>
+                <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="btn-primary block w-full py-4 font-bold">
+                  返回登录
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>

@@ -18,8 +18,8 @@ Future<Response> onRequest(RequestContext context) async {
   final phoneNumber = (body['phone_number'] ?? '').toString();
   final currentPassword = (body['current_password'] ?? '').toString();
   final captchaToken = (body['captcha_token'] ?? '').toString();
-  if (phoneNumber.trim().isEmpty || currentPassword.trim().isEmpty) {
-    return errorResponse('invalid_request', '请输入手机号和当前密码。');
+  if (phoneNumber.trim().isEmpty) {
+    return errorResponse('invalid_request', '请输入手机号。');
   }
 
   final user = context.read<AuthenticatedUser>();
@@ -50,6 +50,7 @@ Future<Response> onRequest(RequestContext context) async {
     phoneNumber: phoneNumber,
     currentPassword: currentPassword,
     requestIp: requestIp,
+    skipCurrentPassword: true,
   );
   if (!result.ok) {
     return errorResponse(

@@ -24,8 +24,8 @@ Future<Response> onRequest(RequestContext context) async {
   final bypassCaptcha = await authService.shouldBypassBootstrapCaptchaForUser(
     user.id,
   );
-  if (email.trim().isEmpty || currentPassword.trim().isEmpty) {
-    return errorResponse('invalid_request', '请输入新邮箱和当前密码。');
+  if (email.trim().isEmpty) {
+    return errorResponse('invalid_request', '请输入新邮箱。');
   }
   if (!bypassCaptcha && captchaToken.trim().isEmpty) {
     return errorResponse('invalid_request', '请先完成人机验证。');
@@ -52,6 +52,7 @@ Future<Response> onRequest(RequestContext context) async {
       newEmail: email,
       currentPassword: currentPassword,
       requestIp: requestIp,
+      skipCurrentPassword: true,
     );
   } on EmailDeliveryException {
     return errorResponse(
