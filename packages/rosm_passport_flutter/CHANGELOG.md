@@ -1,3 +1,10 @@
+## 0.7.2
+
+- Send login codes before resolving account existence, then expose a signed registration handoff only after a valid email or phone code.
+- Let the built-in sign-in flow complete registration without requesting a second verification code.
+- Add direct-login step-up APIs and a factor-choice screen instead of an administrator-password field.
+- Preserve the legacy optional password argument for existing 0.7.1 integrations.
+
 ## 0.7.1
 
 - Support password plus email-code two-factor login for administrator accounts while keeping existing email-code login compatible for standard accounts.

@@ -42,12 +42,26 @@ test('password bootstrap login preserves the remember-me choice', () => {
   assert.match(prepareLogin, /if \(data\.direct_login\)[\s\S]*remember_me: rememberMe/);
 });
 
-test('direct email-code login forwards an optional administrator password', () => {
+test('direct code login continues to registration or a separate step-up challenge', () => {
   const completeEmailLogin = appSource.slice(
     appSource.indexOf('async function completeEmailCodeLogin'),
     appSource.indexOf('const loadLoginCodeCooldown'),
   );
 
-  assert.match(completeEmailLogin, /loginForm\.password \? \{ password: loginForm\.password \} : \{\}/);
+  assert.doesNotMatch(completeEmailLogin, /password: loginForm\.password/);
   assert.match(completeEmailLogin, /remember_me: rememberMe/);
+  assert.match(completeEmailLogin, /error\?\.code === 'registration_required'/);
+  assert.match(completeEmailLogin, /registration_handoff: details\.registration_handoff/);
+  assert.match(completeEmailLogin, /error\?\.code === 'mfa_required'/);
+  assert.match(completeEmailLogin, /setLoginStep\('step_up'\)/);
+  assert.match(completeEmailLogin, /navigate\(next \? `\/register\?next=/);
+});
+
+test('sending login codes never branches on account existence', () => {
+  const sendEmailCode = appSource.slice(
+    appSource.indexOf('async function requestEmailCodeLogin'),
+    appSource.indexOf('async function requestPhoneCodeLogin'),
+  );
+  assert.doesNotMatch(sendEmailCode, /registration_required/);
+  assert.match(sendEmailCode, /setLoginStep\('code'\)/);
 });

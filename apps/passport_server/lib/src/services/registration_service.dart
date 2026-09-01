@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../repositories/user_repository.dart';
 import '../security/password_hasher.dart';
 import '../security/password_policy.dart';
+import '../security/token_service.dart';
 import 'audit_service.dart';
 import 'auth_attempts.dart';
 import 'auth_throttle_service.dart';
@@ -17,6 +18,7 @@ class RegistrationService {
     required UserRepository userRepository,
     required PasswordHasher passwordHasher,
     required PasswordPolicy passwordPolicy,
+    required TokenService tokenService,
     required EmailCodeService emailCodeService,
     required AuthThrottleService throttleService,
     required SessionService sessionService,
@@ -27,6 +29,7 @@ class RegistrationService {
   }) : _users = userRepository,
        _passwords = passwordHasher,
        _passwordPolicy = passwordPolicy,
+       _tokens = tokenService,
        _emailCodes = emailCodeService,
        _throttles = throttleService,
        _sessions = sessionService,
@@ -43,6 +46,7 @@ class RegistrationService {
   final UserRepository _users;
   final PasswordHasher _passwords;
   final PasswordPolicy _passwordPolicy;
+  final TokenService _tokens;
   final EmailCodeService _emailCodes;
   final AuthThrottleService _throttles;
   final SessionService _sessions;
@@ -90,7 +94,8 @@ class RegistrationService {
     required String email,
     required String nickname,
     required String password,
-    required String emailCode,
+    String? emailCode,
+    String? registrationHandoff,
     String? requestIp,
   }) async {
     final passwordFailure = _validatePassword(password);
@@ -104,6 +109,22 @@ class RegistrationService {
         statusCode: 403,
       );
     }
+    final handoff = registrationHandoff?.trim() ?? '';
+    final verifiedByHandoff =
+        handoff.isNotEmpty &&
+        _tokens.verifyRegistrationHandoff(
+              handoff,
+              method: 'email',
+              subject: email,
+            ) !=
+            null;
+    if (!verifiedByHandoff &&
+        !await _emailCodes.verifyRegisterCode(email, emailCode ?? '')) {
+      return const RegisterAttempt.failure(
+        code: 'invalid_email_code',
+        message: '注册码无效或已过期。',
+      );
+    }
     if (await _users.findByEmail(email) != null) {
       return const RegisterAttempt.failure(
         code: 'email_already_registered',
@@ -111,15 +132,25 @@ class RegistrationService {
         statusCode: 409,
       );
     }
-    if (!await _emailCodes.verifyRegisterCode(email, emailCode)) {
-      return const RegisterAttempt.failure(
-        code: 'invalid_email_code',
-        message: '注册码无效或已过期。',
-      );
-    }
 
     final userId = _uuid.v4();
     final hash = await _passwords.hash(password);
+    if (verifiedByHandoff) {
+      final proof = _tokens.verifyRegistrationHandoff(
+        handoff,
+        method: 'email',
+        subject: email,
+      );
+      if (proof == null ||
+          !await _throttles.consumeOneTimeProof(
+            proof.payload['jti']?.toString() ?? '',
+          )) {
+        return const RegisterAttempt.failure(
+          code: 'invalid_registration_handoff',
+          message: '注册验证已失效，请重新验证。',
+        );
+      }
+    }
     await _users.createUser(
       userId: userId,
       email: email,
@@ -169,13 +200,6 @@ class RegistrationService {
         message: '手机号格式不正确。',
       );
     }
-    if (await _users.findByPhoneNumber(normalized) != null) {
-      return const AdminLoginCodeAttempt.failure(
-        code: 'phone_already_registered',
-        message: '该手机号已注册。',
-        statusCode: 409,
-      );
-    }
     final sent = await phones.sendCode(
       phoneNumber: normalized,
       requestIp: requestIp?.trim() ?? '',
@@ -193,7 +217,8 @@ class RegistrationService {
     required String phoneNumber,
     required String nickname,
     required String password,
-    required String verifyCode,
+    String? verifyCode,
+    String? registrationHandoff,
     String? requestIp,
   }) async {
     final passwordFailure = _validatePassword(password);
@@ -215,23 +240,40 @@ class RegistrationService {
         message: '手机号格式不正确。',
       );
     }
+    final handoff = registrationHandoff?.trim() ?? '';
+    final proof = handoff.isEmpty
+        ? null
+        : _tokens.verifyRegistrationHandoff(
+            handoff,
+            method: 'phone',
+            subject: normalized,
+          );
+    if (proof == null) {
+      final checked = await phones.verifyCode(
+        phoneNumber: normalized,
+        verifyCode: verifyCode ?? '',
+        requestIp: requestIp?.trim() ?? '',
+      );
+      if (!checked.ok) {
+        return RegisterAttempt.failure(
+          code: checked.code ?? 'invalid_verify_code',
+          message: checked.message ?? '验证码无效或已过期。',
+          statusCode: checked.statusCode,
+        );
+      }
+    } else if (!await _throttles.consumeOneTimeProof(
+      proof.payload['jti']?.toString() ?? '',
+    )) {
+      return const RegisterAttempt.failure(
+        code: 'invalid_registration_handoff',
+        message: '注册验证已失效，请重新验证。',
+      );
+    }
     if (await _users.findByPhoneNumber(normalized) != null) {
       return const RegisterAttempt.failure(
         code: 'phone_already_registered',
         message: '该手机号已注册。',
         statusCode: 409,
-      );
-    }
-    final checked = await phones.verifyCode(
-      phoneNumber: normalized,
-      verifyCode: verifyCode,
-      requestIp: requestIp?.trim() ?? '',
-    );
-    if (!checked.ok) {
-      return RegisterAttempt.failure(
-        code: checked.code ?? 'invalid_verify_code',
-        message: checked.message ?? '验证码无效或已过期。',
-        statusCode: checked.statusCode,
       );
     }
 

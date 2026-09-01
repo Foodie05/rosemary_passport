@@ -15,10 +15,13 @@ Future<Response> onRequest(RequestContext context) async {
   }
   final phoneNumber = (body['phone_number'] ?? '').toString().trim();
   final verifyCode = (body['verify_code'] ?? '').toString().trim();
+  final registrationHandoff = (body['registration_handoff'] ?? '')
+      .toString()
+      .trim();
   final nickname = (body['nickname'] ?? '').toString().trim();
   final password = (body['password'] ?? '').toString();
   if (phoneNumber.isEmpty ||
-      verifyCode.isEmpty ||
+      (verifyCode.isEmpty && registrationHandoff.isEmpty) ||
       nickname.isEmpty ||
       password.isEmpty) {
     return errorResponse(
@@ -36,6 +39,7 @@ Future<Response> onRequest(RequestContext context) async {
     nickname: nickname,
     password: password,
     verifyCode: verifyCode,
+    registrationHandoff: registrationHandoff,
     requestIp: requestIp,
   );
   if (!attempt.ok) {

@@ -456,7 +456,8 @@ class RosmPassportClient {
     required String email,
     required String nickname,
     required String password,
-    required String emailCode,
+    String? emailCode,
+    String? registrationHandoff,
   }) async {
     final json = await _postJson(
       '/api/v1/auth/register',
@@ -465,8 +466,62 @@ class RosmPassportClient {
         nickname: nickname,
         password: password,
         emailCode: emailCode,
+        registrationHandoff: registrationHandoff,
       ).toJson(),
     );
+    return _authResultFromJson(json);
+  }
+
+  Future<RosmAuthResult> registerWithPhone({
+    required String phoneNumber,
+    required String nickname,
+    required String password,
+    String? verifyCode,
+    String? registrationHandoff,
+  }) async {
+    final json = await _postJson('/api/v1/auth/register-phone', {
+      'phone_number': phoneNumber,
+      'nickname': nickname,
+      'password': password,
+      if (verifyCode != null && verifyCode.isNotEmpty)
+        'verify_code': verifyCode,
+      if (registrationHandoff != null && registrationHandoff.isNotEmpty)
+        'registration_handoff': registrationHandoff,
+    });
+    return _authResultFromJson(json);
+  }
+
+  Future<RosmOperationResult> sendLoginStepUpCode({
+    required String challenge,
+    required String factor,
+  }) async {
+    final json = await _postJson('/api/v1/auth/login-step-up-code', {
+      'step_up_challenge': challenge,
+      'factor': factor,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  Future<Map<String, dynamic>> loginStepUpPasskeyOptions({
+    required String challenge,
+  }) => _postJson('/api/v1/auth/login-step-up-passkey-options', {
+    'step_up_challenge': challenge,
+  });
+
+  Future<RosmAuthResult> completeLoginStepUp({
+    required String challenge,
+    required String factor,
+    String? password,
+    String? code,
+    Map<String, dynamic>? response,
+  }) async {
+    final json = await _postJson('/api/v1/auth/login-step-up', {
+      'step_up_challenge': challenge,
+      'factor': factor,
+      if (password != null) 'password': password,
+      if (code != null) 'code': code,
+      if (response != null) 'response': response,
+    });
     return _authResultFromJson(json);
   }
 
@@ -795,6 +850,7 @@ class RosmPassportClient {
             ? _fallbackMessageFor(error, response)
             : message,
         statusCode: response.statusCode,
+        details: json,
       );
     }
     return json;

@@ -106,6 +106,7 @@ class AuthService {
          userRepository: userRepository,
          passwordHasher: passwordHasher,
          passwordPolicy: passwordPolicy,
+         tokenService: tokenService,
          emailCodeService: emailCodeService,
          throttleService: AuthThrottleService(
            securityService: securityService,
@@ -127,6 +128,7 @@ class AuthService {
          userRepository: userRepository,
          settingsRepository: settingsRepository,
          passwordHasher: passwordHasher,
+         tokenService: tokenService,
          emailCodeService: emailCodeService,
          throttleService: AuthThrottleService(
            securityService: securityService,
@@ -503,7 +505,8 @@ class AuthService {
     required String email,
     required String nickname,
     required String password,
-    required String emailCode,
+    String? emailCode,
+    String? registrationHandoff,
     String? requestIp,
   }) {
     return _registration.registerWithEmail(
@@ -511,6 +514,7 @@ class AuthService {
       nickname: nickname,
       password: password,
       emailCode: emailCode,
+      registrationHandoff: registrationHandoff,
       requestIp: requestIp,
     );
   }
@@ -529,7 +533,8 @@ class AuthService {
     required String phoneNumber,
     required String nickname,
     required String password,
-    required String verifyCode,
+    String? verifyCode,
+    String? registrationHandoff,
     String? requestIp,
   }) {
     return _registration.registerWithPhone(
@@ -537,6 +542,7 @@ class AuthService {
       nickname: nickname,
       password: password,
       verifyCode: verifyCode,
+      registrationHandoff: registrationHandoff,
       requestIp: requestIp,
     );
   }
@@ -629,6 +635,35 @@ class AuthService {
       rememberMe: rememberMe,
     );
   }
+
+  Future<AdminLoginCodeAttempt> sendLoginStepUpCode({
+    required String challenge,
+    required String factor,
+    String? requestIp,
+  }) => _login.sendLoginStepUpCode(
+    challenge: challenge,
+    factor: factor,
+    requestIp: requestIp,
+  );
+
+  Future<Map<String, dynamic>?> beginLoginStepUpPasskey({
+    required String challenge,
+    required String origin,
+  }) => _login.beginLoginStepUpPasskey(challenge: challenge, origin: origin);
+
+  Future<LoginAttempt> completeLoginStepUp({
+    required String challenge,
+    required String factor,
+    required Map<String, dynamic> proof,
+    String? requestIp,
+    bool rememberMe = false,
+  }) => _login.completeLoginStepUp(
+    challenge: challenge,
+    factor: factor,
+    proof: proof,
+    requestIp: requestIp,
+    rememberMe: rememberMe,
+  );
 
   Future<AccountUpdateAttempt> updateSelfAccount({
     required String userId,

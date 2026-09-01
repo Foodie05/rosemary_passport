@@ -63,18 +63,23 @@ class EmailCodeService {
     final now = DateTime.now().toUtc();
     final expiresAt = now.add(Duration(seconds: _config.emailCodeTtlSeconds));
 
-    await _repository.storeCode(
+    final codeId = await _repository.storeCode(
       email: email,
       codeHash: _digest(email: email, code: code),
       purpose: purpose,
       expiresAt: expiresAt,
     );
 
-    await _emailService.sendVerificationCode(
-      email: email,
-      code: code,
-      templateName: templateName,
-    );
+    try {
+      await _emailService.sendVerificationCode(
+        email: email,
+        code: code,
+        templateName: templateName,
+      );
+    } catch (_) {
+      await _repository.markUsed(codeId);
+      rethrow;
+    }
   }
 
   Future<void> issueAdminLoginCode(String email) async {
@@ -89,18 +94,23 @@ class EmailCodeService {
     final now = DateTime.now().toUtc();
     final expiresAt = now.add(Duration(seconds: _config.emailCodeTtlSeconds));
 
-    await _repository.storeCode(
+    final codeId = await _repository.storeCode(
       email: email,
       codeHash: _digest(email: email, code: code),
       purpose: 'login',
       expiresAt: expiresAt,
     );
 
-    await _emailService.sendVerificationCode(
-      email: email,
-      code: code,
-      templateName: templateName,
-    );
+    try {
+      await _emailService.sendVerificationCode(
+        email: email,
+        code: code,
+        templateName: templateName,
+      );
+    } catch (_) {
+      await _repository.markUsed(codeId);
+      rethrow;
+    }
   }
 
   Future<bool> verifyRegisterCode(String email, String code) async {

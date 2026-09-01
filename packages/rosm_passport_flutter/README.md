@@ -215,9 +215,18 @@ final handoff = await passport.completeServerHandoff(
 );
 ```
 
-Administrator accounts must also pass their password to `loginWithEmailCode`.
-The `password` argument is optional for standard accounts, so existing clients
-remain compatible.
+Login-code delivery intentionally does not reveal whether an email address or
+phone number is registered. After a valid code is submitted, an unregistered
+identifier returns a `RosmApiException` with code `registration_required` and a
+short-lived `registration_handoff` in `details`. Pass that handoff to
+`registerWithEmail` or `registerWithPhone`; no second verification code is
+required.
+
+When a direct code login requires another factor, the server returns
+`mfa_required` with a `step_up_challenge` and supported factors. Use
+`sendLoginStepUpCode` and `completeLoginStepUp`. The optional password argument
+on `loginWithEmailCode` remains available only for compatibility with older
+integrations.
 
 For password login, call `passwordFactors` before the final password login request. If `directLogin` is false, show the returned factors and then complete login with `factorType` plus the selected verification code. The built-in UI does this automatically.
 

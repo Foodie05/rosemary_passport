@@ -1,6 +1,7 @@
 import '../repositories/settings_repository.dart';
 import '../repositories/user_repository.dart';
 import '../security/password_hasher.dart';
+import '../security/token_service.dart';
 import 'audit_service.dart';
 import 'auth_attempts.dart';
 import 'auth_throttle_service.dart';
@@ -16,6 +17,7 @@ class LoginService {
     required UserRepository userRepository,
     required SettingsRepository settingsRepository,
     required PasswordHasher passwordHasher,
+    required TokenService tokenService,
     required EmailCodeService emailCodeService,
     required AuthThrottleService throttleService,
     required SessionService sessionService,
@@ -26,6 +28,7 @@ class LoginService {
   }) : _users = userRepository,
        _settings = settingsRepository,
        _passwords = passwordHasher,
+       _tokens = tokenService,
        _emailCodes = emailCodeService,
        _throttles = throttleService,
        _sessions = sessionService,
@@ -40,12 +43,13 @@ class LoginService {
   static const _mfaEmailScope = 'verification-code:mfa-login:email';
   static const _mfaIpScope = 'verification-code:mfa-login:ip';
   static const _mfaCooldownScope = 'verification-code:mfa-login:cooldown:email';
-  static const _uniformEmailSendMessage = '如果账号存在，验证码将发送到已绑定邮箱。';
-  static const _uniformPhoneSendMessage = '如果账号存在，验证码将发送到已绑定手机号。';
+  static const _uniformEmailSendMessage = '登录验证码已发送，请检查邮箱。';
+  static const _uniformPhoneSendMessage = '登录验证码已发送，请检查短信。';
 
   final UserRepository _users;
   final SettingsRepository _settings;
   final PasswordHasher _passwords;
+  final TokenService _tokens;
   final EmailCodeService _emailCodes;
   final AuthThrottleService _throttles;
   final SessionService _sessions;
@@ -191,27 +195,25 @@ class LoginService {
       return limited;
     }
     final user = await _users.findByEmail(email);
-    if (user == null || await isBootstrapAdmin(user)) {
-      await _throttles.startVerificationCodeCooldown(
-        email: email,
-        seconds: policy.loginCodeCooldownSeconds,
-        cooldownScope: _loginCooldownScope,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      return const AdminLoginCodeAttempt.success(
-        message: _uniformEmailSendMessage,
-      );
-    }
     try {
       await _emailCodes.issueLoginCode(
-        user.email,
-        templateName: 'login_verification',
+        email,
+        templateName: user?.roles.contains('admin') == true
+            ? 'admin_login_verification'
+            : 'login_verification',
       );
     } catch (_) {
-      await _recordDeliveryFailure(
-        user,
-        channel: 'email',
-        requestIp: requestIp,
+      if (user != null) {
+        await _recordDeliveryFailure(
+          user,
+          channel: 'email',
+          requestIp: requestIp,
+        );
+      }
+      return const AdminLoginCodeAttempt.failure(
+        code: 'temporary_issue',
+        message: '邮件发送失败，请稍后重试。',
+        statusCode: 503,
       );
     }
     await _throttles.startVerificationCodeCooldown(
@@ -361,19 +363,47 @@ class LoginService {
     if (limited != null) {
       return limited;
     }
-    final user = await _users.findByEmail(email);
-    if (user == null || await isBootstrapAdmin(user)) {
-      return _loginFailure;
-    }
-    if (user.roles.contains('admin') &&
-        !await _passwords.verify(user.passwordHash, password ?? '')) {
-      return _loginFailure;
-    }
-    final codeId = await _emailCodes.validateLoginCode(
-      user.email,
-      emailCode.trim(),
-    );
+    final codeId = await _emailCodes.validateLoginCode(email, emailCode.trim());
     if (codeId == null) {
+      return const LoginAttempt.failure(
+        code: 'mfa_required',
+        message: '邮箱验证码无效或已过期。',
+      );
+    }
+    final user = await _users.findByEmail(email);
+    if (user == null) {
+      if (!await _emailCodes.consumeCode(codeId)) {
+        return const LoginAttempt.failure(
+          code: 'mfa_required',
+          message: '邮箱验证码无效或已过期。',
+        );
+      }
+      return LoginAttempt.registrationRequired(
+        _tokens.issueRegistrationHandoff(method: 'email', subject: email),
+      );
+    }
+    if (await isBootstrapAdmin(user)) {
+      return _loginFailure;
+    }
+    if (user.roles.contains('admin')) {
+      final legacyPassword = password?.trim() ?? '';
+      if (legacyPassword.isEmpty) {
+        if (!await _emailCodes.consumeCode(codeId)) {
+          return _loginFailure;
+        }
+        return LoginAttempt.mfaRequired(
+          stepUpChallenge: _tokens.issueLoginStepUpChallenge(
+            userId: user.id,
+            primaryMethod: 'email_code',
+          ),
+          factors: await _secondaryFactors(user, 'email_code'),
+        );
+      }
+      if (!await _passwords.verify(user.passwordHash, legacyPassword)) {
+        return _loginFailure;
+      }
+    }
+    if (!await _emailCodes.consumeCode(codeId)) {
       return const LoginAttempt.failure(
         code: 'mfa_required',
         message: '邮箱验证码无效或已过期。',
@@ -383,12 +413,6 @@ class LoginService {
       user,
       rememberMe: rememberMe,
     );
-    if (!await _emailCodes.consumeCode(codeId)) {
-      return const LoginAttempt.failure(
-        code: 'mfa_required',
-        message: '邮箱验证码无效或已过期。',
-      );
-    }
     await _throttles.clearLoginGuards(email: email);
     await _audit.log(
       action: 'user.login.email_code',
@@ -421,30 +445,31 @@ class LoginService {
         message: '手机号格式不正确。',
       );
     }
-    final user = await _users.findByPhoneNumber(normalized);
-    if (user == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      return const AdminLoginCodeAttempt.success(
-        message: _uniformPhoneSendMessage,
-      );
-    }
     try {
       final sent = await phones.sendCode(
         phoneNumber: normalized,
         requestIp: requestIp?.trim() ?? '',
       );
       if (!sent.ok) {
-        await _recordDeliveryFailure(
-          user,
-          channel: 'phone',
-          requestIp: requestIp,
+        final user = await _users.findByPhoneNumber(normalized);
+        if (user != null) {
+          await _recordDeliveryFailure(
+            user,
+            channel: 'phone',
+            requestIp: requestIp,
+          );
+        }
+        return AdminLoginCodeAttempt.failure(
+          code: sent.code ?? 'temporary_issue',
+          message: sent.message ?? '验证码发送失败，请稍后重试。',
+          statusCode: sent.statusCode,
         );
       }
     } catch (_) {
-      await _recordDeliveryFailure(
-        user,
-        channel: 'phone',
-        requestIp: requestIp,
+      return const AdminLoginCodeAttempt.failure(
+        code: 'temporary_issue',
+        message: '验证码发送失败，请稍后重试。',
+        statusCode: 503,
       );
     }
     return const AdminLoginCodeAttempt.success(
@@ -493,10 +518,6 @@ class LoginService {
         message: '手机号格式不正确。',
       );
     }
-    final user = await _users.findByPhoneNumber(normalized);
-    if (user == null) {
-      return _loginFailure;
-    }
     final checked = await phones.verifyCode(
       phoneNumber: normalized,
       verifyCode: verifyCode,
@@ -507,6 +528,21 @@ class LoginService {
         code: checked.code ?? 'mfa_required',
         message: checked.message ?? '手机验证码无效或已过期。',
         statusCode: checked.statusCode,
+      );
+    }
+    final user = await _users.findByPhoneNumber(normalized);
+    if (user == null) {
+      return LoginAttempt.registrationRequired(
+        _tokens.issueRegistrationHandoff(method: 'phone', subject: normalized),
+      );
+    }
+    if (user.roles.contains('admin')) {
+      return LoginAttempt.mfaRequired(
+        stepUpChallenge: _tokens.issueLoginStepUpChallenge(
+          userId: user.id,
+          primaryMethod: 'phone_code',
+        ),
+        factors: await _secondaryFactors(user, 'phone_code'),
       );
     }
     final auth = await _sessions.issueFirstPartyAuthResult(
@@ -523,6 +559,197 @@ class LoginService {
       ip: requestIp,
     );
     return LoginAttempt.success(auth);
+  }
+
+  Future<AdminLoginCodeAttempt> sendLoginStepUpCode({
+    required String challenge,
+    required String factor,
+    String? requestIp,
+  }) async {
+    final context = await _stepUpContext(challenge, factor);
+    if (context == null) {
+      return const AdminLoginCodeAttempt.failure(
+        code: 'invalid_challenge',
+        message: '登录验证已失效，请重新开始。',
+        statusCode: 401,
+      );
+    }
+    final user = context.user;
+    if (factor == 'email_code') {
+      final policy = await _throttles.loadPolicy();
+      final limited = await _throttles.enforceVerificationCodeSendGuards(
+        email: user.email,
+        requestIp: requestIp,
+        policy: policy,
+        emailScope: _mfaEmailScope,
+        ipScope: _mfaIpScope,
+        cooldownScope: _mfaCooldownScope,
+        emailLimit: policy.adminLoginCodeEmailLimit,
+        ipLimit: policy.adminLoginCodeIpLimit,
+      );
+      if (limited != null) return limited;
+      try {
+        await _emailCodes.issueStepUpCode(user.email);
+      } catch (_) {
+        await _recordDeliveryFailure(
+          user,
+          channel: 'email',
+          requestIp: requestIp,
+        );
+        return const AdminLoginCodeAttempt.failure(
+          code: 'temporary_issue',
+          message: '邮件发送失败，请稍后重试。',
+          statusCode: 503,
+        );
+      }
+      await _throttles.startVerificationCodeCooldown(
+        email: user.email,
+        seconds: policy.adminLoginCodeCooldownSeconds,
+        cooldownScope: _mfaCooldownScope,
+      );
+      return const AdminLoginCodeAttempt.success(message: '验证码已发送。');
+    }
+    if (factor == 'phone_code') {
+      final phone = user.phoneNumber?.trim() ?? '';
+      PhoneVerificationAttempt? sent;
+      try {
+        sent = await _phones?.sendCode(
+          phoneNumber: phone,
+          requestIp: requestIp?.trim() ?? '',
+        );
+      } catch (_) {
+        await _recordDeliveryFailure(
+          user,
+          channel: 'phone',
+          requestIp: requestIp,
+        );
+      }
+      return sent?.ok == true
+          ? const AdminLoginCodeAttempt.success(message: '验证码已发送。')
+          : AdminLoginCodeAttempt.failure(
+              code: sent?.code ?? 'temporary_issue',
+              message: sent?.message ?? '验证码发送失败，请稍后重试。',
+              statusCode: sent?.statusCode ?? 503,
+            );
+    }
+    return const AdminLoginCodeAttempt.failure(
+      code: 'invalid_factor',
+      message: '该验证方式不需要发送验证码。',
+    );
+  }
+
+  Future<Map<String, dynamic>?> beginLoginStepUpPasskey({
+    required String challenge,
+    required String origin,
+  }) async {
+    final context = await _stepUpContext(challenge, 'webauthn');
+    if (context == null) return null;
+    return _webAuthn?.generateAuthenticationOptions(
+      email: context.user.email,
+      userId: context.user.id,
+      origin: origin,
+      requireUserVerification: true,
+    );
+  }
+
+  Future<LoginAttempt> completeLoginStepUp({
+    required String challenge,
+    required String factor,
+    required Map<String, dynamic> proof,
+    String? requestIp,
+    bool rememberMe = false,
+  }) async {
+    final context = await _stepUpContext(challenge, factor);
+    if (context == null) return _loginFailure;
+    final user = context.user;
+    var verified = false;
+    if (factor == 'password') {
+      verified = await _passwords.verify(
+        user.passwordHash,
+        (proof['password'] ?? '').toString(),
+      );
+    } else if (factor == 'email_code') {
+      verified = await _emailCodes.verifyStepUpCode(
+        user.email,
+        (proof['code'] ?? '').toString().trim(),
+      );
+    } else if (factor == 'phone_code') {
+      final checked = await _phones?.verifyCode(
+        phoneNumber: user.phoneNumber?.trim() ?? '',
+        verifyCode: (proof['code'] ?? '').toString().trim(),
+        requestIp: requestIp?.trim() ?? '',
+      );
+      verified = checked?.ok == true;
+    } else if (factor == 'authenticator') {
+      final secret = await _users.findAuthenticatorSecretByUserId(user.id);
+      verified =
+          secret != null &&
+          (_authenticator?.verifyCode(
+                secret: secret,
+                code: (proof['code'] ?? '').toString().trim(),
+              ) ??
+              false);
+    } else if (factor == 'webauthn' && proof['response'] is Map) {
+      verified =
+          await (_webAuthn?.verifyAuthentication(
+                userId: user.id,
+                email: user.email,
+                response: Map<String, dynamic>.from(proof['response'] as Map),
+                forceUserVerification: true,
+              ) ??
+              Future.value(false));
+    }
+    if (!verified || !await _throttles.consumeOneTimeProof(context.proofId)) {
+      return const LoginAttempt.failure(
+        code: 'verification_failed',
+        message: '二次验证未通过，请重试。',
+      );
+    }
+    return _completeLogin(
+      user,
+      factor: '${context.primaryMethod}+$factor',
+      email: user.email,
+      requestIp: requestIp,
+      rememberMe: rememberMe,
+    );
+  }
+
+  Future<_LoginStepUpContext?> _stepUpContext(
+    String challenge,
+    String factor,
+  ) async {
+    final verified = _tokens.verifyLoginStepUpChallenge(challenge);
+    if (verified == null) return null;
+    final userId = verified.payload['sub']?.toString() ?? '';
+    final primary = verified.payload['primary_method']?.toString() ?? '';
+    final proofId = verified.payload['jti']?.toString() ?? '';
+    final user = await _users.findById(userId);
+    if (user == null || proofId.isEmpty) return null;
+    final factors = await _secondaryFactors(user, primary);
+    return factors.contains(factor)
+        ? _LoginStepUpContext(
+            user: user,
+            primaryMethod: primary,
+            proofId: proofId,
+          )
+        : null;
+  }
+
+  Future<List<String>> _secondaryFactors(
+    UserRecord user,
+    String primaryMethod,
+  ) async {
+    return [
+      'password',
+      if (primaryMethod != 'email_code' && user.isEmailVerified) 'email_code',
+      if (primaryMethod != 'phone_code' &&
+          user.isPhoneVerified &&
+          (user.phoneNumber?.trim().isNotEmpty ?? false))
+        'phone_code',
+      if (user.hasAuthenticator) 'authenticator',
+      if (await (_webAuthn?.hasCredentials(user.id) ?? Future.value(false)))
+        'webauthn',
+    ];
   }
 
   Future<UserRecord?> _validPasswordUser(String email, String password) async {
@@ -594,4 +821,16 @@ class LoginService {
     message: '登录失败。',
     statusCode: 401,
   );
+}
+
+class _LoginStepUpContext {
+  const _LoginStepUpContext({
+    required this.user,
+    required this.primaryMethod,
+    required this.proofId,
+  });
+
+  final UserRecord user;
+  final String primaryMethod;
+  final String proofId;
 }

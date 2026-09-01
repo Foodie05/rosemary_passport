@@ -96,7 +96,8 @@ RegisterRequest _$RegisterRequestFromJson(Map<String, dynamic> json) =>
       email: json['email'] as String,
       nickname: json['nickname'] as String,
       password: json['password'] as String,
-      emailCode: json['email_code'] as String,
+      emailCode: json['email_code'] as String?,
+      registrationHandoff: json['registration_handoff'] as String?,
     );
 
 Map<String, dynamic> _$RegisterRequestToJson(RegisterRequest instance) =>
@@ -104,7 +105,8 @@ Map<String, dynamic> _$RegisterRequestToJson(RegisterRequest instance) =>
       'email': instance.email,
       'nickname': instance.nickname,
       'password': instance.password,
-      'email_code': instance.emailCode,
+      'email_code': ?instance.emailCode,
+      'registration_handoff': ?instance.registrationHandoff,
     };
 
 SendRegisterCodeRequest _$SendRegisterCodeRequestFromJson(

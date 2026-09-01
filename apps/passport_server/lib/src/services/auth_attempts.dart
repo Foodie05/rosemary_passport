@@ -17,18 +17,44 @@ class LoginAttempt {
   const LoginAttempt.success(this.result)
     : code = null,
       message = null,
-      statusCode = 200;
+      statusCode = 200,
+      registrationToken = null,
+      stepUpChallenge = null,
+      factors = const [];
+
+  const LoginAttempt.registrationRequired(this.registrationToken)
+    : result = null,
+      code = 'registration_required',
+      message = '验证成功，请完成注册。',
+      statusCode = 409,
+      stepUpChallenge = null,
+      factors = const [];
+
+  const LoginAttempt.mfaRequired({
+    required this.stepUpChallenge,
+    required this.factors,
+  }) : result = null,
+       code = 'mfa_required',
+       message = '请选择另一种验证方式完成登录。',
+       statusCode = 401,
+       registrationToken = null;
 
   const LoginAttempt.failure({
     required this.code,
     required this.message,
     this.statusCode = 401,
-  }) : result = null;
+  }) : result = null,
+       registrationToken = null,
+       stepUpChallenge = null,
+       factors = const [];
 
   final AuthResult? result;
   final String? code;
   final String? message;
   final int statusCode;
+  final String? registrationToken;
+  final String? stepUpChallenge;
+  final List<String> factors;
 
   bool get ok => result != null;
 }

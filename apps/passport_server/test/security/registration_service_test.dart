@@ -19,6 +19,8 @@ class _MockUsers extends Mock implements UserRepository {}
 
 class _MockPasswords extends Mock implements PasswordHasher {}
 
+class _MockTokens extends Mock implements TokenService {}
+
 class _MockEmailCodes extends Mock implements EmailCodeService {}
 
 class _MockThrottles extends Mock implements AuthThrottleService {}
@@ -71,6 +73,7 @@ void main() {
 
   late _MockUsers users;
   late _MockPasswords passwords;
+  late _MockTokens tokenService;
   late _MockEmailCodes emailCodes;
   late _MockThrottles throttles;
   late _MockSessions sessions;
@@ -87,6 +90,7 @@ void main() {
   setUp(() {
     users = _MockUsers();
     passwords = _MockPasswords();
+    tokenService = _MockTokens();
     emailCodes = _MockEmailCodes();
     throttles = _MockThrottles();
     sessions = _MockSessions();
@@ -98,6 +102,7 @@ void main() {
       userRepository: users,
       passwordHasher: passwords,
       passwordPolicy: PasswordPolicy(),
+      tokenService: tokenService,
       emailCodeService: emailCodes,
       throttleService: throttles,
       sessionService: sessions,
@@ -218,6 +223,9 @@ void main() {
 
     allowEmailProvider();
     when(() => users.findByEmail(any())).thenAnswer((_) async => user);
+    when(
+      () => emailCodes.verifyRegisterCode(any(), any()),
+    ).thenAnswer((_) async => true);
     expect(
       (await service.registerWithEmail(
         email: user.email,
@@ -250,7 +258,7 @@ void main() {
       when(
         () => emailCodes.verifyRegisterCode(any(), any()),
       ).thenAnswer((_) async => true);
-      stubCreatedUser();
+      stubCreatedUser(result: null);
       when(
         () => sessions.issueFirstPartyAuthResult(
           user,
@@ -269,6 +277,17 @@ void main() {
           ip: any(named: 'ip'),
         ),
       ).thenAnswer((_) async {});
+      expect(
+        (await service.registerWithEmail(
+          email: user.email,
+          nickname: user.nickname,
+          password: 'A secure historical-compatible passphrase',
+          emailCode: '123456',
+          requestIp: '192.0.2.1',
+        )).code,
+        'register_failed',
+      );
+      stubCreatedUser();
       final result = await service.registerWithEmail(
         email: user.email,
         nickname: user.nickname,
@@ -292,12 +311,73 @@ void main() {
   );
 
   test(
+    'verified email login handoff replaces a second registration code',
+    () async {
+      allowEmailProvider();
+      when(() => users.findByEmail(any())).thenAnswer((_) async => null);
+      when(
+        () => tokenService.verifyRegistrationHandoff(
+          'signed-handoff',
+          method: 'email',
+          subject: user.email,
+        ),
+      ).thenReturn(const VerifiedToken(payload: {'jti': 'handoff-id'}));
+      when(
+        () => throttles.consumeOneTimeProof('handoff-id'),
+      ).thenAnswer((_) async => false);
+      stubCreatedUser();
+      when(
+        () => sessions.issueFirstPartyAuthResult(
+          user,
+          postRegistrationPasskeyBootstrap: true,
+          rememberMe: any(named: 'rememberMe'),
+        ),
+      ).thenAnswer((_) async => auth);
+      when(
+        () => audit.log(
+          action: any(named: 'action'),
+          actorId: any(named: 'actorId'),
+          actorType: any(named: 'actorType'),
+          resourceType: any(named: 'resourceType'),
+          resourceId: any(named: 'resourceId'),
+          metadata: any(named: 'metadata'),
+          ip: any(named: 'ip'),
+        ),
+      ).thenAnswer((_) async {});
+
+      expect(
+        (await service.registerWithEmail(
+          email: user.email,
+          nickname: user.nickname,
+          password: 'A secure historical-compatible passphrase',
+          registrationHandoff: 'signed-handoff',
+        )).code,
+        'invalid_registration_handoff',
+      );
+      when(
+        () => throttles.consumeOneTimeProof('handoff-id'),
+      ).thenAnswer((_) async => true);
+      final result = await service.registerWithEmail(
+        email: user.email,
+        nickname: user.nickname,
+        password: 'A secure historical-compatible passphrase',
+        registrationHandoff: 'signed-handoff',
+      );
+
+      expect(result.ok, isTrue);
+      verifyNever(() => emailCodes.verifyRegisterCode(any(), any()));
+      verify(() => throttles.consumeOneTimeProof('handoff-id')).called(2);
+    },
+  );
+
+  test(
     'phone code send validates provider, number, uniqueness, and send',
     () async {
       final disabled = RegistrationService(
         userRepository: users,
         passwordHasher: passwords,
         passwordPolicy: PasswordPolicy(),
+        tokenService: tokenService,
         emailCodeService: emailCodes,
         throttleService: throttles,
         sessionService: sessions,
@@ -314,11 +394,6 @@ void main() {
       );
       when(() => phones.normalizePhone(any())).thenReturn('+8613800000000');
       when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
-      expect(
-        (await service.sendPhoneCode(phoneNumber: '13800000000')).code,
-        'phone_already_registered',
-      );
-      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
       when(
         () => phones.sendCode(
           phoneNumber: any(named: 'phoneNumber'),
@@ -335,6 +410,7 @@ void main() {
         (await service.sendPhoneCode(phoneNumber: '13800000000')).code,
         'provider_failed',
       );
+      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
       when(
         () => phones.sendCode(
           phoneNumber: any(named: 'phoneNumber'),
@@ -365,6 +441,7 @@ void main() {
       userRepository: users,
       passwordHasher: passwords,
       passwordPolicy: PasswordPolicy(),
+      tokenService: tokenService,
       emailCodeService: emailCodes,
       throttleService: throttles,
       sessionService: sessions,
@@ -391,6 +468,13 @@ void main() {
     );
     when(() => phones.normalizePhone(any())).thenReturn('+8613800000000');
     when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
+    when(
+      () => phones.verifyCode(
+        phoneNumber: any(named: 'phoneNumber'),
+        verifyCode: any(named: 'verifyCode'),
+        requestIp: any(named: 'requestIp'),
+      ),
+    ).thenAnswer((_) async => const PhoneVerifyCheckAttempt.success());
     expect(
       (await service.registerWithPhone(
         phoneNumber: '13800000000',
@@ -431,7 +515,7 @@ void main() {
         requestIp: any(named: 'requestIp'),
       ),
     ).thenAnswer((_) async => const PhoneVerifyCheckAttempt.success());
-    stubCreatedUser();
+    stubCreatedUser(result: null);
     when(
       () => users.updatePhoneNumber(
         userId: user.id,
@@ -445,6 +529,16 @@ void main() {
         rememberMe: any(named: 'rememberMe'),
       ),
     ).thenAnswer((_) async => auth);
+    expect(
+      (await service.registerWithPhone(
+        phoneNumber: '13800000000',
+        nickname: user.nickname,
+        password: 'A secure historical-compatible passphrase',
+        verifyCode: '123456',
+      )).code,
+      'register_failed',
+    );
+    stubCreatedUser();
     expect(
       (await service.registerWithPhone(
         phoneNumber: '13800000000',

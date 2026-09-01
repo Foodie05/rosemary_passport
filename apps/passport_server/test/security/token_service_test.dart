@@ -121,6 +121,52 @@ void main() {
     );
   });
 
+  test('registration handoffs are signed and bound to method and subject', () {
+    final service = TokenService(config());
+    final token = service.issueRegistrationHandoff(
+      method: 'email',
+      subject: ' New@Example.com ',
+    );
+
+    final verified = service.verifyRegistrationHandoff(
+      token,
+      method: 'email',
+      subject: 'new@example.com',
+    );
+    expect(verified, isNotNull);
+    expect(verified!.payload['typ'], 'registration_handoff');
+    expect(verified.payload['jti'], isNotEmpty);
+    expect(
+      service.verifyRegistrationHandoff(
+        token,
+        method: 'phone',
+        subject: 'new@example.com',
+      ),
+      isNull,
+    );
+    expect(
+      service.verifyRegistrationHandoff(
+        token,
+        method: 'email',
+        subject: 'other@example.com',
+      ),
+      isNull,
+    );
+  });
+
+  test('login step-up challenges retain the primary factor', () {
+    final service = TokenService(config());
+    final token = service.issueLoginStepUpChallenge(
+      userId: user.id,
+      primaryMethod: 'email_code',
+    );
+    final verified = service.verifyLoginStepUpChallenge(token);
+    expect(verified, isNotNull);
+    expect(verified!.payload['sub'], user.id);
+    expect(verified.payload['primary_method'], 'email_code');
+    expect(service.verify(token, expectedType: 'registration_handoff'), isNull);
+  });
+
   test('omits optional identity claims and id token without OIDC scope', () {
     final service = TokenService(config());
     const minimalUser = AuthenticatedUser(

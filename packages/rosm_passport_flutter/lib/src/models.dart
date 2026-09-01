@@ -458,13 +458,15 @@ class RosmEmailRegisterRequest {
     required this.email,
     required this.nickname,
     required this.password,
-    required this.emailCode,
+    this.emailCode,
+    this.registrationHandoff,
   });
 
   final String email;
   final String nickname;
   final String password;
-  final String emailCode;
+  final String? emailCode;
+  final String? registrationHandoff;
 
   Map<String, dynamic> toJson() => _$RosmEmailRegisterRequestToJson(this);
 }
@@ -513,11 +515,17 @@ class RosmPasswordResetByCodeRequest {
 }
 
 class RosmApiException implements Exception {
-  const RosmApiException(this.code, this.message, {this.statusCode});
+  const RosmApiException(
+    this.code,
+    this.message, {
+    this.statusCode,
+    this.details = const {},
+  });
 
   final String code;
   final String message;
   final int? statusCode;
+  final Map<String, dynamic> details;
 
   @override
   String toString() {

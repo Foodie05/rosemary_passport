@@ -88,6 +88,7 @@ void main() {
       seconds: 1,
       cooldownScope: 'cooldown',
     );
+    expect(await disabled.consumeOneTimeProof('proof-id'), isTrue);
     expect(disabled.maxRetryAfter(null, 2), 2);
     expect(disabled.maxRetryAfter(3, null), 3);
     expect(disabled.maxRetryAfter(3, 2), 3);
@@ -298,6 +299,16 @@ void main() {
       seconds: 45,
       cooldownScope: 'cooldown',
     );
+    when(
+      () => security.enforce(
+        scope: 'auth:one-time-proof',
+        subject: 'proof-id',
+        limit: 1,
+        window: any(named: 'window'),
+        blockDuration: any(named: 'blockDuration'),
+      ),
+    ).thenAnswer((_) async => const ThrottleDecision(allowed: true));
+    expect(await service.consumeOneTimeProof('proof-id'), isTrue);
     verify(
       () =>
           security.clear(scope: 'login:email', subject: 'user@example.invalid'),
