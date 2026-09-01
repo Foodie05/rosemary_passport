@@ -16,6 +16,7 @@ dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
+      ref: v0.7.0
       path: packages/rosm_passport_flutter
 ```
 
@@ -45,9 +46,26 @@ final appSession = result?.serverPayload;
 
 The built-in UI supports email code login, phone code login, password login, password MFA, password recovery, email registration, and the final consent page. Registration is enabled by default. Set `enableRegistration: false` if an app wants to hide account creation.
 
+The built-in sign-in and account-management screens follow the device appearance by default. They use the same sage-based ROSM Pass visual language in both light and dark mode. An app can explicitly select an appearance when needed:
+
+```dart
+const signInConfig = RosmPassportSignInConfig(
+  themeMode: RosmPassportThemeMode.dark,
+);
+
+const accountConfig = RosmPassportAccountConfig(
+  themeMode: RosmPassportThemeMode.dark,
+  signInConfig: signInConfig,
+);
+```
+
+Available values are `system`, `light`, and `dark`. Input text and controls always use contrast-safe colors from the selected ROSM Passport color scheme rather than inheriting potentially incompatible colors from the host application.
+
 The SDK uses ROSM's public configuration to run the built-in Aliyun Captcha 2.0 challenge before sending a login, registration, recovery, or MFA code. It sends the returned `captchaVerifyParam` as `captcha_token`; apps do not provide or store Aliyun credentials. To use an existing in-app captcha implementation instead, supply `requestCaptchaToken`; its non-empty return value takes precedence.
 
 After a successful email-code, phone-code, or password login, the SDK securely stores only the selected method and its email address or phone number. The next built-in sign-in screen uses these values to preselect the method and prefill the identifier; it still always requires a new authentication. Call `client.clearLastSignIn()` if the app needs to remove this convenience data. `client.signOut()` clears it as well.
+
+In public direct mode, access-token expiry is handled with the stored refresh token. Concurrent unauthorized requests share one refresh operation so a rotating refresh token is never submitted twice by the SDK.
 
 Opening the built-in account center always starts a fresh ROSM verification. If the ROSM session expires while the page is open, it presents the same verification again. Both flows use the saved, non-secret sign-in hint only for method selection and identifier prefill.
 

@@ -2,6 +2,9 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'models.g.dart';
 
+/// Controls the appearance of ROSM Passport's built-in Flutter screens.
+enum RosmPassportThemeMode { system, light, dark }
+
 class UriStringConverter implements JsonConverter<Uri, String> {
   const UriStringConverter();
 

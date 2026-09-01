@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -373,6 +374,83 @@ void main() {
         '/api/v1/me',
       ]);
       expect(requests.last.headers['authorization'], 'Bearer new-access');
+      expect((await store.read())?.refreshToken, 'refresh-2');
+    },
+  );
+
+  test(
+    'shares one refresh-token rotation across concurrent requests',
+    () async {
+      final refreshStarted = Completer<void>();
+      final releaseRefresh = Completer<void>();
+      var refreshRequests = 0;
+      var accountRequests = 0;
+      final store = _MemoryTokenStore()
+        .._tokens = const RosmTokenSet(
+          accessToken: 'old-access',
+          refreshToken: 'refresh-1',
+          tokenType: 'Bearer',
+          expiresIn: 3600,
+        );
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://api.example.com'),
+        clientId: 'app',
+        redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+        tokenStore: store,
+        httpClient: MockClient((request) async {
+          if (request.url.path == '/oidc/token') {
+            refreshRequests += 1;
+            refreshStarted.complete();
+            await releaseRefresh.future;
+            return http.Response(
+              jsonEncode({
+                'access_token': 'new-access',
+                'refresh_token': 'refresh-2',
+                'token_type': 'Bearer',
+                'expires_in': 3600,
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          if (request.url.path == '/api/v1/me') {
+            accountRequests += 1;
+            if (request.headers['authorization'] == 'Bearer old-access') {
+              return http.Response(
+                jsonEncode({'error': 'unauthorized'}),
+                401,
+                headers: {'content-type': 'application/json'},
+              );
+            }
+            return http.Response(
+              jsonEncode({
+                'user': {
+                  'id': 'user-1',
+                  'email': 'user@example.com',
+                  'nickname': 'User',
+                  'roles': ['user'],
+                },
+                'security': {},
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('{}', 404);
+        }),
+      );
+
+      final first = client.account();
+      final second = client.account();
+      await refreshStarted.future;
+      expect(accountRequests, 2);
+      expect(refreshRequests, 1);
+
+      releaseRefresh.complete();
+      final accounts = await Future.wait([first, second]);
+      expect(accounts.map((account) => account.user.id), ['user-1', 'user-1']);
+      expect(refreshRequests, 1);
+      expect(accountRequests, 4);
       expect((await store.read())?.refreshToken, 'refresh-2');
     },
   );

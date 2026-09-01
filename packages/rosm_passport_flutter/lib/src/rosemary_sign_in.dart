@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_client.dart';
+import 'rosm_passport_theme.dart';
 import 'token_store.dart';
 
 typedef RosmCaptchaTokenProvider = Future<String?> Function();
@@ -22,6 +23,7 @@ class RosmPassportSignInConfig {
     this.enablePhoneCode = true,
     this.enablePassword = true,
     this.enableRegistration = true,
+    this.themeMode = RosmPassportThemeMode.system,
   });
 
   final Uri? serverHandoffEndpoint;
@@ -35,6 +37,7 @@ class RosmPassportSignInConfig {
   final bool enablePhoneCode;
   final bool enablePassword;
   final bool enableRegistration;
+  final RosmPassportThemeMode themeMode;
 }
 
 class RosmPassportUiResult {
@@ -557,74 +560,16 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = buildRosmPassportTheme(context, widget.config.themeMode);
+    final colors = theme.colorScheme;
     final mode = _activeMode;
     return Theme(
-      data: theme.copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5F7F63),
-          primary: _RosmColors.sage600,
-          surface: _RosmColors.surface,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: _RosmColors.surface,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 18,
-          ),
-          labelStyle: const TextStyle(
-            color: _RosmColors.sage700,
-            fontWeight: FontWeight.w700,
-          ),
-          prefixIconColor: _RosmColors.sage500,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: _RosmColors.sage200),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: _RosmColors.sage500,
-              width: 1.4,
-            ),
-          ),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: _RosmColors.sage600,
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(58),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            textStyle: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
-            elevation: 3,
-            shadowColor: const Color(0x33577557),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: _RosmColors.sage700,
-            side: const BorderSide(color: _RosmColors.sage300),
-            minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-      ),
+      data: theme,
       child: Scaffold(
-        backgroundColor: _RosmColors.surface,
+        backgroundColor: colors.surface,
         body: SafeArea(
           child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: _RosmColors.sage600),
-                )
+              ? Center(child: CircularProgressIndicator(color: colors.primary))
               : Align(
                   alignment: Alignment.topCenter,
                   child: ConstrainedBox(
@@ -640,7 +585,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                                 ? null
                                 : () => Navigator.of(context).maybePop(),
                             icon: const Icon(Icons.close_rounded),
-                            color: _RosmColors.sage500,
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                         _Header(
@@ -664,15 +609,15 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                         else if (_recoveryMode)
                           _Card(child: _buildRecovery())
                         else if (_passwordMfaMode)
-                          _Card(child: _buildPasswordMfa())
+                          _Card(child: _buildPasswordMfa(colors))
                         else
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               if (_registerMode)
-                                _buildRegister()
+                                _buildRegister(colors)
                               else ...[
-                                _buildModeTabs(),
+                                _buildModeTabs(colors),
                                 const SizedBox(height: 36),
                                 _buildModeBody(),
                               ],
@@ -687,7 +632,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     );
   }
 
-  Widget _buildModeTabs() {
+  Widget _buildModeTabs(ColorScheme colors) {
     final modes = _availableModes;
     if (modes.isEmpty) {
       return const SizedBox.shrink();
@@ -699,16 +644,16 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       style: ButtonStyle(
         backgroundColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
-              ? Colors.white
-              : _RosmColors.surface;
+              ? colors.surfaceContainerLowest
+              : colors.surface;
         }),
         foregroundColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
-              ? _RosmColors.ink
-              : _RosmColors.sage500;
+              ? colors.onSurface
+              : colors.onSurfaceVariant;
         }),
-        side: const WidgetStatePropertyAll(
-          BorderSide(color: _RosmColors.sage200, width: 1.2),
+        side: WidgetStatePropertyAll(
+          BorderSide(color: colors.outlineVariant, width: 1.2),
         ),
         textStyle: const WidgetStatePropertyAll(
           TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -863,7 +808,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     );
   }
 
-  Widget _buildPasswordMfa() {
+  Widget _buildPasswordMfa(ColorScheme colors) {
     final factor = _selectedPasswordMfaFactor;
     final title = factor == null ? '选择验证方式' : _passwordMfaTitle(factor);
     return Column(
@@ -871,8 +816,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: _RosmColors.ink,
+          style: TextStyle(
+            color: colors.onSurface,
             fontSize: 21,
             fontWeight: FontWeight.w700,
             height: 1.2,
@@ -881,8 +826,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         const SizedBox(height: 8),
         Text(
           factor == null ? '为了保护账号安全，请选择一种二次验证方式。' : _passwordMfaIntro(factor),
-          style: const TextStyle(
-            color: _RosmColors.sage500,
+          style: TextStyle(
+            color: colors.onSurfaceVariant,
             fontSize: 14,
             fontWeight: FontWeight.w500,
             height: 1.45,
@@ -985,25 +930,25 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     });
   }
 
-  Widget _buildRegister() {
+  Widget _buildRegister(ColorScheme colors) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             '创建 ROSM 账号',
             style: TextStyle(
-              color: _RosmColors.ink,
+              color: colors.onSurface,
               fontSize: 21,
               fontWeight: FontWeight.w700,
               height: 1.2,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '使用邮箱验证码完成注册，随后继续确认授权。',
             style: TextStyle(
-              color: _RosmColors.sage500,
+              color: colors.onSurfaceVariant,
               fontSize: 14,
               fontWeight: FontWeight.w500,
               height: 1.45,
@@ -1158,13 +1103,14 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'ROSM 通行证',
           style: TextStyle(
-            color: _RosmColors.sage600,
+            color: colors.primary,
             fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 0,
@@ -1182,12 +1128,12 @@ class _Header extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: _RosmColors.sage100,
+                color: colors.secondaryContainer,
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.verified_user_rounded,
-                color: _RosmColors.sage600,
+                color: colors.onSecondaryContainer,
               ),
             ),
           ),
@@ -1195,8 +1141,8 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 22),
         Text(
           confirmingConsent ? '确认授权' : '欢迎回来',
-          style: const TextStyle(
-            color: _RosmColors.ink,
+          style: TextStyle(
+            color: colors.onSurface,
             fontSize: 34,
             fontWeight: FontWeight.w800,
             height: 1.08,
@@ -1207,8 +1153,8 @@ class _Header extends StatelessWidget {
           confirmingConsent
               ? _consentIntroFor(start?.client.displayName)
               : _introFor(mode, start?.client.displayName),
-          style: const TextStyle(
-            color: _RosmColors.sage500,
+          style: TextStyle(
+            color: colors.onSurfaceVariant,
             fontSize: 16,
             height: 1.45,
             fontWeight: FontWeight.w500,
@@ -1236,6 +1182,7 @@ class _ConsentPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final normalizedName = appName?.trim();
     final title = normalizedName == null || normalizedName.isEmpty
         ? '确认授权'
@@ -1250,18 +1197,18 @@ class _ConsentPage extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: _RosmColors.ink,
+                style: TextStyle(
+                  color: colors.onSurface,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   height: 1.15,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 '继续后，该应用将获得以下授权能力。',
                 style: TextStyle(
-                  color: _RosmColors.sage500,
+                  color: colors.onSurfaceVariant,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                   height: 1.45,
@@ -1274,17 +1221,17 @@ class _ConsentPage extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.check_circle_rounded,
-                        color: _RosmColors.sage600,
+                        color: colors.primary,
                         size: 20,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           meaning,
-                          style: const TextStyle(
-                            color: _RosmColors.ink,
+                          style: TextStyle(
+                            color: colors.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
                             height: 1.35,
@@ -1319,14 +1266,15 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xDBFFFFFF),
-        border: Border.all(color: _RosmColors.sage100),
+        color: colors.surfaceContainerLowest,
+        border: Border.all(color: colors.outlineVariant),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0F161D16),
+            color: colors.shadow.withAlpha(20),
             blurRadius: 22,
             offset: Offset(0, 10),
           ),
@@ -1344,14 +1292,15 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4F2),
+        color: colors.errorContainer,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8B8B0)),
+        border: Border.all(color: colors.error.withAlpha(89)),
       ),
-      child: Text(text, style: const TextStyle(color: Color(0xFFB42318))),
+      child: Text(text, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }
@@ -1371,6 +1320,7 @@ class _FactorButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
@@ -1387,8 +1337,8 @@ class _FactorButton extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: _RosmColors.ink,
+                  style: TextStyle(
+                    color: colors.onSurface,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     height: 1.25,
@@ -1397,8 +1347,8 @@ class _FactorButton extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: _RosmColors.sage500,
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     height: 1.3,
@@ -1428,6 +1378,7 @@ class _ButtonContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     if (!busy) {
       return Text(label);
     }
@@ -1437,7 +1388,7 @@ class _ButtonContent extends StatelessWidget {
       child: CircularProgressIndicator(
         strokeWidth: 2.2,
         valueColor: AlwaysStoppedAnimation<Color>(
-          light ? Colors.white : _RosmColors.sage600,
+          light ? colors.onPrimary : colors.primary,
         ),
       ),
     );
@@ -1451,15 +1402,16 @@ class _RegisterPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 28),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
+          Text(
             '还没有账号？',
             style: TextStyle(
-              color: _RosmColors.sage500,
+              color: colors.onSurfaceVariant,
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
@@ -1553,17 +1505,4 @@ List<String> _scopeMeanings(List<RosmScopeInfo> scopes) {
     }
   }
   return meanings.isEmpty ? const ['确认你的 ROSM 登录身份'] : meanings;
-}
-
-class _RosmColors {
-  const _RosmColors._();
-
-  static const surface = Color(0xFFFAFCFA);
-  static const ink = Color(0xFF161D16);
-  static const sage100 = Color(0xFFE2E9E2);
-  static const sage200 = Color(0xFFC5D3C5);
-  static const sage300 = Color(0xFFA8BDA8);
-  static const sage500 = Color(0xFF6E926E);
-  static const sage600 = Color(0xFF577557);
-  static const sage700 = Color(0xFF415841);
 }

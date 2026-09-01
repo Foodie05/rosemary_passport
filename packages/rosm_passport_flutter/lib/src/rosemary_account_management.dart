@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_client.dart';
+import 'rosm_passport_theme.dart';
 import 'rosemary_sign_in.dart';
 
 class RosmPassportAccountConfig {
@@ -13,12 +14,14 @@ class RosmPassportAccountConfig {
     this.aliyunCaptcha = const RosmAliyunCaptchaProvider(),
     this.reauthenticate,
     this.signInConfig,
+    this.themeMode = RosmPassportThemeMode.system,
   });
 
   final Future<String?> Function()? requestCaptchaToken;
   final RosmAliyunCaptchaProvider? aliyunCaptcha;
   final Future<bool> Function()? reauthenticate;
   final RosmPassportSignInConfig? signInConfig;
+  final RosmPassportThemeMode themeMode;
 }
 
 Future<void> showRosmPassportAccountManagement(
@@ -261,7 +264,9 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     final result = await showRosmPassportSignIn(
       context,
       client: widget.client,
-      config: widget.config.signInConfig ?? const RosmPassportSignInConfig(),
+      config:
+          widget.config.signInConfig ??
+          RosmPassportSignInConfig(themeMode: widget.config.themeMode),
     );
     return result != null;
   }
@@ -516,49 +521,54 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   }
 
   Future<void> _showSheet({required String title, required Widget child}) {
+    final theme = buildRosmPassportTheme(context, widget.config.themeMode);
+    final colors = theme.colorScheme;
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: _AccountColors.surface,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 22,
-            right: 22,
-            top: 18,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          color: _AccountColors.ink,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+        return Theme(
+          data: theme,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 22,
+              right: 22,
+              top: 18,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: _busy
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                child,
-              ],
+                      IconButton(
+                        onPressed: _busy
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  child,
+                ],
+              ),
             ),
           ),
         );
@@ -618,23 +628,14 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   @override
   Widget build(BuildContext context) {
     final account = _account;
+    final theme = buildRosmPassportTheme(context, widget.config.themeMode);
+    final colors = theme.colorScheme;
     return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(seedColor: _AccountColors.sage600),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-        ),
-      ),
+      data: theme,
       child: Scaffold(
-        backgroundColor: _AccountColors.surface,
+        backgroundColor: colors.surface,
         appBar: AppBar(
-          backgroundColor: _AccountColors.surface,
+          backgroundColor: colors.surface,
           elevation: 0,
           title: const Text('账号管理'),
           actions: [
@@ -729,6 +730,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final initial = (account.user.email.isNotEmpty ? account.user.email : 'R')
         .characters
         .first
@@ -741,11 +743,11 @@ class _ProfileCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 34,
-                backgroundColor: _AccountColors.sage200,
+                backgroundColor: colors.secondaryContainer,
                 child: Text(
                   initial,
-                  style: const TextStyle(
-                    color: _AccountColors.sage700,
+                  style: TextStyle(
+                    color: colors.onSecondaryContainer,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1141,6 +1143,7 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: _AccountCard(
@@ -1148,7 +1151,7 @@ class _ActionTile extends StatelessWidget {
           onTap: onTap,
           child: Row(
             children: [
-              Icon(icon, color: _AccountColors.sage600),
+              Icon(icon, color: colors.primary),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1163,15 +1166,12 @@ class _ActionTile extends StatelessWidget {
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _AccountColors.sage500),
+                      style: TextStyle(color: colors.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
-              Text(
-                trailing,
-                style: const TextStyle(color: _AccountColors.sage600),
-              ),
+              Text(trailing, style: TextStyle(color: colors.primary)),
               const Icon(Icons.chevron_right_rounded),
             ],
           ),
@@ -1189,16 +1189,17 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: _AccountColors.sage500),
+          Icon(icon, size: 18, color: colors.onSurfaceVariant),
           const SizedBox(width: 8),
           Text(
             text,
-            style: const TextStyle(
-              color: _AccountColors.sage500,
+            style: TextStyle(
+              color: colors.onSurfaceVariant,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1215,11 +1216,12 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _AccountColors.sage100),
+        color: colors.surfaceContainerLowest,
+        border: Border.all(color: colors.outlineVariant),
         borderRadius: BorderRadius.circular(18),
       ),
       child: child,
@@ -1235,9 +1237,16 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final background = active
+        ? colors.secondaryContainer
+        : colors.tertiaryContainer;
+    final foreground = active
+        ? colors.onSecondaryContainer
+        : colors.onTertiaryContainer;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: active ? const Color(0xFFE7F5EA) : const Color(0xFFFFF5D8),
+        color: background,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
@@ -1245,7 +1254,7 @@ class _StatusPill extends StatelessWidget {
         child: Text(
           text,
           style: TextStyle(
-            color: active ? const Color(0xFF287A3E) : const Color(0xFF9A6A00),
+            color: foreground,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
@@ -1279,14 +1288,15 @@ class _AccountMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4F2),
+        color: colors.errorContainer,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE8B8B0)),
+        border: Border.all(color: colors.error.withAlpha(89)),
       ),
-      child: Text(text, style: const TextStyle(color: Color(0xFFB42318))),
+      child: Text(text, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }
@@ -1338,16 +1348,4 @@ bool _isSessionExpired(Object error) {
       error.code == 'invalid_access_token' ||
       error.code == 'missing_refresh_token' ||
       error.code == 'invalid_grant';
-}
-
-class _AccountColors {
-  const _AccountColors._();
-
-  static const surface = Color(0xFFFAFCFA);
-  static const ink = Color(0xFF161D16);
-  static const sage100 = Color(0xFFE2E9E2);
-  static const sage200 = Color(0xFFC5D3C5);
-  static const sage500 = Color(0xFF6E926E);
-  static const sage600 = Color(0xFF577557);
-  static const sage700 = Color(0xFF415841);
 }
