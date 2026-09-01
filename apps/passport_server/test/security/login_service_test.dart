@@ -403,7 +403,6 @@ void main() {
 
   test('email-code send delivers for every account state', () async {
     stubAllowedGuards();
-    when(() => users.findByEmail(any())).thenAnswer((_) async => null);
     when(
       () => emailCodes.issueLoginCode(
         any(),
@@ -419,7 +418,6 @@ void main() {
     ).thenAnswer((_) async {});
     final missing = await service.sendEmailCode(email: user.email);
     expect(missing.ok, isTrue);
-    when(() => users.findByEmail(any())).thenAnswer((_) async => user);
     when(
       () => emailCodes.issueLoginCode(
         user.email,
@@ -429,8 +427,6 @@ void main() {
     final existing = await service.sendEmailCode(email: user.email);
     expect(existing.ok, isTrue);
     expect(existing.message, missing.message);
-
-    when(() => users.findByEmail(any())).thenAnswer((_) async => boundAdmin);
     when(
       () => emailCodes.issueLoginCode(
         boundAdmin.email,
@@ -442,11 +438,9 @@ void main() {
     verify(
       () => emailCodes.issueLoginCode(
         boundAdmin.email,
-        templateName: 'admin_login_verification',
+        templateName: 'login_verification',
       ),
     ).called(1);
-
-    when(() => users.findByEmail(any())).thenAnswer((_) async => user);
     when(
       () => emailCodes.issueLoginCode(
         user.email,
@@ -456,6 +450,7 @@ void main() {
     final unavailable = await service.sendEmailCode(email: user.email);
     expect(unavailable.ok, isFalse);
     expect(unavailable.statusCode, 503);
+    verifyNever(() => users.findByEmail(any()));
   });
 
   test('email-code send propagates throttling', () async {
@@ -480,6 +475,37 @@ void main() {
     );
     expect((await service.sendEmailCode(email: user.email)).statusCode, 429);
   });
+
+  test(
+    'direct email-code login propagates throttling before validation',
+    () async {
+      stubPolicy();
+      when(
+        () => throttles.enforceLoginGuards(
+          email: any(named: 'email'),
+          requestIp: any(named: 'requestIp'),
+          emailLimit: any(named: 'emailLimit'),
+          ipLimit: any(named: 'ipLimit'),
+          window: any(named: 'window'),
+          blockDuration: any(named: 'blockDuration'),
+        ),
+      ).thenAnswer(
+        (_) async => const LoginAttempt.failure(
+          code: 'rate_limited',
+          message: 'limited',
+          statusCode: 429,
+        ),
+      );
+
+      final result = await service.loginWithEmailCode(
+        email: user.email,
+        emailCode: '123456',
+      );
+
+      expect(result.code, 'rate_limited');
+      verifyNever(() => emailCodes.validateLoginCode(any(), any()));
+    },
+  );
 
   test('password login validates email-code single use', () async {
     stubAllowedGuards();
@@ -1130,7 +1156,6 @@ void main() {
         'invalid_phone_number',
       );
       when(() => phones.normalizePhone(any())).thenReturn('+8613800000000');
-      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
       when(
         () => phones.sendCode(
           phoneNumber: any(named: 'phoneNumber'),
@@ -1157,6 +1182,7 @@ void main() {
           subject: '+8613800000000',
         ),
       ).thenReturn('registration-handoff');
+      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => null);
       expect(
         (await service.loginWithPhoneCode(
           phoneNumber: '13800000000',
@@ -1164,7 +1190,7 @@ void main() {
         )).registrationToken,
         'registration-handoff',
       );
-      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
+      clearInteractions(users);
       when(
         () => phones.sendCode(
           phoneNumber: any(named: 'phoneNumber'),
@@ -1182,6 +1208,18 @@ void main() {
       );
       expect(unavailablePhone.ok, isFalse);
       expect(unavailablePhone.statusCode, 503);
+      verifyNever(() => users.findByPhoneNumber(any()));
+      when(
+        () => phones.sendCode(
+          phoneNumber: any(named: 'phoneNumber'),
+          requestIp: any(named: 'requestIp'),
+        ),
+      ).thenThrow(StateError('provider unavailable'));
+      expect(
+        (await service.sendPhoneCode(phoneNumber: '13800000000')).statusCode,
+        503,
+      );
+      verifyNever(() => users.findByPhoneNumber(any()));
       when(
         () => phones.verifyCode(
           phoneNumber: any(named: 'phoneNumber'),
@@ -1209,6 +1247,7 @@ void main() {
           requestIp: any(named: 'requestIp'),
         ),
       ).thenAnswer((_) async => const PhoneVerifyCheckAttempt.success());
+      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => user);
       stubLoginCompletion();
       expect(
         (await service.loginWithPhoneCode(
