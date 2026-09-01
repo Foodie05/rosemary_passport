@@ -20,7 +20,7 @@ test('OIDC continuation submits parameters to a fixed authorization endpoint', (
 
   assert.match(appSource, /path="\/oidc\/continue"/);
   assert.match(continuation, /new URL\('\/oidc\/authorize', API_BASE\)/);
-  assert.match(continuation, /OIDC_AUTHORIZATION_PARAMETER_NAMES\.has\(name\)/);
+  assert.match(continuation, /oidcAuthorizationParameters\(authorizationSearch\)/);
   assert.match(continuation, /<form ref=\{formRef\} method="get" action=\{authorizationEndpoint\}/);
   assert.doesNotMatch(continuation, /window\.location/);
 

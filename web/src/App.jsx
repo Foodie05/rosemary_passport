@@ -4,23 +4,12 @@ import { AdminLayout, UserLayout } from './components/Layouts';
 import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
 import { useTheme } from './theme';
 import { getUserErrorMessage, getUserMessage } from './lib/errors';
+import { oidcAuthorizationParameters } from './lib/oidc';
 import { normalizeInternalRedirect } from './lib/redirects';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
 const PENDING_OIDC_SEARCH_STORAGE_KEY = 'rosm_pending_oidc_search';
-const OIDC_AUTHORIZATION_PARAMETER_NAMES = new Set([
-  'client_id',
-  'redirect_uri',
-  'response_type',
-  'scope',
-  'state',
-  'nonce',
-  'code_challenge',
-  'code_challenge_method',
-  'decision',
-  'consent_token',
-]);
 const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
 const loadAdminPages = () => import('./pages/AdminPages');
 const loadAuthPages = () => import('./pages/AuthPages');
@@ -336,8 +325,7 @@ function OidcContinueRedirect() {
     }
   })();
   const authorizationParameters = useMemo(
-    () => Array.from(new URLSearchParams(authorizationSearch).entries())
-      .filter(([name]) => OIDC_AUTHORIZATION_PARAMETER_NAMES.has(name)),
+    () => oidcAuthorizationParameters(authorizationSearch),
     [authorizationSearch],
   );
 
