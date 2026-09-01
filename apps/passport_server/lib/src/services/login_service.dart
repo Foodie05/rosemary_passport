@@ -191,7 +191,7 @@ class LoginService {
       return limited;
     }
     final user = await _users.findByEmail(email);
-    if (user == null || user.roles.contains('admin')) {
+    if (user == null || await isBootstrapAdmin(user)) {
       await _throttles.startVerificationCodeCooldown(
         email: email,
         seconds: policy.loginCodeCooldownSeconds,
@@ -353,6 +353,7 @@ class LoginService {
   Future<LoginAttempt> loginWithEmailCode({
     required String email,
     required String emailCode,
+    String? password,
     String? requestIp,
     bool rememberMe = false,
   }) async {
@@ -361,7 +362,11 @@ class LoginService {
       return limited;
     }
     final user = await _users.findByEmail(email);
-    if (user == null || user.roles.contains('admin')) {
+    if (user == null || await isBootstrapAdmin(user)) {
+      return _loginFailure;
+    }
+    if (user.roles.contains('admin') &&
+        !await _passwords.verify(user.passwordHash, password ?? '')) {
       return _loginFailure;
     }
     final codeId = await _emailCodes.validateLoginCode(

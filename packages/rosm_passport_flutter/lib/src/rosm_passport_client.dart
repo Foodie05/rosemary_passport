@@ -394,10 +394,12 @@ class RosmPassportClient {
   Future<RosmAuthResult> loginWithEmailCode({
     required String email,
     required String emailCode,
+    String? password,
   }) async {
     final json = await _postJson('/api/v1/auth/email-login', {
       'email': email,
       'email_code': emailCode,
+      if (password != null && password.isNotEmpty) 'password': password,
     });
     return _authResultFromJson(
       json,

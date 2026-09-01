@@ -596,12 +596,14 @@ class AuthService {
   Future<LoginAttempt> loginWithEmailCode({
     required String email,
     required String emailCode,
+    String? password,
     String? requestIp,
     bool rememberMe = false,
   }) {
     return _login.loginWithEmailCode(
       email: email,
       emailCode: emailCode,
+      password: password,
       requestIp: requestIp,
       rememberMe: rememberMe,
     );

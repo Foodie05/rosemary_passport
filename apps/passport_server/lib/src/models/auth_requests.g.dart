@@ -52,6 +52,7 @@ EmailLoginRequest _$EmailLoginRequestFromJson(Map<String, dynamic> json) =>
     EmailLoginRequest(
       email: json['email'] as String,
       emailCode: json['email_code'] as String,
+      password: json['password'] as String?,
       rememberMe: json['remember_me'] as bool? ?? false,
     );
 
@@ -59,6 +60,7 @@ Map<String, dynamic> _$EmailLoginRequestToJson(EmailLoginRequest instance) =>
     <String, dynamic>{
       'email': instance.email,
       'email_code': instance.emailCode,
+      'password': ?instance.password,
       'remember_me': instance.rememberMe,
     };
 

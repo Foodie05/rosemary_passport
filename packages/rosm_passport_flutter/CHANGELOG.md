@@ -1,3 +1,7 @@
+## 0.7.1
+
+- Support password plus email-code two-factor login for administrator accounts while keeping existing email-code login compatible for standard accounts.
+
 ## 0.7.0
 
 - Add system-adaptive light and dark themes to the built-in sign-in and account-management screens.

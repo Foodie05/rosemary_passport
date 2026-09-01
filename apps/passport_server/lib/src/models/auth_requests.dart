@@ -53,6 +53,7 @@ class EmailLoginRequest {
   const EmailLoginRequest({
     required this.email,
     required this.emailCode,
+    this.password,
     this.rememberMe = false,
   });
 
@@ -61,6 +62,7 @@ class EmailLoginRequest {
 
   final String email;
   final String emailCode;
+  final String? password;
   final bool rememberMe;
 
   Map<String, dynamic> toJson() => _$EmailLoginRequestToJson(this);

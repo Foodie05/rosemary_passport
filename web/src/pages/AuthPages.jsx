@@ -331,6 +331,15 @@ export function LoginPage({
             onAction={() => void resendEmailCodeLogin()}
             actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
           />
+          <AuthInput
+            icon={Lock}
+            label="管理员密码（普通账号可留空）"
+            type="password"
+            autoComplete="current-password"
+            placeholder="管理员需完成双因素验证"
+            value={loginForm.password}
+            onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+          />
           <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
           </button>

@@ -1164,7 +1164,7 @@ function App() {
       });
       setLoginStep('code');
       setLoginCodeCooldownRemaining(Number(data.retry_after || 0));
-      showToast('登录验证码已发送，请检查邮箱。', 'success');
+      showToast('请求已受理。若邮箱已绑定账号，将收到登录验证码。', 'success');
     } catch (error) {
       showToast(getAuthErrorMessage(error, 'email_code_send'), 'error');
     } finally {
@@ -1244,6 +1244,7 @@ function App() {
         body: {
           email: loginForm.email.trim(),
           email_code: loginForm.email_code.trim(),
+          ...(loginForm.password ? { password: loginForm.password } : {}),
           remember_me: rememberMe,
         },
       });
