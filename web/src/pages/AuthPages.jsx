@@ -409,12 +409,6 @@ export function LoginPage({
             onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
           />
 
-          <div className="flex items-center justify-between px-1">
-            <Link to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'} className="text-xs font-bold text-sage-600 transition-colors hover:text-sage-900">
-              忘记密码？
-            </Link>
-          </div>
-
           <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="处理中..." idleText="继续登录" icon={ArrowRight} />
           </button>
@@ -667,16 +661,36 @@ export function LoginPage({
               </AnimatePresence>
             </motion.div>
 
-            <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
+                <p className="text-sm text-sage-500">
+                  还没有账户？
+                  {' '}
+                  <Link to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="font-bold text-sage-900 underline-offset-4 hover:underline">
+                    立即注册
+                  </Link>
+                </p>
+              </div>
 
-            <p className="text-center text-sm text-sage-500">
-              还没有账户？
-              {' '}
-              <Link to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="font-bold text-sage-900 underline-offset-4 hover:underline">
-                立即注册
+              <Link
+                to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
+                className="group flex w-full items-center justify-between rounded-2xl border border-sage-200 bg-sage-50/60 px-4 py-3.5 text-left transition-colors hover:border-sage-300 hover:bg-sage-100/70"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sage-600 shadow-sm">
+                    <Lock size={18} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-sage-900">忘记密码？</span>
+                    <span className="block text-xs leading-relaxed text-sage-500">使用已绑定的验证方式重置密码</span>
+                  </span>
+                </span>
+                <ArrowRight size={17} className="shrink-0 text-sage-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </Link>
-            </p>
-            <AccountCenterLink />
+
+              <AccountCenterLink />
+            </div>
           </div>
         </div>
       </div>
@@ -861,9 +875,11 @@ export function ForgotPasswordPage({
   const [error, setError] = useState('');
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-sage-50 px-4 py-8 sm:p-6">
-      <div className="w-full max-w-md">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass-card rounded-3xl p-6 shadow-2xl shadow-sage-900/5 sm:rounded-[2.5rem] sm:p-10">
+    <AuthPageFrame>
+      <div className="grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-2">
+        <BrandSection />
+        <div className="flex flex-col justify-center px-5 pb-10 pt-20 sm:p-12 lg:p-24">
+          <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto w-full max-w-md">
           <AnimatePresence mode="wait">
             {step === 'request' ? (
               <motion.div key="request" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
@@ -963,9 +979,10 @@ export function ForgotPasswordPage({
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </AuthPageFrame>
   );
 }
 

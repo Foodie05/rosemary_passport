@@ -8,6 +8,19 @@ import { normalizeInternalRedirect } from './lib/redirects';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
+const PENDING_OIDC_SEARCH_STORAGE_KEY = 'rosm_pending_oidc_search';
+const OIDC_AUTHORIZATION_PARAMETER_NAMES = new Set([
+  'client_id',
+  'redirect_uri',
+  'response_type',
+  'scope',
+  'state',
+  'nonce',
+  'code_challenge',
+  'code_challenge_method',
+  'decision',
+  'consent_token',
+]);
 const lazyNamed = (loader, name) => lazy(() => loader().then((module) => ({ default: module[name] })));
 const loadAdminPages = () => import('./pages/AdminPages');
 const loadAuthPages = () => import('./pages/AuthPages');
@@ -173,7 +186,7 @@ function AppRoutes({
           path="/register"
           element={
             isLoggedIn ? (
-              <Navigate to={defaultAuthedPath} replace />
+              <PostLoginRedirect target={registerNext} fallback={defaultAuthedPath} />
             ) : (
               <RegisterPage
                 registerForm={registerForm}
@@ -194,13 +207,27 @@ function AppRoutes({
             )
           }
         />
-        <Route path="/forgot-password" element={isLoggedIn ? <Navigate to={defaultAuthedPath} replace /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} beginWebAuthnLogin={beginWebAuthnLogin} authNext={forgotNext} />} />
+        <Route path="/forgot-password" element={isLoggedIn ? <PostLoginRedirect target={forgotNext} fallback={defaultAuthedPath} /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} beginWebAuthnLogin={beginWebAuthnLogin} authNext={forgotNext} />} />
 
         <Route path="/docs" element={<Navigate to="/docs/oidc" replace />} />
         <Route path="/docs/oidc" element={<AdminOidcDocsPage discovery={discovery} />} />
         <Route path="/docs/flutter-sdk" element={<AdminFlutterSdkDocsPage discovery={discovery} />} />
         <Route path="/admin/oidc/docs" element={<AdminOidcDocsPage discovery={discovery} />} />
         <Route path="/admin/oidc/docs/flutter-sdk" element={<AdminFlutterSdkDocsPage discovery={discovery} />} />
+
+        <Route
+          path="/oidc/continue"
+          element={
+            isLoggedIn ? (
+              <OidcContinueRedirect />
+            ) : (
+              <Navigate
+                to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`}
+                replace
+              />
+            )
+          }
+        />
 
         <Route path="/admin" element={isLoggedIn ? <AdminLayout session={session} logout={logout} mustBindEmail={mustBindEmail} /> : <Navigate to="/login" replace />}>
           <Route index element={<Navigate to="/admin/account" replace />} />
@@ -297,8 +324,50 @@ function PostLoginRedirect({ target, fallback }) {
   return <Navigate to={normalizeInternalRedirect(target) || fallback} replace />;
 }
 
+function OidcContinueRedirect() {
+  const location = useLocation();
+  const formRef = useRef(null);
+  const authorizationEndpoint = new URL('/oidc/authorize', API_BASE).toString();
+  const authorizationSearch = location.search || (() => {
+    try {
+      return window.sessionStorage.getItem(PENDING_OIDC_SEARCH_STORAGE_KEY) || '';
+    } catch (_) {
+      return '';
+    }
+  })();
+  const authorizationParameters = useMemo(
+    () => Array.from(new URLSearchParams(authorizationSearch).entries())
+      .filter(([name]) => OIDC_AUTHORIZATION_PARAMETER_NAMES.has(name)),
+    [authorizationSearch],
+  );
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.removeItem(PENDING_OIDC_SEARCH_STORAGE_KEY);
+    } catch (_) {
+      // The form can still continue using the parameters already read above.
+    }
+    formRef.current?.submit();
+  }, []);
+
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-sage-50 px-5 text-center" aria-busy="true">
+      <form ref={formRef} method="get" action={authorizationEndpoint} className="space-y-4">
+        {authorizationParameters.map(([name, value], index) => (
+          <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
+        ))}
+        <p className="text-sm font-semibold text-sage-700">正在继续授权流程…</p>
+        <button type="submit" className="btn-primary px-5 py-3 text-sm font-bold">
+          继续授权
+        </button>
+      </form>
+    </main>
+  );
+}
+
 function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { resolvedTheme } = useTheme();
   const normalizeProvider = useCallback((value) => {
     const trimmed = `${value || ''}`.trim().toLowerCase();
@@ -406,6 +475,23 @@ function App() {
   const isAdmin = session.user?.roles?.includes('admin');
   const mustBindEmail = Boolean(session.security?.must_bind_email);
   const defaultAuthedPath = isAdmin ? '/admin/account' : '/account';
+  const continuePostAuth = useCallback((target) => {
+    const normalized = normalizeInternalRedirect(target);
+    if (!normalized) {
+      return false;
+    }
+    const parsed = new URL(normalized, window.location.origin);
+    if (parsed.pathname !== '/oidc/continue') {
+      return false;
+    }
+    try {
+      window.sessionStorage.setItem(PENDING_OIDC_SEARCH_STORAGE_KEY, parsed.search);
+    } catch (_) {
+      return false;
+    }
+    navigate('/oidc/continue', { replace: true });
+    return true;
+  }, [navigate]);
 
   useEffect(() => {
     if (!toast) {
@@ -441,19 +527,17 @@ function App() {
 
   useEffect(() => {
     try {
-      const pathname = window.location.pathname;
-      if (pathname !== '/login' && pathname !== '/register') {
+      const pathname = location.pathname;
+      if (pathname !== '/login' && pathname !== '/register' && pathname !== '/forgot-password') {
         return;
       }
-      const params = new URLSearchParams(window.location.search);
+      const params = new URLSearchParams(location.search);
       const next = normalizeInternalRedirect(params.get('next'));
-      if (next) {
-        setPendingAuthRedirect(next);
-      }
+      setPendingAuthRedirect(next);
     } catch (_) {
       // ignore malformed URL parsing
     }
-  }, []);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     void ensurePublicCaptchaWidget();
@@ -1200,9 +1284,11 @@ function App() {
     if (!(payload.security?.must_bind_email)) {
       void Promise.allSettled([loadSystemConfig(), loadOidcClients()]);
     }
-    if (!deferRedirect && pendingAuthRedirect && payload.post_register_passkey_bootstrap !== true) {
-      navigate(pendingAuthRedirect, { replace: true });
-      return;
+    if (!deferRedirect && payload.post_register_passkey_bootstrap !== true) {
+      const redirected = continuePostAuth(pendingAuthRedirect);
+      if (redirected) {
+        return;
+      }
     }
     showToast('登录成功', 'success');
   }
@@ -1270,11 +1356,10 @@ function App() {
         response: serializeRegistrationCredential(credential),
       });
       setPostRegisterPasskeyPromptOpen(false);
-      if (pendingAuthRedirect) {
-        navigate(pendingAuthRedirect, { replace: true });
-        return;
+      const redirected = continuePostAuth(pendingAuthRedirect);
+      if (!redirected) {
+        showToast('系统通行密钥已连接，后续可更快捷登录。', 'success');
       }
-      showToast('系统通行密钥已连接，后续可更快捷登录。', 'success');
     } catch (error) {
       setPostRegisterPasskeyError(getPasskeySetupErrorMessage(error));
     } finally {
@@ -1958,8 +2043,8 @@ function App() {
             setPostRegisterBindingPassword('');
             if (postRegisterPasskeyPending) {
               setPostRegisterPasskeyPromptOpen(true);
-            } else if (pendingAuthRedirect) {
-              navigate(pendingAuthRedirect, { replace: true });
+            } else {
+              continuePostAuth(pendingAuthRedirect);
             }
             showToast(bindingPhone ? '手机号绑定成功' : '邮箱绑定成功', 'success');
           }}
@@ -1968,8 +2053,8 @@ function App() {
             setPostRegisterBindingPassword('');
             if (postRegisterPasskeyPending) {
               setPostRegisterPasskeyPromptOpen(true);
-            } else if (pendingAuthRedirect) {
-              navigate(pendingAuthRedirect, { replace: true });
+            } else {
+              continuePostAuth(pendingAuthRedirect);
             }
           }}
         />
@@ -1982,10 +2067,7 @@ function App() {
           onSkip={() => {
             setPostRegisterPasskeyError('');
             setPostRegisterPasskeyPromptOpen(false);
-            if (pendingAuthRedirect) {
-              navigate(pendingAuthRedirect, { replace: true });
-              return;
-            }
+            continuePostAuth(pendingAuthRedirect);
           }}
         />
         <AppRoutes
