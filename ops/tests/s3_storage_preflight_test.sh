@@ -40,7 +40,8 @@ write_env() {
 S3_ENDPOINT=https://object-store.invalid
 S3_BUCKET=backup-test
 S3_REGION=auto
-S3_REQUIRE_OBJECT_LOCK=$1
+S3_REQUIRE_VERSIONING=$1
+S3_REQUIRE_OBJECT_LOCK=$2
 S3_OBJECT_LOCK_MIN_RETENTION_DAYS=30
 EOF
 }
@@ -57,7 +58,7 @@ expect_failure() {
   grep -q "$expected" "$test_dir/err"
 }
 
-write_env true
+write_env true true
 FAKE_VERSIONING=Suspended expect_failure 'versioning must be enabled'
 FAKE_OBJECT_LOCK_QUERY_FAIL=true expect_failure 'configuration cannot be queried'
 FAKE_LOCK_DAYS=7 expect_failure 'at least 30 days'
@@ -66,8 +67,12 @@ FAKE_VERSIONING=Enabled FAKE_OBJECT_LOCK_ENABLED=Enabled \
   FAKE_LOCK_MODE=COMPLIANCE FAKE_LOCK_DAYS=30 \
   "$preflight" "$test_dir/runtime.env" "$test_dir/secrets" >/dev/null
 
-write_env false
+write_env true false
 FAKE_OBJECT_LOCK_QUERY_FAIL=true \
+  "$preflight" "$test_dir/runtime.env" "$test_dir/secrets" >/dev/null
+
+write_env false false
+FAKE_VERSIONING=None FAKE_OBJECT_LOCK_QUERY_FAIL=true \
   "$preflight" "$test_dir/runtime.env" "$test_dir/secrets" >/dev/null
 
 echo 'S3 storage preflight tests passed.'

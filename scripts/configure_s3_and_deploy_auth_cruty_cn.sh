@@ -77,7 +77,7 @@ printf '%s\n%s\n' "$access_key_id" "$secret_access_key" | \
   ssh "${ssh_options[@]}" "$ssh_target" /bin/bash \
     "$remote_stage/configure_s3_credentials.sh" \
     "$remote_runtime_env" "$remote_secrets_dir" \
-    "$s3_endpoint" "$s3_bucket" "$s3_region" "$s3_prefix"
+    "$s3_endpoint" "$s3_bucket" "$s3_region" "$s3_prefix" false false
 access_key_id=''
 secret_access_key=''
 

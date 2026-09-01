@@ -8,6 +8,8 @@ s3_endpoint="${3:?S3 endpoint required}"
 s3_bucket="${4:?S3 bucket required}"
 s3_region="${5:?S3 region required}"
 s3_prefix="${6:?S3 prefix required}"
+require_versioning="${7:-true}"
+require_object_lock="${8:-true}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ops/deploy/auth_cruty_cn/s3_key.sh
 source "$script_dir/s3_key.sh"
@@ -26,6 +28,10 @@ case "$(file_mode "$runtime_env")" in 600|640) ;; *) die 'runtime env mode must 
 [[ "$s3_bucket" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || die 'S3 bucket name is invalid'
 [[ "$s3_region" =~ ^[A-Za-z0-9-]+$ ]] || die 'S3 region is invalid'
 validate_s3_prefix "$s3_prefix" || die 'S3 prefix is invalid'
+[[ "$require_versioning" == true || "$require_versioning" == false ]] \
+  || die 'S3 versioning requirement must be true or false'
+[[ "$require_object_lock" == true || "$require_object_lock" == false ]] \
+  || die 'S3 Object Lock requirement must be true or false'
 
 IFS= read -r access_key_id || die 'missing AccessKey ID on standard input'
 IFS= read -r secret_access_key || die 'missing Secret AccessKey on standard input'
@@ -49,12 +55,16 @@ printf '%s' "$secret_access_key" >"$sk_tmp"
 chmod 0400 "$ak_tmp" "$sk_tmp"
 
 awk -v endpoint="$s3_endpoint" -v bucket="$s3_bucket" \
-  -v region="$s3_region" -v prefix="$s3_prefix" '
+  -v region="$s3_region" -v prefix="$s3_prefix" \
+  -v require_versioning="$require_versioning" \
+  -v require_object_lock="$require_object_lock" '
   BEGIN {
     values["S3_ENDPOINT"] = endpoint
     values["S3_BUCKET"] = bucket
     values["S3_REGION"] = region
     values["S3_PREFIX"] = prefix
+    values["S3_REQUIRE_VERSIONING"] = require_versioning
+    values["S3_REQUIRE_OBJECT_LOCK"] = require_object_lock
   }
   /^[A-Za-z_][A-Za-z0-9_]*=/ {
     key = substr($0, 1, index($0, "=") - 1)
@@ -67,7 +77,8 @@ awk -v endpoint="$s3_endpoint" -v bucket="$s3_bucket" \
   END {
     order[1] = "S3_ENDPOINT"; order[2] = "S3_BUCKET"
     order[3] = "S3_REGION"; order[4] = "S3_PREFIX"
-    for (i = 1; i <= 4; i++) if (!seen[order[i]]) print order[i] "=" values[order[i]]
+    order[5] = "S3_REQUIRE_VERSIONING"; order[6] = "S3_REQUIRE_OBJECT_LOCK"
+    for (i = 1; i <= 6; i++) if (!seen[order[i]]) print order[i] "=" values[order[i]]
   }
 ' "$runtime_env" >"$env_tmp"
 chmod "$(file_mode "$runtime_env")" "$env_tmp"
@@ -79,5 +90,6 @@ sk_tmp=''
 mv -f "$env_tmp" "$runtime_env"
 env_tmp=''
 
-printf '[s3-config] configured endpoint=%s bucket=%s region=%s prefix=%s\n' \
-  "$s3_endpoint" "$s3_bucket" "$s3_region" "$s3_prefix"
+printf '[s3-config] configured endpoint=%s bucket=%s region=%s prefix=%s versioning_required=%s object_lock_required=%s\n' \
+  "$s3_endpoint" "$s3_bucket" "$s3_region" "$s3_prefix" \
+  "$require_versioning" "$require_object_lock"

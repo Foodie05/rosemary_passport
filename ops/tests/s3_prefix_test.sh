@@ -33,13 +33,15 @@ stderr="$test_dir/stderr"
 printf '%s\n%s\n' 'fixture-access-key' 'fixture-secret-key' | \
   "$configurator" "$runtime_env" "$test_dir/secrets" \
     'https://s3.bitiful.net' 'serverbak' 'cn-east-1' \
-    'rosemary-passport/production' >"$stdout" 2>"$stderr"
+    'rosemary-passport/production' false false >"$stdout" 2>"$stderr"
 
 grep -qx 'S3_ENDPOINT=https://s3.bitiful.net' "$runtime_env"
 grep -qx 'S3_BUCKET=serverbak' "$runtime_env"
 grep -qx 'S3_REGION=cn-east-1' "$runtime_env"
 grep -qx 'S3_PREFIX=rosemary-passport/production' "$runtime_env"
-[[ "$(grep -c '^S3_' "$runtime_env")" -eq 4 ]]
+grep -qx 'S3_REQUIRE_VERSIONING=false' "$runtime_env"
+grep -qx 'S3_REQUIRE_OBJECT_LOCK=false' "$runtime_env"
+[[ "$(grep -c '^S3_' "$runtime_env")" -eq 6 ]]
 [[ "$(cat "$test_dir/secrets/s3_access_key_id")" == 'fixture-access-key' ]]
 [[ "$(cat "$test_dir/secrets/s3_secret_access_key")" == 'fixture-secret-key' ]]
 [[ "$(stat -c '%a' "$test_dir/secrets/s3_access_key_id" 2>/dev/null \

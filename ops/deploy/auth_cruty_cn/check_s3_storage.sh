@@ -26,13 +26,17 @@ s3_endpoint="$(read_env S3_ENDPOINT)"
 s3_bucket="$(read_env S3_BUCKET)"
 s3_region="$(read_env S3_REGION)"
 s3_prefix="$(read_env S3_PREFIX)"
+require_versioning="$(read_env S3_REQUIRE_VERSIONING)"
 require_object_lock="$(read_env S3_REQUIRE_OBJECT_LOCK)"
 minimum_retention_days="$(read_env S3_OBJECT_LOCK_MIN_RETENTION_DAYS)"
+require_versioning="${require_versioning:-true}"
 require_object_lock="${require_object_lock:-false}"
 minimum_retention_days="${minimum_retention_days:-30}"
 
 [[ -n "$s3_endpoint" && -n "$s3_bucket" ]] || die 'S3_ENDPOINT and S3_BUCKET are required'
 validate_s3_prefix "$s3_prefix" || die 'S3_PREFIX must be empty or a safe path without leading/trailing slashes'
+[[ "$require_versioning" == true || "$require_versioning" == false ]] \
+  || die 'S3_REQUIRE_VERSIONING must be true or false'
 [[ "$require_object_lock" == true || "$require_object_lock" == false ]] \
   || die 'S3_REQUIRE_OBJECT_LOCK must be true or false'
 [[ "$minimum_retention_days" =~ ^[1-9][0-9]*$ ]] \
@@ -46,7 +50,9 @@ export AWS_DEFAULT_REGION="${s3_region:-auto}"
 versioning="$(aws --endpoint-url "$s3_endpoint" s3api get-bucket-versioning \
   --bucket "$s3_bucket" --query Status --output text)" \
   || die 'unable to query S3 bucket versioning'
-[[ "$versioning" == Enabled ]] || die 'S3 bucket versioning must be enabled'
+if [[ "$require_versioning" == true && "$versioning" != Enabled ]]; then
+  die 'S3 bucket versioning must be enabled'
+fi
 
 if [[ "$require_object_lock" == true ]]; then
   lock_enabled="$(aws --endpoint-url "$s3_endpoint" s3api get-object-lock-configuration \
@@ -76,4 +82,5 @@ if [[ "$require_object_lock" == true ]]; then
     || die "Object Lock default retention must be at least $minimum_retention_days days"
 fi
 
-printf '[s3-preflight] versioning=Enabled object_lock_required=%s\n' "$require_object_lock"
+printf '[s3-preflight] versioning=%s versioning_required=%s object_lock_required=%s\n' \
+  "$versioning" "$require_versioning" "$require_object_lock"
