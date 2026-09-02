@@ -11,6 +11,8 @@ required_runtime_files=(
   'DB_PASSWORD_FILE:$RUNTIME_SECRETS/db_password'
   'JWT_BINDING_KEY_FILE:$RUNTIME_SECRETS/jwt_binding_key'
   'EMAIL_CODE_HMAC_KEY_FILE:$RUNTIME_SECRETS/email_code_hmac_key'
+  'LEGAL_INITIAL_TERMS_FILE:$RUNTIME_SECRETS/legal/terms-v1.md'
+  'LEGAL_INITIAL_PRIVACY_FILE:$RUNTIME_SECRETS/legal/privacy-v1.md'
   'ALIYUN_CAPTCHA_ACCESS_KEY_ID_FILE:$RUNTIME_SECRETS/aliyun_captcha_access_key_id'
   'ALIYUN_CAPTCHA_ACCESS_KEY_SECRET_FILE:$RUNTIME_SECRETS/aliyun_captcha_access_key_secret'
   'ALIYUN_ACCESS_KEY_ID_FILE:$RUNTIME_SECRETS/aliyun_access_key_id'
