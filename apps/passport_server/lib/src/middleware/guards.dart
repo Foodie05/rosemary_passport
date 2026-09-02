@@ -62,6 +62,13 @@ Middleware requireAuth() {
           statusCode: 401,
         );
       }
+      if (user.isBanned) {
+        return errorResponse(
+          'account_banned',
+          '该账户已被封禁。如需申诉，请联系 info@rosemaryisland.pro。',
+          statusCode: 403,
+        );
+      }
       return handler(context.provide<AuthenticatedUser>(() => user));
     };
   };
@@ -76,6 +83,13 @@ Middleware requireAdmin() {
           'unauthorized',
           'Access token is missing or invalid.',
           statusCode: 401,
+        );
+      }
+      if (user.isBanned) {
+        return errorResponse(
+          'account_banned',
+          '该账户已被封禁。如需申诉，请联系 info@rosemaryisland.pro。',
+          statusCode: 403,
         );
       }
       if (!user.isAdmin) {

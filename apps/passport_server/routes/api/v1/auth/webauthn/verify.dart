@@ -5,6 +5,7 @@ import '../../../../../lib/src/models/auth_requests.dart';
 import '../../../../../lib/src/services/auth_service.dart';
 import '../../../../../lib/src/utils/auth_response.dart';
 import '../../../../../lib/src/utils/http.dart';
+import '../../../../../lib/src/utils/legal_http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -18,6 +19,12 @@ Future<Response> onRequest(RequestContext context) async {
   if (payload == null) {
     return errorResponse('invalid_request', 'response is required.');
   }
+  final (legal, legalError) = await validateLegalSubmission(context, {
+    'accepted_legal': payload.acceptedLegal,
+    'terms_version': payload.termsVersion,
+    'privacy_version': payload.privacyVersion,
+  });
+  if (legalError != null) return legalError;
 
   final requestIp = clientIpFromRequest(
     context.request,
@@ -38,6 +45,12 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final result = attempt.result!;
+  await recordLegalAcceptance(
+    context,
+    userId: result.user.id,
+    validation: legal!,
+    acceptanceContext: 'login_webauthn',
+  );
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: result.user,

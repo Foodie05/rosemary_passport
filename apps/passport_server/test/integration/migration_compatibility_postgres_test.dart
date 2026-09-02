@@ -151,6 +151,20 @@ void main() {
       expect(migrated.single[0], isNotNull);
       expect(migrated.single[1], 'legacy-refresh-token');
       expect(migrated.single[2].toString(), userId);
+      final governance = await database.execute(
+        '''
+          select u.account_status,
+                 to_regclass('public.legal_documents') is not null,
+                 to_regclass('public.user_legal_acceptances') is not null,
+                 to_regclass('public.activity_logs') is not null
+          from users u where u.id = cast(@id as uuid)
+          ''',
+        params: {'id': userId},
+      );
+      expect(governance.single[0], 'active');
+      expect(governance.single[1], isTrue);
+      expect(governance.single[2], isTrue);
+      expect(governance.single[3], isTrue);
       final firstPartyClient = await database.execute('''
           select display_name, is_official, is_confidential
           from oidc_clients where client_id = 'first_party_web'

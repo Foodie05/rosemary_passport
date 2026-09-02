@@ -1034,6 +1034,38 @@ void main() {
       )).ok,
       isTrue,
     );
+    when(
+      () => audit.log(
+        action: any(named: 'action'),
+        actorId: any(named: 'actorId'),
+        actorType: any(named: 'actorType'),
+        resourceType: any(named: 'resourceType'),
+        resourceId: any(named: 'resourceId'),
+        metadata: any(named: 'metadata'),
+        ip: any(named: 'ip'),
+      ),
+    ).thenAnswer((_) async {});
+    when(
+      () => emailCodes.issueStepUpCode(user.email),
+    ).thenThrow(StateError('provider unavailable'));
+    expect(
+      (await service.sendLoginStepUpCode(
+        challenge: 'all-factors',
+        factor: 'email_code',
+      )).code,
+      'temporary_issue',
+    );
+    verify(
+      () => audit.log(
+        action: 'user.login_code.delivery_failed',
+        actorId: user.id,
+        actorType: 'user',
+        resourceType: 'user',
+        resourceId: user.id,
+        metadata: {'channel': 'email'},
+        ip: null,
+      ),
+    ).called(1);
     expect(
       (await service.sendLoginStepUpCode(
         challenge: 'all-factors',

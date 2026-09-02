@@ -20,12 +20,16 @@ const AdminOidcDocsPage = lazyNamed(loadAdminPages, 'AdminOidcDocsPage');
 const AdminSecurityPolicy = lazyNamed(loadAdminPages, 'AdminSecurityPolicy');
 const AdminServiceConfig = lazyNamed(loadAdminPages, 'AdminServiceConfig');
 const AdminUsers = lazyNamed(loadAdminPages, 'AdminUsers');
+const AdminDashboard = lazyNamed(loadAdminPages, 'AdminDashboard');
+const AdminLegalDocuments = lazyNamed(loadAdminPages, 'AdminLegalDocuments');
 const ForgotPasswordPage = lazyNamed(loadAuthPages, 'ForgotPasswordPage');
 const LoginPage = lazyNamed(loadAuthPages, 'LoginPage');
 const PostRegisterBindingPrompt = lazyNamed(loadAuthPages, 'PostRegisterBindingPrompt');
 const PostRegisterPasskeyPrompt = lazyNamed(loadAuthPages, 'PostRegisterPasskeyPrompt');
 const RegisterPage = lazyNamed(loadAuthPages, 'RegisterPage');
 const UserAccountPage = lazyNamed(() => import('./pages/UserPages'), 'UserAccountPage');
+const LegalDocumentPage = lazyNamed(() => import('./pages/LegalPages'), 'LegalDocumentPage');
+const BannedPage = lazyNamed(() => import('./pages/LegalPages'), 'BannedPage');
 
 function AppRoutes({
   isLoggedIn,
@@ -61,6 +65,11 @@ function AppRoutes({
   loadLoginCodeCooldown,
   beginWebAuthnLogin,
   completeWebAuthnLogin,
+  legalAccepted,
+  setLegalAccepted,
+  legalDocuments,
+  legalLoading,
+  bannedAccount,
   registerForm,
   setRegisterForm,
   registerMethod,
@@ -101,7 +110,15 @@ function AppRoutes({
   testPhoneSmsConnection,
   users,
   usersPagination,
+  dashboard,
+  loadDashboard,
+  adminLegalDocuments,
+  loadAdminLegalDocuments,
+  saveLegalDraft,
+  publishLegalDocument,
   loadUsers,
+  loadManagedUser,
+  updateManagedUserStatus,
   createManagedUser,
   updateManagedUserRoles,
   deleteManagedUser,
@@ -135,6 +152,9 @@ function AppRoutes({
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-50" aria-busy="true" />}>
       <Routes location={location}>
+        <Route path="/legal/terms" element={<LegalDocumentPage document={legalDocuments?.terms} loading={legalLoading} />} />
+        <Route path="/legal/privacy" element={<LegalDocumentPage document={legalDocuments?.privacy} loading={legalLoading} />} />
+        <Route path="/banned" element={<BannedPage account={bannedAccount} />} />
         <Route
           path="/login"
           element={
@@ -173,6 +193,9 @@ function AppRoutes({
                 loadLoginCodeCooldown={loadLoginCodeCooldown}
                 beginWebAuthnLogin={beginWebAuthnLogin}
                 completeWebAuthnLogin={completeWebAuthnLogin}
+                legalAccepted={legalAccepted}
+                setLegalAccepted={setLegalAccepted}
+                legalDocuments={legalDocuments}
                 authNext={loginNext}
               />
             )
@@ -198,6 +221,9 @@ function AppRoutes({
                 publicConfig={publicConfig}
                 captchaConfigured={captchaConfigured}
                 mountCaptcha={mountPublicCaptcha}
+                legalAccepted={legalAccepted}
+                setLegalAccepted={setLegalAccepted}
+                legalDocuments={legalDocuments}
                 authNext={registerNext}
               />
             )
@@ -225,8 +251,9 @@ function AppRoutes({
           }
         />
 
-        <Route path="/admin" element={isLoggedIn ? <AdminLayout session={session} logout={logout} mustBindEmail={mustBindEmail} /> : <Navigate to="/login" replace />}>
-          <Route index element={<Navigate to="/admin/account" replace />} />
+        <Route path="/admin" element={isLoggedIn && isAdmin ? <AdminLayout session={session} logout={logout} mustBindEmail={mustBindEmail} /> : <Navigate to={isLoggedIn ? '/account' : '/login'} replace />}>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard data={dashboard} loadDashboard={loadDashboard} safely={safely} />} />
           <Route
             path="account"
             element={
@@ -259,6 +286,8 @@ function AppRoutes({
                 users={users}
                 pagination={usersPagination}
                 loadUsers={loadUsers}
+                loadUser={loadManagedUser}
+                updateUserStatus={updateManagedUserStatus}
                 safely={safely}
                 createUser={createManagedUser}
                 updateUserRoles={updateManagedUserRoles}
@@ -266,6 +295,7 @@ function AppRoutes({
               />
             }
           />
+          <Route path="legal" element={<AdminLegalDocuments documents={adminLegalDocuments} loadDocuments={loadAdminLegalDocuments} saveDraft={saveLegalDraft} publishDocument={publishLegalDocument} safely={safely} />} />
           <Route path="oidc" element={<AdminOIDCConfig discovery={discovery} oidcSettings={systemSettings?.oidc} loadDiscovery={loadDiscovery} oidcClients={oidcClients} loadOidcClients={loadOidcClients} safely={safely} oidcForm={oidcForm} setOidcForm={setOidcForm} saveOidcClient={saveOidcClient} deleteOidcClient={deleteOidcClient} />} />
           <Route
             path="security"
@@ -393,12 +423,18 @@ function App() {
   const [loginStep, setLoginStep] = useState('credentials');
   const [status, setStatus] = useState('');
   const [publicConfig, setPublicConfig] = useState(null);
+  const [legalDocuments, setLegalDocuments] = useState(null);
+  const [legalLoading, setLegalLoading] = useState(true);
+  const [legalAccepted, setLegalAccepted] = useState(false);
+  const [bannedAccount, setBannedAccount] = useState('');
   const [session, setSession] = useState({ user: null, security: null });
   const [systemSettings, setSystemSettings] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [oidcClients, setOidcClients] = useState([]);
   const [users, setUsers] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
+  const [adminLegalDocuments, setAdminLegalDocuments] = useState([]);
   const [usersPagination, setUsersPagination] = useState({
     page: 1,
     page_size: 10,
@@ -484,7 +520,7 @@ function App() {
   const isLoggedIn = Boolean(session.user);
   const isAdmin = session.user?.roles?.includes('admin');
   const mustBindEmail = Boolean(session.security?.must_bind_email);
-  const defaultAuthedPath = isAdmin ? '/admin/account' : '/account';
+  const defaultAuthedPath = isAdmin ? '/admin/dashboard' : '/account';
   const continuePostAuth = useCallback((target) => {
     const normalized = normalizeInternalRedirect(target);
     if (!normalized) {
@@ -496,7 +532,8 @@ function App() {
     }
     try {
       window.sessionStorage.setItem(PENDING_OIDC_SEARCH_STORAGE_KEY, parsed.search);
-    } catch (_) {
+    } catch (error) {
+      if (handleBannedLogin(error)) return true;
       return false;
     }
     navigate('/oidc/continue', { replace: true });
@@ -513,6 +550,7 @@ function App() {
 
   useEffect(() => {
     void loadPublicConfig();
+    void loadLegalDocuments();
   }, []);
 
   useEffect(() => {
@@ -650,6 +688,10 @@ function App() {
       error.serverMessage = typeof data.message === 'string' ? data.message : '';
       error.details = data;
       error.message = getUserErrorMessage(error);
+      if (error.code === 'legal_acceptance_required') {
+        setLegalAccepted(false);
+        void loadLegalDocuments();
+      }
       throw error;
     }
     return data;
@@ -728,6 +770,37 @@ function App() {
     }
   }
 
+  async function loadLegalDocuments() {
+    setLegalLoading(true);
+    try {
+      const data = await api('/api/v1/legal/documents');
+      setLegalDocuments(data);
+    } catch (_) {
+      setLegalDocuments(null);
+    } finally {
+      setLegalLoading(false);
+    }
+  }
+
+  function legalSubmission() {
+    if (!legalAccepted || !legalDocuments?.terms || !legalDocuments?.privacy) {
+      throw new Error('请先阅读并同意使用条款与隐私政策。');
+    }
+    return {
+      accepted_legal: true,
+      terms_version: legalDocuments.terms.version,
+      privacy_version: legalDocuments.privacy.version,
+    };
+  }
+
+  function handleBannedLogin(error, account = '') {
+    if (error?.code !== 'account_banned') return false;
+    setBannedAccount(account);
+    setSession({ user: null, security: null });
+    navigate('/banned', { replace: true });
+    return true;
+  }
+
   const loadSystemConfig = useCallback(async () => {
     const data = await api('/api/v1/admin/settings', { auth: true });
     setSystemSettings(data.settings || {});
@@ -783,6 +856,30 @@ function App() {
       data.pagination || { page, page_size: 10, total: data.users?.length || 0, total_pages: 1 },
     );
   }, [usersPagination.page_size]);
+
+  const loadDashboard = useCallback(async (days = 30) => {
+    const data = await api(`/api/v1/admin/dashboard?days=${encodeURIComponent(days)}`, { auth: true });
+    setDashboard(data);
+    return data;
+  }, []);
+
+  const loadAdminLegalDocuments = useCallback(async () => {
+    const data = await api('/api/v1/admin/legal/documents', { auth: true });
+    setAdminLegalDocuments(data.documents || []);
+    return data.documents || [];
+  }, []);
+
+  async function saveLegalDraft(form) {
+    await api('/api/v1/admin/legal/documents', { method: 'POST', auth: true, body: form });
+    await loadAdminLegalDocuments();
+    showToast('协议草稿已保存。', 'success');
+  }
+
+  async function publishLegalDocument(id) {
+    await api(`/api/v1/admin/legal/documents/${encodeURIComponent(id)}/publish`, { method: 'POST', auth: true });
+    await Promise.all([loadAdminLegalDocuments(), loadLegalDocuments()]);
+    showToast('新版协议已发布，后续登录将要求重新同意。', 'success');
+  }
 
   const loadDiscovery = useCallback(async () => {
     const data = await api('/.well-known/openid-configuration');
@@ -1117,6 +1214,7 @@ function App() {
             email,
             password: loginForm.password,
             remember_me: rememberMe,
+            ...legalSubmission(),
           },
         });
         onLoginSuccess(payload);
@@ -1128,6 +1226,7 @@ function App() {
       setLoginStep('code');
       showToast('请选择二因素验证方式。', 'success');
     } catch (error) {
+      if (handleBannedLogin(error, loginForm.email.trim())) return;
       showToast(getAuthErrorMessage(error, 'password_factor_select'), 'error');
     } finally {
       setLoading(false);
@@ -1149,11 +1248,13 @@ function App() {
           phone_code: loginForm.phone_code.trim(),
           authenticator_code: loginForm.authenticator_code.trim(),
           remember_me: rememberMe,
+          ...legalSubmission(),
           ...(captchaToken ? { captcha_token: captchaToken } : {}),
         },
       });
       onLoginSuccess(payload);
     } catch (error) {
+      if (handleBannedLogin(error, loginForm.email.trim())) return;
       showToast(getAuthErrorMessage(error, 'password_login'), 'error');
     } finally {
       setLoading(false);
@@ -1224,10 +1325,12 @@ function App() {
           phone_number: loginForm.phone_number.trim(),
           verify_code: loginForm.phone_code.trim(),
           remember_me: rememberMe,
+          ...legalSubmission(),
         },
       });
       onLoginSuccess(payload);
     } catch (error) {
+      if (handleBannedLogin(error, loginForm.phone_number.trim())) return;
       if (handleCodeLoginContinuation(error, 'phone', loginForm.phone_number.trim())) {
         return;
       }
@@ -1257,10 +1360,12 @@ function App() {
           email: loginForm.email.trim(),
           email_code: loginForm.email_code.trim(),
           remember_me: rememberMe,
+          ...legalSubmission(),
         },
       });
       onLoginSuccess(payload);
     } catch (error) {
+      if (handleBannedLogin(error, loginForm.email.trim())) return;
       if (handleCodeLoginContinuation(error, 'email', loginForm.email.trim())) {
         return;
       }
@@ -1333,10 +1438,12 @@ function App() {
           code: factor === 'phone_code' ? loginForm.phone_code : loginForm.authenticator_code || loginForm.email_code,
           ...(response ? { response } : {}),
           remember_me: rememberMe,
+          ...legalSubmission(),
         },
       });
       onLoginSuccess(payload);
     } catch (error) {
+      if (handleBannedLogin(error, loginForm.email.trim() || loginForm.phone_number.trim())) return;
       showToast(getUserErrorMessage(error, '二次验证失败，请重试。'), 'error');
     } finally {
       setLoading(false);
@@ -1368,6 +1475,7 @@ function App() {
 
   function onLoginSuccess(payload, { deferRedirect = false } = {}) {
     setSession({ user: payload.user, security: payload.security || {} });
+    setLegalAccepted(false);
     setStatus(`已登录：${payload.user?.email || ''}`);
     setLoginMethod('phone_code');
     setLoginStep('credentials');
@@ -1407,6 +1515,7 @@ function App() {
               registration_handoff: registerForm.registration_handoff || undefined,
               nickname: registerForm.nickname.trim(),
               password: registerForm.password,
+              ...legalSubmission(),
             },
           })
         : await api('/api/v1/auth/register', {
@@ -1417,6 +1526,7 @@ function App() {
               registration_handoff: registerForm.registration_handoff || undefined,
               nickname: registerForm.nickname.trim(),
               password: registerForm.password,
+              ...legalSubmission(),
             },
           });
       const registrationPassword = registerForm.password;
@@ -1437,6 +1547,7 @@ function App() {
       setPostRegisterPasskeyPromptOpen(false);
       setPostRegisterBindingPromptOpen(true);
     } catch (error) {
+      if (handleBannedLogin(error, registerForm.email.trim() || registerForm.phone_number.trim())) return;
       showToast(getAuthErrorMessage(error, 'register'), 'error');
     } finally {
       setLoading(false);
@@ -1713,12 +1824,19 @@ function App() {
   }
 
   async function completeWebAuthnLogin(email, response, remember = rememberMe) {
-    const payload = await api('/api/v1/auth/webauthn/verify', {
-      method: 'POST',
-      body: email ? { email, response, remember_me: remember } : { response, remember_me: remember },
-    });
-    onLoginSuccess(payload);
-    return payload;
+    try {
+      const payload = await api('/api/v1/auth/webauthn/verify', {
+        method: 'POST',
+        body: email
+          ? { email, response, remember_me: remember, ...legalSubmission() }
+          : { response, remember_me: remember, ...legalSubmission() },
+      });
+      onLoginSuccess(payload);
+      return payload;
+    } catch (error) {
+      if (handleBannedLogin(error, email)) return null;
+      throw error;
+    }
   }
 
   async function saveServiceConfig(event) {
@@ -2007,6 +2125,20 @@ function App() {
     showToast('用户权限已更新', 'success');
   }
 
+  async function loadManagedUser(userId) {
+    const data = await api(`/api/v1/admin/users/${encodeURIComponent(userId)}`, { auth: true });
+    return data.user;
+  }
+
+  async function updateManagedUserStatus(userId, statusValue, reason = '') {
+    await api(`/api/v1/admin/users/${encodeURIComponent(userId)}/status`, {
+      method: 'PATCH',
+      auth: true,
+      body: { status: statusValue, reason },
+    });
+    showToast(statusValue === 'banned' ? '账户已封禁，现有会话已撤销。' : '账户已解封。', 'success');
+  }
+
   async function deleteManagedUser(userId) {
     await api(`/api/v1/admin/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
@@ -2208,6 +2340,11 @@ function App() {
         loadLoginCodeCooldown={loadLoginCodeCooldown}
         beginWebAuthnLogin={beginWebAuthnLogin}
         completeWebAuthnLogin={completeWebAuthnLogin}
+        legalAccepted={legalAccepted}
+        setLegalAccepted={setLegalAccepted}
+        legalDocuments={legalDocuments}
+        legalLoading={legalLoading}
+        bannedAccount={bannedAccount}
         registerForm={registerForm}
         setRegisterForm={setRegisterForm}
         registerMethod={registerMethod}
@@ -2248,7 +2385,15 @@ function App() {
         testPhoneSmsConnection={testPhoneSmsConnection}
         users={users}
         usersPagination={usersPagination}
+        dashboard={dashboard}
+        loadDashboard={loadDashboard}
+        adminLegalDocuments={adminLegalDocuments}
+        loadAdminLegalDocuments={loadAdminLegalDocuments}
+        saveLegalDraft={saveLegalDraft}
+        publishLegalDocument={publishLegalDocument}
         loadUsers={loadUsers}
+        loadManagedUser={loadManagedUser}
+        updateManagedUserStatus={updateManagedUserStatus}
         createManagedUser={createManagedUser}
         updateManagedUserRoles={updateManagedUserRoles}
         deleteManagedUser={deleteManagedUser}

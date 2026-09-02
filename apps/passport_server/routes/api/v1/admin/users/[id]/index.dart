@@ -6,8 +6,18 @@ import '../../../../../../lib/src/services/audit_service.dart';
 import '../../../../../../lib/src/utils/http.dart';
 
 Future<Response> onRequest(RequestContext context, String id) async {
+  if (context.request.method == HttpMethod.get) {
+    final details = await context.read<UserRepository>().userDetails(id);
+    return details == null
+        ? errorResponse('not_found', 'user not found.', statusCode: 404)
+        : jsonResponse({'user': details});
+  }
   if (context.request.method != HttpMethod.delete) {
-    return errorResponse('method_not_allowed', 'Use DELETE.', statusCode: 405);
+    return errorResponse(
+      'method_not_allowed',
+      'Use GET or DELETE.',
+      statusCode: 405,
+    );
   }
 
   final actor = context.read<AuthenticatedUser>();

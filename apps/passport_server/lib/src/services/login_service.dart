@@ -372,6 +372,7 @@ class LoginService {
         _tokens.issueRegistrationHandoff(method: 'email', subject: email),
       );
     }
+    if (user.isBanned) return _bannedFailure;
     if (await isBootstrapAdmin(user)) {
       return _loginFailure;
     }
@@ -518,6 +519,7 @@ class LoginService {
         _tokens.issueRegistrationHandoff(method: 'phone', subject: normalized),
       );
     }
+    if (user.isBanned) return _bannedFailure;
     if (user.roles.contains('admin')) {
       return LoginAttempt.mfaRequired(
         stepUpChallenge: _tokens.issueLoginStepUpChallenge(
@@ -761,6 +763,7 @@ class LoginService {
     required String? requestIp,
     required bool rememberMe,
   }) async {
+    if (user.isBanned) return _bannedFailure;
     final auth = await _sessions.issueFirstPartyAuthResult(
       user,
       rememberMe: rememberMe,
@@ -802,6 +805,11 @@ class LoginService {
     code: 'login_failed',
     message: '登录失败。',
     statusCode: 401,
+  );
+  static const _bannedFailure = LoginAttempt.failure(
+    code: 'account_banned',
+    message: '该账户已被封禁。如需申诉，请联系 info@rosemaryisland.pro。',
+    statusCode: 403,
   );
 }
 

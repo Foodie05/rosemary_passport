@@ -116,11 +116,35 @@ void main() {
         expect(authenticated.canBootstrapPasskeyAfterRegistration, isTrue);
         expect(authenticated.toJson()['phone_number'], '+8613800000030');
 
+        await repository.updateAccountStatus(
+          userId: userId,
+          status: 'banned',
+          reason: '集成测试封禁',
+          actorId: userId,
+        );
+        user = await repository.findById(userId);
+        expect(user!.isBanned, isTrue);
+        expect(user.bannedReason, '集成测试封禁');
+        final details = await repository.userDetails(userId);
+        expect(details?['account_status'], 'banned');
+        expect(details?['phone_number'], '+8613800000030');
+        await repository.updateAccountStatus(
+          userId: userId,
+          status: 'active',
+          reason: null,
+          actorId: userId,
+        );
+        expect((await repository.findById(userId))?.isBanned, isFalse);
+
         final listed = await repository.listUsers(
           search: 'updated@example.invalid',
         );
         expect(listed.any((item) => item['id'].toString() == userId), isTrue);
         expect(await repository.countUsers(search: 'Updated'), greaterThan(0));
+        expect(
+          await repository.countUsers(search: '+8613800000030'),
+          greaterThan(0),
+        );
         expect(await repository.countUsers(search: 'not-present-value'), 0);
       } finally {
         await repository.deleteUser(userId: userId);

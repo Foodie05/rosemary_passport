@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:postgres/postgres.dart';
 import 'package:uuid/uuid.dart';
 
@@ -7,9 +8,10 @@ import '../db/database.dart';
 import '../security/audit_chain.dart';
 
 class AuditService {
-  AuditService(this._db);
+  AuditService(this._db, {String? ipHashKey}) : _ipHashKey = ipHashKey;
 
   final Database _db;
+  final String? _ipHashKey;
   final _uuid = const Uuid();
 
   Future<void> log({
@@ -22,6 +24,7 @@ class AuditService {
     String? ip,
   }) async {
     final sanitizedMetadata = _sanitizeMetadata(metadata);
+    final protectedIp = _protectIp(ip);
     final id = _uuid.v4();
     final createdAt = DateTime.now().toUtc();
     await _db.runTx((tx) async {
@@ -42,7 +45,7 @@ class AuditService {
         resourceType: resourceType,
         resourceId: resourceId,
         metadata: sanitizedMetadata,
-        ipAddress: ip,
+        ipAddress: protectedIp,
         createdAt: createdAt,
       );
       await tx.execute(
@@ -64,7 +67,7 @@ class AuditService {
           'resource_type': resourceType,
           'resource_id': resourceId,
           'metadata': jsonEncode(sanitizedMetadata),
-          'ip': ip,
+          'ip': protectedIp,
           'created_at': createdAt,
           'previous_hash': previousHash.isEmpty ? null : previousHash,
           'entry_hash': entryHash,
@@ -302,5 +305,13 @@ class AuditService {
       return '${local[0]}***@$domain';
     }
     return '${local.substring(0, 2)}***@$domain';
+  }
+
+  String? _protectIp(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return null;
+    final key = _ipHashKey;
+    if (key == null || key.isEmpty) return value;
+    return 'hmac-sha256:${Hmac(sha256, utf8.encode(key)).convert(utf8.encode(value))}';
   }
 }

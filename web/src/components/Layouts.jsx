@@ -3,11 +3,13 @@ import {
   Bell,
   Fingerprint,
   Key,
+  LayoutDashboard,
   LogOut,
   Mail,
   Menu,
   ShieldCheck,
   ScrollText,
+  FileText,
   Shield,
   Users,
   X,
@@ -44,11 +46,13 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
   const menuItems = useMemo(
     () =>
       [
+        { icon: LayoutDashboard, label: '运营看板', to: '/admin/dashboard' },
         { icon: ShieldCheck, label: '账户安全', to: '/admin/account' },
         { icon: Mail, label: '服务配置', to: '/admin/service' },
         { icon: Users, label: '用户管理', to: '/admin/users' },
         { icon: Key, label: 'OCID', to: '/admin/oidc' },
         { icon: ScrollText, label: '安全策略', to: '/admin/security' },
+        { icon: FileText, label: '协议管理', to: '/admin/legal' },
       ],
     [],
   );

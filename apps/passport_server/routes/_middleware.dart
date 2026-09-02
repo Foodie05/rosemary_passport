@@ -5,14 +5,18 @@ import 'package:uuid/uuid.dart';
 import '../lib/src/bootstrap.dart';
 import '../lib/src/config/app_config.dart';
 import '../lib/src/repositories/oidc_repository.dart';
+import '../lib/src/repositories/admin_analytics_repository.dart';
+import '../lib/src/repositories/legal_repository.dart';
 import '../lib/src/repositories/user_repository.dart';
 import '../lib/src/security/token_service.dart';
 import '../lib/src/security/password_policy.dart';
 import '../lib/src/services/audit_service.dart';
+import '../lib/src/services/activity_log_service.dart';
 import '../lib/src/services/admin_settings_service.dart';
 import '../lib/src/services/auth_service.dart';
 import '../lib/src/services/oidc_admin_service.dart';
 import '../lib/src/services/oidc_service.dart';
+import '../lib/src/services/legal_service.dart';
 import '../lib/src/services/phone_verification_service.dart';
 import '../lib/src/services/security_service.dart';
 import '../lib/src/services/token_validation_service.dart';
@@ -45,6 +49,14 @@ Handler middleware(Handler handler) {
       .use(provider<UserRepository>((_) => services.userRepository))
       .use(provider<OidcRepository>((_) => services.oidcRepository))
       .use(provider<AuditService>((_) => services.auditService))
+      .use(provider<ActivityLogService>((_) => services.activityLogService))
+      .use(provider<LegalService>((_) => services.legalService))
+      .use(provider<LegalRepository>((_) => services.legalRepository))
+      .use(
+        provider<AdminAnalyticsRepository>(
+          (_) => services.adminAnalyticsRepository,
+        ),
+      )
       .use(provider<AdminSettingsService>((_) => services.adminSettingsService))
       .use(provider<SecurityService>((_) => services.securityService))
       .use(
@@ -143,6 +155,22 @@ Middleware _requestLogging() {
           'duration_ms': duration,
         }),
       );
+      try {
+        await AppServices.instance.activityLogService.recordRequest(
+          method: context.request.method.name,
+          path: context.request.uri.path,
+          statusCode: response.statusCode,
+          authorization: context.request.headers['authorization'],
+          cookie: context.request.headers['cookie'],
+          ip: clientIpFromRequest(
+            context.request,
+            config: AppServices.instance.config,
+          ),
+          userAgent: context.request.headers['user-agent'],
+        );
+      } catch (_) {
+        // Analytics logging must never make an otherwise valid request fail.
+      }
       return response.copyWith(headers: {'x-request-id': resolvedRequestId});
     };
   };

@@ -63,6 +63,11 @@ class RosmPassportClient {
     return RosmAuthorizationStart.fromJson(json);
   }
 
+  Future<RosmLegalDocuments> currentLegalDocuments() async {
+    final json = await _getJson('/api/v1/legal/documents');
+    return RosmLegalDocuments.fromJson(json);
+  }
+
   Future<RosmAuthorizationApproval> approveNativeAuthorization(
     RosmAuthorizationRequest request,
   ) async {
@@ -340,6 +345,7 @@ class RosmPassportClient {
     String? phoneCode,
     String? authenticatorCode,
     String? captchaToken,
+    RosmLegalAcceptance? legalAcceptance,
   }) async {
     final json = await _postJson(
       '/api/v1/auth/login',
@@ -351,7 +357,7 @@ class RosmPassportClient {
         phoneCode: phoneCode,
         authenticatorCode: authenticatorCode,
         captchaToken: captchaToken,
-      ).toJson(),
+      ).toJson()..addAll(legalAcceptance?.toJson() ?? const {}),
     );
     return _authResultFromJson(
       json,
@@ -395,11 +401,13 @@ class RosmPassportClient {
     required String email,
     required String emailCode,
     String? password,
+    RosmLegalAcceptance? legalAcceptance,
   }) async {
     final json = await _postJson('/api/v1/auth/email-login', {
       'email': email,
       'email_code': emailCode,
       if (password != null && password.isNotEmpty) 'password': password,
+      ...?legalAcceptance?.toJson(),
     });
     return _authResultFromJson(
       json,
@@ -424,10 +432,12 @@ class RosmPassportClient {
   Future<RosmAuthResult> loginWithPhoneCode({
     required String phoneNumber,
     required String verifyCode,
+    RosmLegalAcceptance? legalAcceptance,
   }) async {
     final json = await _postJson('/api/v1/auth/phone-login', {
       'phone_number': phoneNumber,
       'verify_code': verifyCode,
+      ...?legalAcceptance?.toJson(),
     });
     return _authResultFromJson(
       json,
@@ -458,6 +468,7 @@ class RosmPassportClient {
     required String password,
     String? emailCode,
     String? registrationHandoff,
+    RosmLegalAcceptance? legalAcceptance,
   }) async {
     final json = await _postJson(
       '/api/v1/auth/register',
@@ -467,7 +478,7 @@ class RosmPassportClient {
         password: password,
         emailCode: emailCode,
         registrationHandoff: registrationHandoff,
-      ).toJson(),
+      ).toJson()..addAll(legalAcceptance?.toJson() ?? const {}),
     );
     return _authResultFromJson(json);
   }
@@ -478,6 +489,7 @@ class RosmPassportClient {
     required String password,
     String? verifyCode,
     String? registrationHandoff,
+    RosmLegalAcceptance? legalAcceptance,
   }) async {
     final json = await _postJson('/api/v1/auth/register-phone', {
       'phone_number': phoneNumber,
@@ -487,6 +499,7 @@ class RosmPassportClient {
         'verify_code': verifyCode,
       if (registrationHandoff != null && registrationHandoff.isNotEmpty)
         'registration_handoff': registrationHandoff,
+      ...?legalAcceptance?.toJson(),
     });
     return _authResultFromJson(json);
   }
@@ -514,6 +527,7 @@ class RosmPassportClient {
     String? password,
     String? code,
     Map<String, dynamic>? response,
+    RosmLegalAcceptance? legalAcceptance,
   }) async {
     final json = await _postJson('/api/v1/auth/login-step-up', {
       'step_up_challenge': challenge,
@@ -521,6 +535,7 @@ class RosmPassportClient {
       if (password != null) 'password': password,
       if (code != null) 'code': code,
       if (response != null) 'response': response,
+      ...?legalAcceptance?.toJson(),
     });
     return _authResultFromJson(json);
   }

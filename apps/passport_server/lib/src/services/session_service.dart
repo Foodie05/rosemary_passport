@@ -153,7 +153,7 @@ class SessionService {
     }
 
     final user = await _users.findById(userId);
-    if (user == null) {
+    if (user == null || user.isBanned) {
       return null;
     }
 

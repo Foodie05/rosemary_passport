@@ -2,6 +2,8 @@ import 'config/app_config.dart';
 import 'db/database.dart';
 import 'db/migration_runner.dart';
 import 'repositories/email_code_repository.dart';
+import 'repositories/admin_analytics_repository.dart';
+import 'repositories/legal_repository.dart';
 import 'repositories/oidc_repository.dart';
 import 'repositories/security_repository.dart';
 import 'repositories/settings_repository.dart';
@@ -13,6 +15,7 @@ import 'security/password_policy.dart';
 import 'security/settings_cipher.dart';
 import 'security/token_service.dart';
 import 'services/audit_service.dart';
+import 'services/activity_log_service.dart';
 import 'services/admin_settings_service.dart';
 import 'services/authenticator_service.dart';
 import 'services/auth_service.dart';
@@ -20,6 +23,7 @@ import 'services/captcha_service.dart';
 import 'services/email_code_service.dart';
 import 'services/email_service.dart';
 import 'services/helper_client.dart';
+import 'services/legal_service.dart';
 import 'services/oidc_admin_service.dart';
 import 'services/oidc_service.dart';
 import 'services/phone_verification_service.dart';
@@ -33,6 +37,8 @@ class AppServices {
     final settingsCipher = SettingsCipher(config);
     userRepository = UserRepository(_database, config, settingsCipher);
     emailCodeRepository = EmailCodeRepository(_database);
+    adminAnalyticsRepository = AdminAnalyticsRepository(_database);
+    legalRepository = LegalRepository(_database);
     oidcRepository = OidcRepository(_database);
     securityRepository = SecurityRepository(_database);
     settingsRepository = SettingsRepository(_database, settingsCipher);
@@ -44,6 +50,8 @@ class AppServices {
     passwordPolicy = PasswordPolicy();
     helperClient = HelperClient(config);
     tokenService = TokenService(config);
+    legalService = LegalService(legalRepository, config);
+    activityLogService = ActivityLogService(_database, config, tokenService);
     tokenValidationService = TokenValidationService(
       tokenService,
       oidcRepository,
@@ -58,7 +66,7 @@ class AppServices {
       emailService,
       securityPolicyService,
     );
-    auditService = AuditService(_database);
+    auditService = AuditService(_database, ipHashKey: config.jwtBindingKey);
     securityService = SecurityService(securityRepository);
     webAuthnService = WebAuthnService(
       config: config,
@@ -118,6 +126,7 @@ class AppServices {
   Future<void> start() async {
     await _database.warmUp();
     await migrationRunner.migrate();
+    await legalService.ensureInitialDocuments();
   }
 
   Future<void> close() async {
@@ -145,6 +154,8 @@ class AppServices {
 
   late final UserRepository userRepository;
   late final EmailCodeRepository emailCodeRepository;
+  late final AdminAnalyticsRepository adminAnalyticsRepository;
+  late final LegalRepository legalRepository;
   late final OidcRepository oidcRepository;
   late final SecurityRepository securityRepository;
   late final SettingsRepository settingsRepository;
@@ -154,6 +165,8 @@ class AppServices {
   late final PasswordPolicy passwordPolicy;
   late final HelperClient helperClient;
   late final TokenService tokenService;
+  late final LegalService legalService;
+  late final ActivityLogService activityLogService;
   late final TokenValidationService tokenValidationService;
   late final AuthenticatorService authenticatorService;
   late final CaptchaService captchaService;

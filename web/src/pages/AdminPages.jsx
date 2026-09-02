@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Check, CircleHelp, Copy, Globe, Key, Mail, Pencil, Search, Settings2, Smartphone, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { Ban, BookOpen, Check, CircleHelp, Copy, FileText, Globe, Key, Mail, Pencil, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
@@ -549,7 +549,82 @@ export function AdminSecurityPolicy({
   );
 }
 
-export function AdminUsers({ users, pagination, loadUsers, safely, createUser, updateUserRoles, deleteUser }) {
+function MiniLineChart({ data, series }) {
+  const geometry = useMemo(() => {
+    const width = 720;
+    const height = 220;
+    const values = data.flatMap((row) => series.map((item) => Number(row[item.key] || 0)));
+    const max = Math.max(1, ...values);
+    const paths = series.map((item) => ({
+      ...item,
+      points: data.map((row, index) => {
+        const x = data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
+        const y = height - (Number(row[item.key] || 0) / max) * (height - 20) - 10;
+        return `${x},${y}`;
+      }).join(' '),
+    }));
+    return { width, height, paths };
+  }, [data, series]);
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-4 text-xs font-bold text-sage-600">
+        {series.map((item) => <span key={item.key} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
+      </div>
+      <svg viewBox={`0 0 ${geometry.width} ${geometry.height}`} className="h-56 w-full" role="img" aria-label={series.map((item) => item.label).join('、')}>
+        {[0, 1, 2, 3, 4].map((row) => <line key={row} x1="0" x2={geometry.width} y1={(row / 4) * geometry.height} y2={(row / 4) * geometry.height} stroke="currentColor" className="text-sage-100" />)}
+        {geometry.paths.map((item) => <polyline key={item.key} points={item.points} fill="none" stroke={item.color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />)}
+      </svg>
+      <div className="mt-2 flex justify-between text-xs text-sage-400"><span>{data[0]?.date || '-'}</span><span>{data.at(-1)?.date || '-'}</span></div>
+    </div>
+  );
+}
+
+export function AdminDashboard({ data, loadDashboard, safely }) {
+  const [days, setDays] = useState(30);
+  useEffect(() => { void safely(() => loadDashboard(days), '看板数据加载失败'); }, [days, loadDashboard, safely]);
+  const summary = data?.summary || {};
+  return (
+    <div className="space-y-6">
+      <SectionHeader title="运营与安全看板" description="基于系统数据库与审计记录生成；统计口径可在图表下方查看。" actions={<select className="input-field w-auto" value={days} onChange={(event) => setDays(Number(event.target.value))}><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select>} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[['当前用户', summary.total_users ?? '-'], ['封禁账户', summary.banned_users ?? '-'], ['接入 OIDC 平台', summary.active_third_party_oidc_clients ?? '-'], ['全部活跃客户端', summary.active_oidc_clients ?? '-']].map(([label, value]) => <div key={label} className="glass-card rounded-2xl p-6"><p className="text-sm font-bold text-sage-500">{label}</p><p className="mt-3 text-3xl font-bold text-sage-900">{value}</p></div>)}
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="glass-card rounded-2xl p-6"><h2 className="mb-5 text-lg font-bold">用户数量变化</h2><MiniLineChart data={data?.user_growth || []} series={[{ key: 'total_users', label: '累计用户', color: '#587c5d' }, { key: 'new_users', label: '当日新增', color: '#a7c58b' }]} /></div>
+        <div className="glass-card rounded-2xl p-6"><h2 className="mb-5 text-lg font-bold">登录与 OIDC 授权</h2><MiniLineChart data={data?.authentication_activity || []} series={[{ key: 'logins', label: '登录', color: '#587c5d' }, { key: 'authorizations', label: '授权码', color: '#d59b52' }]} /></div>
+        <div className="glass-card rounded-2xl p-6 xl:col-span-2"><h2 className="mb-5 text-lg font-bold">邮箱与短信验证码发送</h2><MiniLineChart data={data?.verification_activity || []} series={[{ key: 'email_codes', label: '邮箱发放尝试', color: '#587c5d' }, { key: 'sms_codes', label: '短信成功响应', color: '#6689b8' }]} /></div>
+      </div>
+      <div className="rounded-2xl border border-sage-200 bg-sage-50 p-5 text-xs leading-6 text-sage-600">{Object.values(data?.definitions || {}).map((definition) => <p key={definition}>• {definition}</p>)}</div>
+    </div>
+  );
+}
+
+export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publishDocument, safely }) {
+  const [type, setType] = useState('terms');
+  const [form, setForm] = useState({ title: '', content: '' });
+  useEffect(() => { void safely(loadDocuments, '协议记录加载失败'); }, [loadDocuments, safely]);
+  const selected = documents.filter((item) => item.type === type);
+  const draft = selected.find((item) => item.status === 'draft');
+  useEffect(() => {
+    const source = draft || selected.find((item) => item.status === 'published');
+    setForm({ title: source?.title || (type === 'terms' ? 'ROSM Pass 使用条款' : 'ROSM Pass 隐私政策'), content: source?.content || '' });
+  }, [type, draft?.id, documents]);
+  return (
+    <div className="space-y-6">
+      <SectionHeader title="使用条款与隐私政策" description="保存形成下一版本草稿；发布后立即成为当前版本，并要求用户在后续登录时重新明确同意。" />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="glass-card rounded-2xl p-6">
+          <div className="mb-5 flex gap-2">{[['terms', '使用条款'], ['privacy', '隐私政策']].map(([value, label]) => <button key={value} type="button" onClick={() => setType(value)} className={cn('rounded-xl px-4 py-2 text-sm font-bold', type === value ? 'bg-sage-600 text-white' : 'bg-sage-100 text-sage-600')}>{label}</button>)}</div>
+          <div className="space-y-4"><input className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /><textarea className="input-field min-h-[520px] font-mono text-sm leading-6" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></div>
+          <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</button><button type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</button>{draft ? <button type="button" className="rounded-xl bg-sage-900 px-5 py-3 font-bold text-white" onClick={() => void safely(async () => { if (!window.confirm(`确认发布版本 ${draft.version}？发布后无法覆盖历史版本。`)) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</button> : null}</div>
+        </div>
+        <aside className="glass-card h-fit rounded-2xl p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{selected.map((item) => <button key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-xl border border-sage-100 p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-green-600' : 'text-amber-600')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-sage-400">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></button>)}</div></aside>
+      </div>
+    </div>
+  );
+}
+
+export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserStatus, safely, createUser, updateUserRoles, deleteUser }) {
   const [search, setSearch] = useState('');
   const [createForm, setCreateForm] = useState({
     email: '',
@@ -560,6 +635,8 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editingRoles, setEditingRoles] = useState('user');
+  const [viewingUser, setViewingUser] = useState(null);
+  const [banReason, setBanReason] = useState('');
 
   useEffect(() => {
     void safely(() => loadUsers({ page: 1, search: '' }), '用户数据加载失败');
@@ -604,14 +681,14 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
             </thead>
             <tbody className="divide-y divide-sage-50">
               {users.map((user, index) => (
-                <tr key={user.id || `${user.email}-${index}`} className="transition-colors hover:bg-sage-50/30">
+                <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-sage-50/60" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
                   <td className="px-6 py-4">
                     <p className="text-sm font-semibold text-sage-900">{cleanDisplayName(user.nickname, user.email || '-')}</p>
                     <p className="text-xs text-sage-400">{user.email || '-'}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', user.is_email_verified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
-                      {user.is_email_verified ? '已验证' : '待验证'}
+                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', user.account_status === 'banned' ? 'bg-red-100 text-red-700' : user.is_email_verified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
+                      {user.account_status === 'banned' ? '已封禁' : user.is_email_verified ? '已验证' : '待验证'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -630,7 +707,8 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
                         type="button"
                         className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-sage-200 bg-white text-sage-600 transition-colors hover:bg-sage-50"
                         aria-label={`编辑 ${cleanDisplayName(user.nickname, user.email || '-')}`}
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.stopPropagation();
                           setEditingUser(user);
                           setEditingRoles((user.roles || []).join(', '));
                         }}
@@ -641,7 +719,8 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
                         type="button"
                         className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition-colors hover:bg-red-50"
                         aria-label={`删除 ${cleanDisplayName(user.nickname, user.email || '-')}`}
-                        onClick={() =>
+                        onClick={(event) => {
+                          event.stopPropagation();
                           void safely(async () => {
                             const confirmed = window.confirm(`确定删除用户“${cleanDisplayName(user.nickname, user.email || '未命名用户')}”吗？`);
                             if (!confirmed) {
@@ -649,8 +728,8 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
                             }
                             await deleteUser(user.id);
                             await loadUsers({ page: pagination.page || 1, search });
-                          }, '删除用户失败')
-                        }
+                          }, '删除用户失败');
+                        }}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -779,6 +858,25 @@ export function AdminUsers({ users, pagination, loadUsers, safely, createUser, u
               onChange={(event) => setEditingRoles(event.target.value)}
             />
           </div>
+        </Modal>
+      )}
+
+      {viewingUser && (
+        <Modal title={`用户详情 · ${cleanDisplayName(viewingUser.nickname, viewingUser.email || '-')}`} onClose={() => setViewingUser(null)} actions={<button type="button" className="btn-secondary" onClick={() => setViewingUser(null)}>关闭</button>}>
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            {[
+              ['用户 ID', viewingUser.id], ['注册时间', viewingUser.created_at ? new Date(viewingUser.created_at).toLocaleString('zh-CN') : '-'],
+              ['邮箱', viewingUser.email || '-'], ['邮箱验证', viewingUser.is_email_verified ? '已验证' : '未验证'],
+              ['手机号', viewingUser.phone_number || '-'], ['手机验证', viewingUser.is_phone_verified ? '已验证' : '未验证'],
+              ['通行密钥', `${viewingUser.passkey_count || 0} 个`], ['近期 OIDC 授权', `${viewingUser.oidc_authorization_count || 0} 次`],
+              ['最近登录', viewingUser.last_login_at ? new Date(viewingUser.last_login_at).toLocaleString('zh-CN') : '-'], ['账户状态', viewingUser.account_status === 'banned' ? '已封禁' : '正常'],
+            ].map(([label, value]) => <div key={label} className="rounded-xl bg-sage-50 p-3"><p className="text-xs font-bold text-sage-400">{label}</p><p className="mt-1 break-all font-semibold text-sage-800">{value}</p></div>)}
+          </div>
+          {viewingUser.account_status === 'banned' ? (
+            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4"><p className="text-sm text-red-700">封禁原因：{viewingUser.banned_reason || '-'}</p><button type="button" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 font-bold text-white" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</button></div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-4"><label className="text-sm font-bold text-red-700">封禁原因</label><textarea value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><button type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 font-bold text-white disabled:opacity-40" onClick={() => void safely(async () => { if (!window.confirm('封禁将立即撤销该用户的所有 Access Token 和 Refresh Token，确定继续？')) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</button></div>
+          )}
         </Modal>
       )}
     </div>

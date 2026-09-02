@@ -10,6 +10,8 @@ const ERROR_MESSAGES = {
   invalid_request: '提交的信息不完整或格式不正确，请检查后重试。',
   invalid_totp_code: '验证信息无效，请重新输入。',
   login_failed: '账号或密码错误。',
+  legal_acceptance_required: '请先阅读并同意当前版本的使用条款与隐私政策。',
+  account_banned: '该账户已被封禁，如需申诉请联系 info@rosemaryisland.pro。',
   method_not_allowed: '当前操作暂不支持，请返回后重试。',
   mfa_required: '请完成二次验证后继续。',
   network_error: '当前无法连接到服务，请检查网络后重试。',

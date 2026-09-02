@@ -1,3 +1,9 @@
+## 0.8.0
+
+- Load the currently published ROSM Pass Terms of Use and Privacy Policy and require explicit acceptance before every completed sign-in or registration.
+- Add version-bound legal acceptance parameters to password, email-code, phone-code, registration, and direct step-up client APIs.
+- Present both agreements in readable dialogs while preserving system-adaptive light/dark styling and high-contrast phone input text.
+
 ## 0.7.2
 
 - Send login codes before resolving account existence, then expose a signed registration handoff only after a valid email or phone code.

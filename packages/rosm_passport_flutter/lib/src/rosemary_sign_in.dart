@@ -93,6 +93,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   var _loading = true;
   var _busy = false;
   var _sent = false;
+  RosmLegalDocuments? _legalDocuments;
+  var _legalAccepted = false;
   String? _error;
 
   final _email = TextEditingController();
@@ -180,10 +182,16 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         source: 'rosm_passport.ui.sign_in',
         event: 'authorization.load.start',
       );
-      final start = await widget.client.startNativeAuthorization(_request);
+      final results = await Future.wait<Object>([
+        widget.client.startNativeAuthorization(_request),
+        widget.client.currentLegalDocuments(),
+      ]);
+      final start = results[0] as RosmAuthorizationStart;
+      final legalDocuments = results[1] as RosmLegalDocuments;
       if (!mounted) return;
       setState(() {
         _start = start;
+        _legalDocuments = legalDocuments;
         _loading = false;
       });
       widget.client.logger.info(
@@ -244,15 +252,18 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _loginWithCode() async {
     await _run(() async {
+      final legal = _requireLegalAcceptance();
       try {
         final auth = _mode == _SignInMode.email
             ? await widget.client.loginWithEmailCode(
                 email: _email.text.trim(),
                 emailCode: _code.text.trim(),
+                legalAcceptance: legal,
               )
             : await widget.client.loginWithPhoneCode(
                 phoneNumber: _phone.text.trim(),
                 verifyCode: _code.text.trim(),
+                legalAcceptance: legal,
               );
         _showConsent(auth);
       } on RosmApiException catch (error) {
@@ -334,11 +345,13 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     final factor = _selectedDirectStepUpFactor;
     if (challenge == null || factor == null) return;
     await _run(() async {
+      final legal = _requireLegalAcceptance();
       final auth = await widget.client.completeLoginStepUp(
         challenge: challenge,
         factor: factor,
         password: factor == 'password' ? _password.text : null,
         code: factor == 'password' ? null : _mfaCode.text.trim(),
+        legalAcceptance: legal,
       );
       _showConsent(auth);
     });
@@ -352,9 +365,11 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         captchaToken: await _requestCaptchaToken(),
       );
       if (factors.directLogin) {
+        final legal = _requireLegalAcceptance();
         final auth = await widget.client.loginWithPassword(
           email: _passwordEmail.text.trim(),
           password: _password.text,
+          legalAcceptance: legal,
         );
         _showConsent(auth);
         return;
@@ -413,6 +428,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       return;
     }
     await _run(() async {
+      final legal = _requireLegalAcceptance();
       final auth = await widget.client.loginWithPassword(
         email: _passwordEmail.text.trim(),
         password: _password.text,
@@ -423,6 +439,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             ? _mfaCode.text.trim()
             : null,
         captchaToken: await _requestCaptchaToken(),
+        legalAcceptance: legal,
       );
       _showConsent(auth);
     });
@@ -478,6 +495,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Future<void> _registerAccount() async {
     await _run(() async {
+      final legal = _requireLegalAcceptance();
       final auth = _registerMethod == 'phone'
           ? await widget.client.registerWithPhone(
               phoneNumber: _registerEmail.text.trim(),
@@ -487,6 +505,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                   ? _registerCode.text.trim()
                   : null,
               registrationHandoff: _registrationHandoff,
+              legalAcceptance: legal,
             )
           : await widget.client.registerWithEmail(
               email: _registerEmail.text.trim(),
@@ -496,6 +515,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                   ? _registerCode.text.trim()
                   : null,
               registrationHandoff: _registrationHandoff,
+              legalAcceptance: legal,
             );
       _showConsent(auth);
     });
@@ -518,6 +538,36 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       _directStepUpChallenge = null;
       _passwordMfaMode = false;
     });
+  }
+
+  RosmLegalAcceptance _requireLegalAcceptance() {
+    final documents = _legalDocuments;
+    if (!_legalAccepted || documents == null) {
+      throw const RosmApiException(
+        'legal_acceptance_required',
+        '请先阅读并同意使用条款与隐私政策。',
+      );
+    }
+    return documents.acceptance;
+  }
+
+  Future<void> _showLegalDocument(RosmLegalDocument document) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('${document.title} · 版本 ${document.version}'),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(child: SelectableText(document.content)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _approveAndFinish() async {
@@ -732,6 +782,10 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                               ],
                             ],
                           ),
+                        if (_pendingAuth == null && !_recoveryMode) ...[
+                          const SizedBox(height: 18),
+                          _buildLegalAcceptance(colors),
+                        ],
                       ],
                     ),
                   ),
@@ -793,6 +847,44 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 _error = null;
               });
             },
+    );
+  }
+
+  Widget _buildLegalAcceptance(ColorScheme colors) {
+    final documents = _legalDocuments;
+    if (documents == null) return const SizedBox.shrink();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: CheckboxListTile(
+        value: _legalAccepted,
+        onChanged: _busy
+            ? null
+            : (value) => setState(() => _legalAccepted = value == true),
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        title: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Text('我已阅读并同意 '),
+            TextButton(
+              onPressed: () => _showLegalDocument(documents.terms),
+              child: const Text('《使用条款》'),
+            ),
+            const Text('与'),
+            TextButton(
+              onPressed: () => _showLegalDocument(documents.privacy),
+              child: const Text('《隐私政策》'),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          '当前版本 ${documents.terms.version}/${documents.privacy.version}',
+        ),
+      ),
     );
   }
 

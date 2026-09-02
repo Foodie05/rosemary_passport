@@ -24,6 +24,13 @@ Future<Response> onRequest(RequestContext context) async {
       statusCode: 401,
     );
   }
+  if (user.isBanned) {
+    return errorResponse(
+      'account_banned',
+      '该账户已被封禁。如需申诉，请联系 info@rosemaryisland.pro。',
+      statusCode: 403,
+    );
+  }
 
   final description = await describeNativeAuthorization(context, request);
   if (description == null) {
