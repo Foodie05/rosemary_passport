@@ -16,7 +16,7 @@ dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: v0.7.0
+      ref: v0.8.1
       path: packages/rosm_passport_flutter
 ```
 
@@ -44,7 +44,7 @@ final result = await showRosmPassportSignIn(
 final appSession = result?.serverPayload;
 ```
 
-The built-in UI supports email code login, phone code login, password login, password MFA, password recovery, email registration, and the final consent page. Registration is enabled by default. Set `enableRegistration: false` if an app wants to hide account creation.
+The built-in UI supports email code login, phone code login, password login, password MFA, password recovery, email registration, version-bound Terms of Use and Privacy Policy acceptance, and the final OIDC consent page. It loads the current legal versions, lets the user read each document in a ROSM Pass dialog, and blocks completion until the checkbox is selected. Registration is enabled by default. Set `enableRegistration: false` if an app wants to hide account creation.
 
 The built-in sign-in and account-management screens follow the device appearance by default. They use the same sage-based ROSM Pass visual language in both light and dark mode. An app can explicitly select an appearance when needed:
 
@@ -202,9 +202,11 @@ final request = passport.createAuthorizationRequest(serverHandoff: true);
 final start = await passport.startNativeAuthorization(request);
 
 await passport.sendEmailLoginCode(email: 'user@example.com');
+final legalDocuments = await passport.currentLegalDocuments();
 final auth = await passport.loginWithEmailCode(
   email: 'user@example.com',
   emailCode: '123456',
+  legalAcceptance: legalDocuments.acceptance,
 );
 
 final approval = await passport.approveNativeAuthorization(request);

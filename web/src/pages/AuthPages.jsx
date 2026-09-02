@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { ThemeToggle } from '../theme';
+import { RosemaryCheckbox } from '../components/ui';
 import { getPasskeyErrorMessage, getUserErrorMessage } from '../lib/errors';
 import {
   preparePublicKeyRequestOptions,
@@ -98,26 +99,19 @@ function CodeInputWithAction({
 
 function RememberMeCheckbox({ checked, onChange }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 px-1 text-sm text-sage-500">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
-      />
+    <RosemaryCheckbox checked={checked} onCheckedChange={onChange} className="px-1 text-sage-500">
       保持登录状态（3 天）
-    </label>
+    </RosemaryCheckbox>
   );
 }
 
 function LegalAgreementCheckbox({ checked, onChange, documents }) {
   return (
-    <label className="flex items-start gap-2 rounded-2xl border border-sage-200 bg-sage-50/60 px-4 py-3 text-sm leading-6 text-sage-600">
-      <input
-        type="checkbox"
+    <div className="flex items-start gap-2.5 px-1 text-sm leading-6 text-sage-600">
+      <RosemaryCheckbox
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 rounded text-sage-600 focus:ring-sage-400"
+        onCheckedChange={onChange}
+        ariaLabel="同意使用条款与隐私政策"
       />
       <span>
         我已阅读并同意
@@ -126,7 +120,7 @@ function LegalAgreementCheckbox({ checked, onChange, documents }) {
         <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-sage-900 underline underline-offset-4">《隐私政策》</Link>
         {documents?.terms && documents?.privacy ? `（版本 ${documents.terms.version}/${documents.privacy.version}）` : ''}
       </span>
-    </label>
+    </div>
   );
 }
 
@@ -774,16 +768,11 @@ export function LoginPage({
 
               <Link
                 to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
-                className="group flex w-full items-center justify-between rounded-2xl border border-sage-200 bg-sage-50/60 px-4 py-3.5 text-left transition-colors hover:border-sage-300 hover:bg-sage-100/70"
+                className="group flex w-full items-center justify-between gap-3 px-1 py-1 text-left"
               >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sage-600 shadow-sm">
-                    <Lock size={18} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold text-sage-900">忘记密码？</span>
-                    <span className="block text-xs leading-relaxed text-sage-500">使用已绑定的验证方式重置密码</span>
-                  </span>
+                <span className="min-w-0 text-sm">
+                  <span className="font-bold text-sage-900 transition-colors group-hover:text-sage-700">忘记密码？</span>
+                  <span className="ml-2 text-sage-500">使用已绑定的验证方式重置密码</span>
                 </span>
                 <ArrowRight size={17} className="shrink-0 text-sage-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </Link>

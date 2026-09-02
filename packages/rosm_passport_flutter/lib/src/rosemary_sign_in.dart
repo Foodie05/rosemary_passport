@@ -552,20 +552,104 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   }
 
   Future<void> _showLegalDocument(RosmLegalDocument document) {
+    final theme = buildRosmPassportTheme(context, widget.config.themeMode);
+    final colors = theme.colorScheme;
     return showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('${document.title} · 版本 ${document.version}'),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(child: SelectableText(document.content)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('关闭'),
+      barrierColor: colors.shadow.withValues(alpha: 0.48),
+      builder: (dialogContext) => Theme(
+        data: theme,
+        child: Dialog(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 28,
           ),
-        ],
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.82,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                border: Border.all(color: colors.outlineVariant),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.shadow.withValues(alpha: 0.18),
+                    blurRadius: 36,
+                    offset: const Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 16, 18),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                document.title,
+                                style: TextStyle(
+                                  color: colors.onSurface,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'ROSM Pass · 版本 ${document.version}',
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '关闭',
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: colors.outlineVariant),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: SelectableText(
+                        document.content,
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 14,
+                          height: 1.65,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Divider(height: 1, color: colors.outlineVariant),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('阅读完成'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -853,37 +937,63 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   Widget _buildLegalAcceptance(ColorScheme colors) {
     final documents = _legalDocuments;
     if (documents == null) return const SizedBox.shrink();
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: CheckboxListTile(
-        value: _legalAccepted,
-        onChanged: _busy
-            ? null
-            : (value) => setState(() => _legalAccepted = value == true),
-        controlAffinity: ListTileControlAffinity.leading,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        title: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const Text('我已阅读并同意 '),
-            TextButton(
-              onPressed: () => _showLegalDocument(documents.terms),
-              child: const Text('《使用条款》'),
+    return Semantics(
+      container: true,
+      label: '使用条款与隐私政策同意',
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Checkbox(
+              value: _legalAccepted,
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() => _legalAccepted = value == true),
             ),
-            const Text('与'),
-            TextButton(
-              onPressed: () => _showLegalDocument(documents.privacy),
-              child: const Text('《隐私政策》'),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 7),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '我已阅读并同意 ',
+                    style: TextStyle(color: colors.onSurfaceVariant),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => _showLegalDocument(documents.terms),
+                    child: const Text('《使用条款》'),
+                  ),
+                  Text(' 与 ', style: TextStyle(color: colors.onSurfaceVariant)),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => _showLegalDocument(documents.privacy),
+                    child: const Text('《隐私政策》'),
+                  ),
+                  Text(
+                    '（版本 ${documents.terms.version}/${documents.privacy.version}）',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        subtitle: Text(
-          '当前版本 ${documents.terms.version}/${documents.privacy.version}',
-        ),
+          ),
+        ],
       ),
     );
   }

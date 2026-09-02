@@ -4,6 +4,7 @@ import { Ban, BookOpen, Check, CircleHelp, Copy, FileText, Globe, Key, Mail, Pen
 import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
+import { RosemaryCheckbox, useRosemaryDialog } from '../components/ui';
 
 const SECURITY_GROUPS = [
   {
@@ -72,6 +73,20 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
 const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/master/packages/rosm_passport_flutter';
+const DASHBOARD_PERIODS = [
+  { days: 7, label: '7 天' },
+  { days: 30, label: '30 天' },
+  { days: 90, label: '90 天' },
+  { days: 180, label: '180 天' },
+];
+
+function formatBeijingDate(value, includeYear = false) {
+  const matched = `${value || ''}`.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!matched) return '-';
+  const [, year, month, day] = matched;
+  const readable = `${Number(month)}月${Number(day)}日`;
+  return includeYear ? `${year}年${readable}` : readable;
+}
 
 function parseUniqueLines(value) {
   return `${value || ''}`
@@ -239,7 +254,7 @@ function ProviderListSection({
 
 function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
   return (
-    <label className="flex items-start justify-between gap-4 rounded-2xl border border-sage-100 bg-white p-5 text-sm text-sage-700">
+    <div className="flex items-start justify-between gap-4 rounded-2xl border border-sage-100 bg-white p-5 text-sm text-sage-700">
       <span className="min-w-0 space-y-2">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="min-w-0 break-words font-bold text-sage-900">{title}</span>
@@ -249,13 +264,13 @@ function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
           <HelpHint hint={hint} />
         </span>
       </span>
-      <input
-        type="checkbox"
-        className="mt-1 h-4 w-4 shrink-0 rounded text-sage-600 focus:ring-sage-400"
+      <RosemaryCheckbox
         checked={checked}
-        onChange={onChange}
+        onCheckedChange={onChange}
+        ariaLabel={title}
+        className="shrink-0"
       />
-    </label>
+    </div>
   );
 }
 
@@ -348,10 +363,9 @@ export function AdminServiceConfig({
               <input type="password" className="input-field" value={systemForm.smtp_password_confirm || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_password_confirm: event.target.value }))} />
             </ConfigField>
           </div>
-          <label className="flex items-center gap-3 text-sm text-sage-600">
-            <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(systemForm.smtp_secure)} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_secure: event.target.checked }))} />
+          <RosemaryCheckbox checked={Boolean(systemForm.smtp_secure)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, smtp_secure: checked }))}>
             启用安全连接
-          </label>
+          </RosemaryCheckbox>
         </div>
 
         <div className="border-t border-sage-100 pt-8">
@@ -374,10 +388,9 @@ export function AdminServiceConfig({
                 <input type="password" className="input-field" autoComplete="new-password" placeholder={systemForm.aliyun_captcha_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.aliyun_captcha_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_secret: event.target.value }))} />
               </ConfigField>
             </div>
-            <label className="flex items-center gap-3 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(systemForm.registration_email_verify)} onChange={(event) => setSystemForm((current) => ({ ...current, registration_email_verify: event.target.checked }))} />
+            <RosemaryCheckbox checked={Boolean(systemForm.registration_email_verify)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, registration_email_verify: checked }))}>
               注册必须验证邮箱
-            </label>
+            </RosemaryCheckbox>
           </div>
         </div>
 
@@ -404,10 +417,9 @@ export function AdminServiceConfig({
                 <input className="input-field" value={systemForm.phone_sms_scheme_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_scheme_name: event.target.value }))} />
               </ConfigField>
             </div>
-            <label className="flex items-center gap-3 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(systemForm.phone_verification_enabled ?? true)} onChange={(event) => setSystemForm((current) => ({ ...current, phone_verification_enabled: event.target.checked }))} />
+            <RosemaryCheckbox checked={Boolean(systemForm.phone_verification_enabled ?? true)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, phone_verification_enabled: checked }))}>
               启用手机号验证码能力（登录 / MFA / 绑定）
-            </label>
+            </RosemaryCheckbox>
           </div>
         </div>
       </div>
@@ -458,14 +470,14 @@ export function AdminSecurityPolicy({
               defaultEnabled={SECURITY_TOGGLE_DEFAULTS.email_rate_limit_enabled}
               hint={SECURITY_FIELD_HINTS.email_rate_limit_enabled}
               checked={Boolean(systemForm.email_rate_limit_enabled ?? true)}
-              onChange={(event) => setSystemForm((current) => ({ ...current, email_rate_limit_enabled: event.target.checked }))}
+              onChange={(checked) => setSystemForm((current) => ({ ...current, email_rate_limit_enabled: checked }))}
             />
             <ToggleCard
               title="启用 IP 维度限流"
               defaultEnabled={SECURITY_TOGGLE_DEFAULTS.ip_rate_limit_enabled}
               hint={SECURITY_FIELD_HINTS.ip_rate_limit_enabled}
               checked={Boolean(systemForm.ip_rate_limit_enabled ?? true)}
-              onChange={(event) => setSystemForm((current) => ({ ...current, ip_rate_limit_enabled: event.target.checked }))}
+              onChange={(checked) => setSystemForm((current) => ({ ...current, ip_rate_limit_enabled: checked }))}
             />
           </div>
         </div>
@@ -550,31 +562,95 @@ export function AdminSecurityPolicy({
 }
 
 function MiniLineChart({ data, series }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
   const geometry = useMemo(() => {
     const width = 720;
     const height = 220;
     const values = data.flatMap((row) => series.map((item) => Number(row[item.key] || 0)));
     const max = Math.max(1, ...values);
-    const paths = series.map((item) => ({
-      ...item,
-      points: data.map((row, index) => {
+    const paths = series.map((item) => {
+      const points = data.map((row, index) => {
         const x = data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
         const y = height - (Number(row[item.key] || 0) / max) * (height - 20) - 10;
-        return `${x},${y}`;
-      }).join(' '),
-    }));
+        return { x, y };
+      });
+      return {
+        ...item,
+        points,
+        polyline: points.map((point) => `${point.x},${point.y}`).join(' '),
+      };
+    });
     return { width, height, paths };
   }, [data, series]);
+  const hoveredRow = hoveredIndex == null ? null : data[hoveredIndex];
+  const hoveredX = hoveredIndex == null || data.length <= 1
+    ? geometry.width / 2
+    : (hoveredIndex / (data.length - 1)) * geometry.width;
+
+  function selectPointerPosition(event) {
+    if (!data.length) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    setHoveredIndex(data.length <= 1 ? 0 : Math.round(ratio * (data.length - 1)));
+  }
+
+  function moveKeyboardPosition(event) {
+    if (!data.length || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowLeft' ? -1 : 1;
+    setHoveredIndex((current) => Math.min(data.length - 1, Math.max(0, (current ?? data.length - 1) + direction)));
+  }
+
   return (
-    <div>
+    <div className="relative">
       <div className="mb-3 flex flex-wrap gap-4 text-xs font-bold text-sage-600">
         {series.map((item) => <span key={item.key} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
       </div>
-      <svg viewBox={`0 0 ${geometry.width} ${geometry.height}`} className="h-56 w-full" role="img" aria-label={series.map((item) => item.label).join('、')}>
+      {hoveredRow ? (
+        <div
+          className="pointer-events-none absolute top-9 z-10 min-w-44 rounded-xl border border-sage-700/20 bg-sage-900/95 px-4 py-3 text-xs text-white shadow-xl backdrop-blur"
+          style={{
+            left: `${data.length <= 1 ? 50 : (hoveredIndex / (data.length - 1)) * 100}%`,
+            transform: hoveredIndex <= (data.length - 1) * 0.25
+              ? 'translateX(0)'
+              : hoveredIndex >= (data.length - 1) * 0.75
+                ? 'translateX(-100%)'
+                : 'translateX(-50%)',
+          }}
+        >
+          <p className="mb-2 font-bold">北京时间 · {formatBeijingDate(hoveredRow.date, true)}</p>
+          <div className="space-y-1.5">
+            {series.map((item) => (
+              <div key={item.key} className="flex items-center justify-between gap-6">
+                <span className="flex items-center gap-2 text-white/80"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>
+                <span className="font-bold tabular-nums">{Number(hoveredRow[item.key] || 0).toLocaleString('zh-CN')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <svg
+        viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+        className="h-56 w-full cursor-crosshair outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2"
+        role="img"
+        aria-label={`${series.map((item) => item.label).join('、')}，按北京时间统计`}
+        tabIndex="0"
+        onPointerDown={selectPointerPosition}
+        onPointerMove={selectPointerPosition}
+        onPointerLeave={() => setHoveredIndex(null)}
+        onFocus={() => { if (data.length) setHoveredIndex(data.length - 1); }}
+        onBlur={() => setHoveredIndex(null)}
+        onKeyDown={moveKeyboardPosition}
+      >
         {[0, 1, 2, 3, 4].map((row) => <line key={row} x1="0" x2={geometry.width} y1={(row / 4) * geometry.height} y2={(row / 4) * geometry.height} stroke="currentColor" className="text-sage-100" />)}
-        {geometry.paths.map((item) => <polyline key={item.key} points={item.points} fill="none" stroke={item.color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />)}
+        {geometry.paths.map((item) => <polyline key={item.key} points={item.polyline} fill="none" stroke={item.color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />)}
+        {hoveredRow ? <line x1={hoveredX} x2={hoveredX} y1="0" y2={geometry.height} stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 5" className="text-sage-400" /> : null}
+        {hoveredRow ? geometry.paths.map((item) => {
+          const point = item.points[hoveredIndex];
+          return <circle key={item.key} cx={point.x} cy={point.y} r="6" fill="white" stroke={item.color} strokeWidth="4" />;
+        }) : null}
       </svg>
-      <div className="mt-2 flex justify-between text-xs text-sage-400"><span>{data[0]?.date || '-'}</span><span>{data.at(-1)?.date || '-'}</span></div>
+      <div className="mt-2 flex justify-between text-xs text-sage-400"><span>{formatBeijingDate(data[0]?.date)}</span><span>{formatBeijingDate(data.at(-1)?.date)}</span></div>
     </div>
   );
 }
@@ -585,7 +661,31 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
   const summary = data?.summary || {};
   return (
     <div className="space-y-6">
-      <SectionHeader title="运营与安全看板" description="基于系统数据库与审计记录生成；统计口径可在图表下方查看。" actions={<select className="input-field w-auto" value={days} onChange={(event) => setDays(Number(event.target.value))}><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select>} />
+      <SectionHeader
+        title="运营与安全看板"
+        description="基于系统数据库与审计记录生成；全部日期与自然日边界均按北京时间（UTC+8）统计。"
+        actions={(
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <span className="text-xs font-bold text-sage-500">选择统计时间范围</span>
+            <div className="inline-flex rounded-2xl border border-sage-200 bg-white p-1 shadow-sm" role="group" aria-label="统计时间范围">
+              {DASHBOARD_PERIODS.map((period) => (
+                <button
+                  key={period.days}
+                  type="button"
+                  className={cn(
+                    'rounded-xl px-3 py-2 text-sm font-bold transition-colors',
+                    days === period.days ? 'bg-sage-600 text-white' : 'text-sage-500 hover:bg-sage-50 hover:text-sage-700',
+                  )}
+                  aria-pressed={days === period.days}
+                  onClick={() => setDays(period.days)}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[['当前用户', summary.total_users ?? '-'], ['封禁账户', summary.banned_users ?? '-'], ['接入 OIDC 平台', summary.active_third_party_oidc_clients ?? '-'], ['全部活跃客户端', summary.active_oidc_clients ?? '-']].map(([label, value]) => <div key={label} className="glass-card rounded-2xl p-6"><p className="text-sm font-bold text-sage-500">{label}</p><p className="mt-3 text-3xl font-bold text-sage-900">{value}</p></div>)}
       </div>
@@ -600,6 +700,7 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
 }
 
 export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publishDocument, safely }) {
+  const { confirm } = useRosemaryDialog();
   const [type, setType] = useState('terms');
   const [form, setForm] = useState({ title: '', content: '' });
   useEffect(() => { void safely(loadDocuments, '协议记录加载失败'); }, [loadDocuments, safely]);
@@ -616,7 +717,7 @@ export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publi
         <div className="glass-card rounded-2xl p-6">
           <div className="mb-5 flex gap-2">{[['terms', '使用条款'], ['privacy', '隐私政策']].map(([value, label]) => <button key={value} type="button" onClick={() => setType(value)} className={cn('rounded-xl px-4 py-2 text-sm font-bold', type === value ? 'bg-sage-600 text-white' : 'bg-sage-100 text-sage-600')}>{label}</button>)}</div>
           <div className="space-y-4"><input className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /><textarea className="input-field min-h-[520px] font-mono text-sm leading-6" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></div>
-          <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</button><button type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</button>{draft ? <button type="button" className="rounded-xl bg-sage-900 px-5 py-3 font-bold text-white" onClick={() => void safely(async () => { if (!window.confirm(`确认发布版本 ${draft.version}？发布后无法覆盖历史版本。`)) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</button> : null}</div>
+          <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</button><button type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</button>{draft ? <button type="button" className="rounded-xl bg-sage-900 px-5 py-3 font-bold text-white" onClick={() => void safely(async () => { const approved = await confirm({ title: `发布协议版本 ${draft.version}`, message: '发布后将立即成为当前版本，历史版本不可覆盖，所有用户下次登录时需要重新明确同意。', confirmLabel: '确认发布', tone: 'warning' }); if (!approved) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</button> : null}</div>
         </div>
         <aside className="glass-card h-fit rounded-2xl p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{selected.map((item) => <button key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-xl border border-sage-100 p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-green-600' : 'text-amber-600')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-sage-400">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></button>)}</div></aside>
       </div>
@@ -625,6 +726,7 @@ export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publi
 }
 
 export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserStatus, safely, createUser, updateUserRoles, deleteUser }) {
+  const { confirm } = useRosemaryDialog();
   const [search, setSearch] = useState('');
   const [createForm, setCreateForm] = useState({
     email: '',
@@ -722,7 +824,12 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                         onClick={(event) => {
                           event.stopPropagation();
                           void safely(async () => {
-                            const confirmed = window.confirm(`确定删除用户“${cleanDisplayName(user.nickname, user.email || '未命名用户')}”吗？`);
+                            const confirmed = await confirm({
+                              title: '删除用户',
+                              message: `确定删除用户“${cleanDisplayName(user.nickname, user.email || '未命名用户')}”吗？此操作不可撤销。`,
+                              confirmLabel: '删除用户',
+                              tone: 'danger',
+                            });
                             if (!confirmed) {
                               return;
                             }
@@ -875,7 +982,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           {viewingUser.account_status === 'banned' ? (
             <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4"><p className="text-sm text-red-700">封禁原因：{viewingUser.banned_reason || '-'}</p><button type="button" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 font-bold text-white" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</button></div>
           ) : (
-            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-4"><label className="text-sm font-bold text-red-700">封禁原因</label><textarea value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><button type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 font-bold text-white disabled:opacity-40" onClick={() => void safely(async () => { if (!window.confirm('封禁将立即撤销该用户的所有 Access Token 和 Refresh Token，确定继续？')) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</button></div>
+            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-4"><label className="text-sm font-bold text-red-700">封禁原因</label><textarea value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><button type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 font-bold text-white disabled:opacity-40" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</button></div>
           )}
         </Modal>
       )}
@@ -884,6 +991,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
 }
 
 export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcClients, loadOidcClients, safely, oidcForm, setOidcForm, saveOidcClient, deleteOidcClient }) {
+  const { alert, confirm } = useRosemaryDialog();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingClientId, setEditingClientId] = useState('');
   const [oneTimeSecret, setOneTimeSecret] = useState(null);
@@ -1006,7 +1114,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
       discardOneTimeSecret();
     } catch {
       setCopyingSecret(false);
-      window.alert('复制失败，请手动复制后关闭窗口。');
+      await alert({ title: '复制失败', message: '无法自动写入剪贴板，请手动复制密钥后再关闭窗口。', tone: 'warning' });
     }
   }
 
@@ -1081,7 +1189,12 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                       onClick={(event) => {
                         event.stopPropagation();
                         void safely(async () => {
-                          const confirmed = window.confirm(`确定删除 OIDC 应用“${client.client_id}”吗？`);
+                          const confirmed = await confirm({
+                            title: '删除 OIDC 应用',
+                            message: `确定删除 OIDC 应用“${client.client_id}”吗？现有授权流程将立即失效。`,
+                            confirmLabel: '删除应用',
+                            tone: 'danger',
+                          });
                           if (!confirmed) {
                             return;
                           }
@@ -1145,19 +1258,19 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
-              <label className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
+              <div className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
                 <span>启用 Web</span>
-                <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.enable_web)} onChange={(event) => setOidcForm((current) => ({ ...current, enable_web: event.target.checked }))} />
-              </label>
+                <RosemaryCheckbox checked={Boolean(oidcForm.enable_web)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_web: checked }))} ariaLabel="启用 Web" />
+              </div>
               <p className="mt-2 text-xs leading-5 text-sage-500">Web 使用 HTTPS 或 loopback 回调。仅 Web 启用时可选择机密客户端。</p>
               <textarea rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
             </div>
 
             <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
-              <label className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
+              <div className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
                 <span>启用 App</span>
-                <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.enable_app)} onChange={(event) => setOidcForm((current) => ({ ...current, enable_app: event.target.checked }))} />
-              </label>
+                <RosemaryCheckbox checked={Boolean(oidcForm.enable_app)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_app: checked }))} ariaLabel="启用 App" />
+              </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs leading-5 text-sage-500">Public 直连使用自定义 scheme；服务端交接使用上方 HTTPS 回调并可保持机密客户端。</p>
                 <button type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
@@ -1173,18 +1286,17 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             <ConfigField label="Scopes">
               <div className="grid max-h-44 grid-cols-1 gap-2 overflow-y-auto rounded-2xl border border-sage-100 bg-sage-50/70 p-3 sm:grid-cols-2">
                 {OIDC_SCOPE_OPTIONS.map((scope) => (
-                  <label key={scope.value} className="flex items-start gap-2 rounded-xl bg-white px-3 py-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
+                  <RosemaryCheckbox
+                      key={scope.value}
                       checked={scopeSet.has(scope.value)}
-                      onChange={(event) => toggleScope(scope.value, event.target.checked)}
-                    />
+                      onCheckedChange={(checked) => toggleScope(scope.value, checked)}
+                      className="rounded-xl bg-white px-3 py-2"
+                    >
                     <span>
                       <span className="block text-sm font-semibold text-sage-800">{scope.label}</span>
                       <span className="block text-xs leading-4 text-sage-500">{scope.description}</span>
                     </span>
-                  </label>
+                  </RosemaryCheckbox>
                 ))}
               </div>
             </ConfigField>
@@ -1200,39 +1312,33 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                     : '机密客户端由服务端自动生成 256 位随机密钥，保存后仅展示一次。'}
                 </p>
                 {editingClientId && oidcForm.is_confidential ? (
-                  <label className="mt-3 flex items-center gap-2 text-sm text-sage-700">
-                    <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={Boolean(oidcForm.generate_client_secret)} onChange={(event) => setOidcForm((current) => ({ ...current, generate_client_secret: event.target.checked }))} />
+                  <RosemaryCheckbox className="mt-3 text-sage-700" checked={Boolean(oidcForm.generate_client_secret)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, generate_client_secret: checked }))}>
                     保存时安全轮换密钥
-                  </label>
+                  </RosemaryCheckbox>
                 ) : null}
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-5 rounded-2xl border border-sage-100 bg-sage-50/80 p-4">
-            <label className="flex items-center gap-2 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={oidcForm.is_official} onChange={(event) => setOidcForm((current) => ({ ...current, is_official: event.target.checked }))} />
+            <RosemaryCheckbox checked={oidcForm.is_official} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, is_official: checked }))}>
               官方应用
-            </label>
-            <label className="flex items-center gap-2 text-sm text-sage-600">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400"
+            </RosemaryCheckbox>
+            <RosemaryCheckbox
                 checked={Boolean(oidcForm.is_confidential)}
-                onChange={(event) => setOidcForm((current) => ({
+                onCheckedChange={(checked) => setOidcForm((current) => ({
                   ...current,
-                  is_confidential: event.target.checked,
-                  generate_client_secret: event.target.checked && !current.is_confidential
+                  is_confidential: checked,
+                  generate_client_secret: checked && !current.is_confidential
                     ? true
                     : current.generate_client_secret,
                 }))}
-              />
+              >
               机密客户端
-            </label>
-            <label className="flex items-center gap-2 text-sm text-sage-600">
-              <input type="checkbox" className="h-4 w-4 rounded text-sage-600 focus:ring-sage-400" checked={oidcForm.is_active} onChange={(event) => setOidcForm((current) => ({ ...current, is_active: event.target.checked }))} />
+            </RosemaryCheckbox>
+            <RosemaryCheckbox checked={oidcForm.is_active} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, is_active: checked }))}>
               启用应用
-            </label>
+            </RosemaryCheckbox>
             <p className="basis-full text-xs leading-5 text-sage-500">
               同一个包名可以同时启用 Web/App。服务端交接模式可使用机密客户端和 HTTPS 回调；Public 直连模式必须关闭机密客户端并使用自定义 scheme。
             </p>
