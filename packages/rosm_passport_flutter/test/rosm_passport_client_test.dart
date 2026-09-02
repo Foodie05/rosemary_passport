@@ -67,6 +67,7 @@ void main() {
       clientId: 'app',
       redirectUri: Uri.parse('com.example.app:/oidc/callback'),
       tokenStore: _MemoryTokenStore(),
+      lastSignInStore: RosmMemoryLastSignInStore(),
       httpClient: MockClient((request) async {
         captured = request;
         return http.Response(
@@ -92,6 +93,77 @@ void main() {
       'captcha_token': 'captcha',
     });
   });
+
+  test(
+    'loads published legal documents and binds acceptance versions',
+    () async {
+      final requests = <http.Request>[];
+      final client = RosmPassportClient(
+        issuer: Uri.parse('https://api.example.com'),
+        clientId: 'app',
+        redirectUri: Uri.parse('com.example.app:/oidc/callback'),
+        tokenStore: _MemoryTokenStore(),
+        lastSignInStore: RosmMemoryLastSignInStore(),
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          if (request.url.path == '/api/v1/legal/documents') {
+            return http.Response(
+              jsonEncode({
+                'terms': {
+                  'id': 'terms-2',
+                  'type': 'terms',
+                  'version': 2,
+                  'title': 'Terms',
+                  'content': 'terms body',
+                },
+                'privacy': {
+                  'id': 'privacy-3',
+                  'type': 'privacy',
+                  'version': 3,
+                  'title': 'Privacy',
+                  'content': 'privacy body',
+                },
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'user': {
+                'id': 'user-1',
+                'email': 'user@example.com',
+                'nickname': 'User',
+                'roles': ['user'],
+              },
+              'security': {},
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final legal = await client.currentLegalDocuments();
+      await client.loginWithEmailCode(
+        email: 'user@example.com',
+        emailCode: '123456',
+        legalAcceptance: legal.acceptance,
+      );
+
+      expect(legal.terms.version, 2);
+      expect(legal.privacy.version, 3);
+      expect(
+        jsonDecode(requests.last.body),
+        containsPair('accepted_legal', true),
+      );
+      expect(jsonDecode(requests.last.body), containsPair('terms_version', 2));
+      expect(
+        jsonDecode(requests.last.body),
+        containsPair('privacy_version', 3),
+      );
+    },
+  );
 
   test(
     'exposes a verified registration handoff after email-code login',

@@ -4,6 +4,7 @@ import '../../../../lib/src/config/app_config.dart';
 import '../../../../lib/src/services/auth_service.dart';
 import '../../../../lib/src/utils/auth_response.dart';
 import '../../../../lib/src/utils/http.dart';
+import '../../../../lib/src/utils/legal_http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -21,6 +22,8 @@ Future<Response> onRequest(RequestContext context) async {
   if (phoneNumber.isEmpty || verifyCode.isEmpty) {
     return errorResponse('invalid_request', '请输入手机号和验证码。');
   }
+  final (legal, legalError) = await validateLegalSubmission(context, body);
+  if (legalError != null) return legalError;
 
   final requestIp = clientIpFromRequest(
     context.request,
@@ -58,6 +61,12 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   final result = attempt.result!;
+  await recordLegalAcceptance(
+    context,
+    userId: result.user.id,
+    validation: legal!,
+    acceptanceContext: 'login_phone_code',
+  );
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: result.user,

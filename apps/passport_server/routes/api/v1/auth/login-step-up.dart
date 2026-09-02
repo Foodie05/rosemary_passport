@@ -4,6 +4,7 @@ import '../../../../lib/src/config/app_config.dart';
 import '../../../../lib/src/services/auth_service.dart';
 import '../../../../lib/src/utils/auth_response.dart';
 import '../../../../lib/src/utils/http.dart';
+import '../../../../lib/src/utils/legal_http.dart';
 
 Future<Response> onRequest(RequestContext context) async {
   if (context.request.method != HttpMethod.post) {
@@ -15,6 +16,11 @@ Future<Response> onRequest(RequestContext context) async {
   if (challenge.isEmpty || factor.isEmpty) {
     return errorResponse('invalid_request', '缺少登录验证参数。');
   }
+  final (legal, legalError) = await validateLegalSubmission(
+    context,
+    body ?? const {},
+  );
+  if (legalError != null) return legalError;
   final proof = <String, dynamic>{
     'password': body?['password'],
     'code': body?['code'],
@@ -39,6 +45,12 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
   final result = attempt.result!;
+  await recordLegalAcceptance(
+    context,
+    userId: result.user.id,
+    validation: legal!,
+    acceptanceContext: 'login_step_up',
+  );
   final responseBody = await buildFirstPartyAuthPayload(
     context,
     user: result.user,

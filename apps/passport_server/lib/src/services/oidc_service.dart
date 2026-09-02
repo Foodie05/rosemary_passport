@@ -187,7 +187,7 @@ class OidcService {
     }
 
     final user = await _users.findById(authCode['user_id'] as String);
-    if (user == null) {
+    if (user == null || user.isBanned) {
       return null;
     }
 
@@ -229,7 +229,7 @@ class OidcService {
       return null;
     }
     final user = await _users.findById(userId);
-    if (user == null) {
+    if (user == null || user.isBanned) {
       return null;
     }
     final scopes = (payload['scope'] as String? ?? '')
@@ -293,6 +293,11 @@ class OidcService {
       if (payload['client_id'] != clientId) {
         return {'active': false};
       }
+      final userId = payload['sub']?.toString();
+      final user = userId == null ? null : await _users.findById(userId);
+      if (user == null || user.isBanned) {
+        return {'active': false};
+      }
       return {
         'active': true,
         'sub': payload['sub'],
@@ -311,6 +316,11 @@ class OidcService {
       return {'active': false};
     }
     if (tokenId == null) {
+      return {'active': false};
+    }
+    final userId = refresh.payload['sub']?.toString();
+    final user = userId == null ? null : await _users.findById(userId);
+    if (user == null || user.isBanned) {
       return {'active': false};
     }
 

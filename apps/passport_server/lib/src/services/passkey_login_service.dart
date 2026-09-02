@@ -63,6 +63,7 @@ class PasskeyLoginService {
     if (!verified) {
       return _failure;
     }
+    if (user.isBanned) return _bannedFailure;
 
     final auth = await _sessions.issueFirstPartyAuthResult(
       user,
@@ -84,5 +85,10 @@ class PasskeyLoginService {
     code: 'login_failed',
     message: '通行密钥登录失败。',
     statusCode: 401,
+  );
+  static const _bannedFailure = LoginAttempt.failure(
+    code: 'account_banned',
+    message: '该账户已被封禁。如需申诉，请联系 info@rosemaryisland.pro。',
+    statusCode: 403,
   );
 }

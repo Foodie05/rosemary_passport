@@ -10,6 +10,8 @@ class AuthenticatedUser {
     required this.roles,
     this.accessTokenId,
     this.postRegistrationPasskeyBootstrapUntil,
+    this.accountStatus = 'active',
+    this.banReason,
   });
 
   final String id;
@@ -20,8 +22,11 @@ class AuthenticatedUser {
   final List<String> roles;
   final String? accessTokenId;
   final DateTime? postRegistrationPasskeyBootstrapUntil;
+  final String accountStatus;
+  final String? banReason;
 
   bool get isAdmin => roles.contains('admin');
+  bool get isBanned => accountStatus == 'banned';
   bool get canBootstrapPasskeyAfterRegistration =>
       postRegistrationPasskeyBootstrapUntil != null &&
       DateTime.now().toUtc().isBefore(postRegistrationPasskeyBootstrapUntil!);
@@ -33,5 +38,6 @@ class AuthenticatedUser {
     'is_phone_verified': isPhoneVerified,
     'nickname': nickname,
     'roles': roles,
+    'account_status': accountStatus,
   };
 }

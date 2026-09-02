@@ -5,6 +5,72 @@ part 'models.g.dart';
 /// Controls the appearance of ROSM Passport's built-in Flutter screens.
 enum RosmPassportThemeMode { system, light, dark }
 
+class RosmLegalDocument {
+  const RosmLegalDocument({
+    required this.id,
+    required this.type,
+    required this.version,
+    required this.title,
+    required this.content,
+    this.publishedAt,
+  });
+
+  factory RosmLegalDocument.fromJson(Map<String, dynamic> json) =>
+      RosmLegalDocument(
+        id: '${json['id'] ?? ''}',
+        type: '${json['type'] ?? ''}',
+        version: (json['version'] as num?)?.toInt() ?? 0,
+        title: '${json['title'] ?? ''}',
+        content: '${json['content'] ?? ''}',
+        publishedAt: DateTime.tryParse('${json['published_at'] ?? ''}'),
+      );
+
+  final String id;
+  final String type;
+  final int version;
+  final String title;
+  final String content;
+  final DateTime? publishedAt;
+}
+
+class RosmLegalDocuments {
+  const RosmLegalDocuments({required this.terms, required this.privacy});
+
+  factory RosmLegalDocuments.fromJson(Map<String, dynamic> json) =>
+      RosmLegalDocuments(
+        terms: RosmLegalDocument.fromJson(
+          Map<String, dynamic>.from(json['terms'] as Map),
+        ),
+        privacy: RosmLegalDocument.fromJson(
+          Map<String, dynamic>.from(json['privacy'] as Map),
+        ),
+      );
+
+  final RosmLegalDocument terms;
+  final RosmLegalDocument privacy;
+
+  RosmLegalAcceptance get acceptance => RosmLegalAcceptance(
+    termsVersion: terms.version,
+    privacyVersion: privacy.version,
+  );
+}
+
+class RosmLegalAcceptance {
+  const RosmLegalAcceptance({
+    required this.termsVersion,
+    required this.privacyVersion,
+  });
+
+  final int termsVersion;
+  final int privacyVersion;
+
+  Map<String, dynamic> toJson() => {
+    'accepted_legal': true,
+    'terms_version': termsVersion,
+    'privacy_version': privacyVersion,
+  };
+}
+
 class UriStringConverter implements JsonConverter<Uri, String> {
   const UriStringConverter();
 

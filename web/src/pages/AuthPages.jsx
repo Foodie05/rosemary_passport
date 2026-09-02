@@ -110,6 +110,26 @@ function RememberMeCheckbox({ checked, onChange }) {
   );
 }
 
+function LegalAgreementCheckbox({ checked, onChange, documents }) {
+  return (
+    <label className="flex items-start gap-2 rounded-2xl border border-sage-200 bg-sage-50/60 px-4 py-3 text-sm leading-6 text-sage-600">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0 rounded text-sage-600 focus:ring-sage-400"
+      />
+      <span>
+        我已阅读并同意
+        <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-sage-900 underline underline-offset-4">《使用条款》</Link>
+        与
+        <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-sage-900 underline underline-offset-4">《隐私政策》</Link>
+        {documents?.terms && documents?.privacy ? `（版本 ${documents.terms.version}/${documents.privacy.version}）` : ''}
+      </span>
+    </label>
+  );
+}
+
 function AccountCenterLink() {
   return (
     <Link
@@ -221,6 +241,9 @@ export function LoginPage({
   loadLoginCodeCooldown,
   beginWebAuthnLogin,
   completeWebAuthnLogin,
+  legalAccepted,
+  setLegalAccepted,
+  legalDocuments,
   authNext = '',
 }) {
   const [webauthnLoading, setWebauthnLoading] = useState(false);
@@ -737,6 +760,7 @@ export function LoginPage({
             </motion.div>
 
             <div className="space-y-4">
+              <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
                 <p className="text-sm text-sage-500">
@@ -787,6 +811,9 @@ export function RegisterPage({
   publicConfig,
   captchaConfigured,
   mountCaptcha,
+  legalAccepted,
+  setLegalAccepted,
+  legalDocuments,
   authNext = '',
 }) {
   const location = useLocation();
@@ -928,6 +955,8 @@ export function RegisterPage({
                 )}
               </div>
             </div>
+
+            <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} />
 
             <button type="submit" disabled={loading} className="btn-primary w-full py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="注册中..." idleText="注册账户" />

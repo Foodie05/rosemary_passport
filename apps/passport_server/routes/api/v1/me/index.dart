@@ -3,6 +3,7 @@ import 'package:dart_frog/dart_frog.dart';
 import '../../../../lib/src/config/app_config.dart';
 import '../../../../lib/src/models/authenticated_user.dart';
 import '../../../../lib/src/services/auth_service.dart';
+import '../../../../lib/src/services/legal_service.dart';
 import '../../../../lib/src/utils/http.dart';
 import '../../../../lib/src/utils/step_up_http.dart';
 
@@ -17,6 +18,9 @@ Future<Response> onRequest(RequestContext context) async {
     final stepUpMethods = await authService.availableStepUpMethods(
       userId: user.id,
     );
+    final legalAccepted = await context.read<LegalService>().hasAcceptedCurrent(
+      user.id,
+    );
     return jsonResponse({
       'user': user.toJson(),
       'security': {
@@ -24,6 +28,7 @@ Future<Response> onRequest(RequestContext context) async {
         'admin_mfa_required': user.roles.contains('admin') && !mustBindEmail,
         ...securityState,
         'step_up_methods': stepUpMethods,
+        'legal_current_accepted': legalAccepted,
       },
     });
   }

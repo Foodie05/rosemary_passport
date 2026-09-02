@@ -45,6 +45,8 @@ macOS 开发环境可运行：
 
 ## 质量门禁
 
+协议版本、账号封禁、管理员看板及脱敏行为日志的设计与运维约束见 [docs/legal-governance.md](docs/legal-governance.md)。
+
 提交前至少运行：
 
 ```bash

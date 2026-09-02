@@ -18,6 +18,11 @@ class UserRecord {
     required this.roles,
     required this.isEmailVerified,
     required this.isPhoneVerified,
+    this.accountStatus = 'active',
+    this.bannedAt,
+    this.bannedReason,
+    this.createdAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -32,6 +37,13 @@ class UserRecord {
   final List<String> roles;
   final bool isEmailVerified;
   final bool isPhoneVerified;
+  final String accountStatus;
+  final DateTime? bannedAt;
+  final String? bannedReason;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  bool get isBanned => accountStatus == 'banned';
 
   bool get hasPasskey => passkeyHash != null && passkeyHash!.trim().isNotEmpty;
   bool get hasSecurityCode =>
@@ -50,6 +62,8 @@ class UserRecord {
     accessTokenId: accessTokenId,
     postRegistrationPasskeyBootstrapUntil:
         postRegistrationPasskeyBootstrapUntil,
+    accountStatus: accountStatus,
+    banReason: bannedReason,
   );
 }
 
@@ -70,6 +84,8 @@ class UserRepository {
              u.is_email_verified,
              u.phone_number,
              u.is_phone_verified,
+             u.account_status, u.banned_at, u.banned_reason,
+             u.created_at, u.updated_at,
              coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
       from users u
       left join user_roles ur on ur.user_id = u.id
@@ -96,7 +112,12 @@ class UserRepository {
       hasAuthenticator: row[6] as bool,
       isEmailVerified: row[7] as bool,
       isPhoneVerified: row[9] as bool,
-      roles: (row[10] as List).map((e) => e.toString()).toList(),
+      accountStatus: row[10].toString(),
+      bannedAt: row[11] as DateTime?,
+      bannedReason: row[12] as String?,
+      createdAt: row[13] as DateTime,
+      updatedAt: row[14] as DateTime,
+      roles: (row[15] as List).map((e) => e.toString()).toList(),
     );
   }
 
@@ -110,6 +131,8 @@ class UserRepository {
              u.is_email_verified,
              u.phone_number,
              u.is_phone_verified,
+             u.account_status, u.banned_at, u.banned_reason,
+             u.created_at, u.updated_at,
              coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
       from users u
       left join user_roles ur on ur.user_id = u.id
@@ -136,7 +159,12 @@ class UserRepository {
       hasAuthenticator: row[6] as bool,
       isEmailVerified: row[7] as bool,
       isPhoneVerified: row[9] as bool,
-      roles: (row[10] as List).map((e) => e.toString()).toList(),
+      accountStatus: row[10].toString(),
+      bannedAt: row[11] as DateTime?,
+      bannedReason: row[12] as String?,
+      createdAt: row[13] as DateTime,
+      updatedAt: row[14] as DateTime,
+      roles: (row[15] as List).map((e) => e.toString()).toList(),
     );
   }
 
@@ -150,6 +178,8 @@ class UserRepository {
              u.is_email_verified,
              u.phone_number,
              u.is_phone_verified,
+             u.account_status, u.banned_at, u.banned_reason,
+             u.created_at, u.updated_at,
              coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
       from users u
       left join user_roles ur on ur.user_id = u.id
@@ -174,7 +204,12 @@ class UserRepository {
       hasAuthenticator: row[6] as bool,
       isEmailVerified: row[7] as bool,
       isPhoneVerified: row[9] as bool,
-      roles: (row[10] as List).map((e) => e.toString()).toList(),
+      accountStatus: row[10].toString(),
+      bannedAt: row[11] as DateTime?,
+      bannedReason: row[12] as String?,
+      createdAt: row[13] as DateTime,
+      updatedAt: row[14] as DateTime,
+      roles: (row[15] as List).map((e) => e.toString()).toList(),
     );
   }
 
@@ -413,13 +448,15 @@ class UserRepository {
                where uwc.user_id = u.id
              ) as has_passkey,
              (u.authenticator_secret is not null and length(trim(u.authenticator_secret)) > 0) as has_authenticator,
+             u.account_status, u.banned_at, u.banned_reason, u.updated_at,
              coalesce(array_agg(ur.role) filter (where ur.role is not null), '{}') as roles
       from users u
       left join user_roles ur on ur.user_id = u.id
       where (
         @search = '' or
         lower(u.email) like lower(@search_like) or
-        lower(u.nickname) like lower(@search_like)
+        lower(u.nickname) like lower(@search_like) or
+        coalesce(u.phone_number, '') like @search_like
       )
       group by u.id
       order by u.created_at desc
@@ -445,7 +482,11 @@ class UserRepository {
             'is_phone_verified': row[6],
             'has_passkey': row[7],
             'has_authenticator': row[8],
-            'roles': (row[9] as List).map((e) => e.toString()).toList(),
+            'account_status': row[9],
+            'banned_at': row[10]?.toString(),
+            'banned_reason': row[11],
+            'updated_at': row[12].toString(),
+            'roles': (row[13] as List).map((e) => e.toString()).toList(),
           },
         )
         .toList();
@@ -460,7 +501,8 @@ class UserRepository {
       where (
         @search = '' or
         lower(u.email) like lower(@search_like) or
-        lower(u.nickname) like lower(@search_like)
+        lower(u.nickname) like lower(@search_like) or
+        coalesce(u.phone_number, '') like @search_like
       )
       ''',
       params: {'search': searchValue, 'search_like': '%$searchValue%'},
@@ -470,5 +512,64 @@ class UserRepository {
       return 0;
     }
     return result.first[0] as int;
+  }
+
+  Future<Map<String, dynamic>?> userDetails(String userId) async {
+    final user = await findById(userId);
+    if (user == null) return null;
+    final counts = await _db.execute(
+      '''
+      select
+        (select count(*) from user_webauthn_credentials where user_id = cast(@id as uuid)),
+        (select count(*) from app_authorizations where user_id = cast(@id as uuid)),
+        (select max(created_at) from audit_logs where actor_id = cast(@id as text) and action like 'user.login%')
+      ''',
+      params: {'id': userId},
+    );
+    final row = counts.single;
+    return {
+      'id': user.id,
+      'email': user.email,
+      'nickname': user.nickname,
+      'phone_number': user.phoneNumber,
+      'is_email_verified': user.isEmailVerified,
+      'is_phone_verified': user.isPhoneVerified,
+      'has_passkey': user.hasPasskey || (row[0] as int) > 0,
+      'passkey_count': row[0],
+      'has_authenticator': user.hasAuthenticator,
+      'roles': user.roles,
+      'account_status': user.accountStatus,
+      'banned_at': user.bannedAt?.toIso8601String(),
+      'banned_reason': user.bannedReason,
+      'created_at': user.createdAt?.toIso8601String(),
+      'updated_at': user.updatedAt?.toIso8601String(),
+      'oidc_authorization_count': row[1],
+      'last_login_at': row[2]?.toString(),
+    };
+  }
+
+  Future<void> updateAccountStatus({
+    required String userId,
+    required String status,
+    required String? reason,
+    required String actorId,
+  }) async {
+    await _db.execute(
+      '''
+      update users
+      set account_status = @status,
+          banned_at = case when @status = 'banned' then now() else null end,
+          banned_reason = case when @status = 'banned' then @reason else null end,
+          banned_by = case when @status = 'banned' then cast(@actor_id as uuid) else null end,
+          updated_at = now()
+      where id = cast(@user_id as uuid)
+      ''',
+      params: {
+        'status': status,
+        'reason': reason,
+        'actor_id': actorId,
+        'user_id': userId,
+      },
+    );
   }
 }

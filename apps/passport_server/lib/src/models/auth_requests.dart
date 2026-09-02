@@ -31,6 +31,9 @@ class PasswordLoginRequest {
     this.phoneCode,
     this.authenticatorCode,
     this.rememberMe = false,
+    this.acceptedLegal = false,
+    this.termsVersion,
+    this.privacyVersion,
   });
 
   factory PasswordLoginRequest.fromJson(Map<String, dynamic> json) =>
@@ -44,6 +47,9 @@ class PasswordLoginRequest {
   final String? phoneCode;
   final String? authenticatorCode;
   final bool rememberMe;
+  final bool acceptedLegal;
+  final int? termsVersion;
+  final int? privacyVersion;
 
   Map<String, dynamic> toJson() => _$PasswordLoginRequestToJson(this);
 }
@@ -55,6 +61,9 @@ class EmailLoginRequest {
     required this.emailCode,
     this.password,
     this.rememberMe = false,
+    this.acceptedLegal = false,
+    this.termsVersion,
+    this.privacyVersion,
   });
 
   factory EmailLoginRequest.fromJson(Map<String, dynamic> json) =>
@@ -64,6 +73,9 @@ class EmailLoginRequest {
   final String emailCode;
   final String? password;
   final bool rememberMe;
+  final bool acceptedLegal;
+  final int? termsVersion;
+  final int? privacyVersion;
 
   Map<String, dynamic> toJson() => _$EmailLoginRequestToJson(this);
 }
@@ -107,6 +119,9 @@ class RegisterRequest {
     required this.password,
     this.emailCode,
     this.registrationHandoff,
+    this.acceptedLegal = false,
+    this.termsVersion,
+    this.privacyVersion,
   });
 
   factory RegisterRequest.fromJson(Map<String, dynamic> json) =>
@@ -117,6 +132,9 @@ class RegisterRequest {
   final String password;
   final String? emailCode;
   final String? registrationHandoff;
+  final bool acceptedLegal;
+  final int? termsVersion;
+  final int? privacyVersion;
 
   Map<String, dynamic> toJson() => _$RegisterRequestToJson(this);
 }
@@ -179,6 +197,9 @@ class WebAuthnVerifyRequest {
     this.email,
     required this.response,
     this.rememberMe = false,
+    this.acceptedLegal = false,
+    this.termsVersion,
+    this.privacyVersion,
   });
 
   factory WebAuthnVerifyRequest.fromJson(Map<String, dynamic> json) =>
@@ -187,6 +208,9 @@ class WebAuthnVerifyRequest {
   final String? email;
   final Map<String, dynamic> response;
   final bool rememberMe;
+  final bool acceptedLegal;
+  final int? termsVersion;
+  final int? privacyVersion;
 
   Map<String, dynamic> toJson() => _$WebAuthnVerifyRequestToJson(this);
 }

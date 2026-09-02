@@ -149,6 +149,86 @@ class MigrationRunner {
       create index if not exists idx_sla_recovery_markers_created_at
         on sla_recovery_markers(created_at desc);
     '''),
+    DatabaseMigration('20260902_001_legal_governance_and_account_status', '''
+      alter table users
+        add column if not exists account_status text not null default 'active';
+      alter table users
+        add column if not exists banned_at timestamptz;
+      alter table users
+        add column if not exists banned_reason text;
+      alter table users
+        add column if not exists banned_by uuid;
+      create index if not exists idx_users_account_status
+        on users(account_status);
+
+      create table if not exists legal_documents (
+        id uuid primary key default gen_random_uuid(),
+        document_type text not null check (document_type in ('terms', 'privacy')),
+        version integer not null,
+        title text not null,
+        content text not null,
+        status text not null default 'draft' check (status in ('draft', 'published')),
+        created_by uuid,
+        published_by uuid,
+        published_at timestamptz,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        unique(document_type, version)
+      );
+      create unique index if not exists idx_legal_one_draft_per_type
+        on legal_documents(document_type) where status = 'draft';
+      create index if not exists idx_legal_published
+        on legal_documents(document_type, version desc)
+        where status = 'published';
+
+      create table if not exists user_legal_acceptances (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid not null references users(id) on delete cascade,
+        terms_document_id uuid not null references legal_documents(id),
+        privacy_document_id uuid not null references legal_documents(id),
+        acceptance_context text not null,
+        ip_hash text,
+        user_agent_hash text,
+        accepted_at timestamptz not null default now()
+      );
+      create index if not exists idx_legal_acceptance_user
+        on user_legal_acceptances(user_id, accepted_at desc);
+
+      create table if not exists activity_logs (
+        id uuid primary key default gen_random_uuid(),
+        actor_id uuid,
+        category text not null,
+        action text not null,
+        route_template text not null,
+        method text not null,
+        outcome text not null,
+        status_code integer not null,
+        risk_level text not null default 'normal',
+        ip_hash text,
+        user_agent_hash text,
+        metadata jsonb not null default '{}'::jsonb,
+        created_at timestamptz not null default now()
+      );
+      create index if not exists idx_activity_created_at
+        on activity_logs(created_at desc);
+      create index if not exists idx_activity_category_date
+        on activity_logs(category, created_at desc);
+    '''),
+    DatabaseMigration('20260902_002_account_status_constraint', '''
+      update users set account_status = 'active'
+        where account_status not in ('active', 'banned');
+      do \$\$
+      begin
+        if not exists (
+          select 1 from pg_constraint
+          where conname = 'users_account_status_check'
+        ) then
+          alter table users add constraint users_account_status_check
+            check (account_status in ('active', 'banned')) not valid;
+          alter table users validate constraint users_account_status_check;
+        end if;
+      end \$\$;
+    '''),
   ];
 
   final Database _database;

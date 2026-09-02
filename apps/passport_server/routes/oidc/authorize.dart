@@ -59,6 +59,13 @@ Future<Response> onRequest(RequestContext context) async {
       headers: {'location': loginUrl.toString()},
     );
   }
+  if (user.isBanned) {
+    final bannedUrl = Uri.parse(config.webBaseUrl).resolve('/banned');
+    return Response(
+      statusCode: 302,
+      headers: {'location': bannedUrl.toString()},
+    );
+  }
 
   final uri = context.request.uri;
   final clientId = uri.queryParameters['client_id'];
