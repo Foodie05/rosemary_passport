@@ -72,6 +72,20 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
 const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/master/packages/rosm_passport_flutter';
+const DASHBOARD_PERIODS = [
+  { days: 7, label: '7 天' },
+  { days: 30, label: '30 天' },
+  { days: 90, label: '90 天' },
+  { days: 180, label: '180 天' },
+];
+
+function formatBeijingDate(value, includeYear = false) {
+  const matched = `${value || ''}`.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!matched) return '-';
+  const [, year, month, day] = matched;
+  const readable = `${Number(month)}月${Number(day)}日`;
+  return includeYear ? `${year}年${readable}` : readable;
+}
 
 function parseUniqueLines(value) {
   return `${value || ''}`
@@ -550,31 +564,95 @@ export function AdminSecurityPolicy({
 }
 
 function MiniLineChart({ data, series }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
   const geometry = useMemo(() => {
     const width = 720;
     const height = 220;
     const values = data.flatMap((row) => series.map((item) => Number(row[item.key] || 0)));
     const max = Math.max(1, ...values);
-    const paths = series.map((item) => ({
-      ...item,
-      points: data.map((row, index) => {
+    const paths = series.map((item) => {
+      const points = data.map((row, index) => {
         const x = data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
         const y = height - (Number(row[item.key] || 0) / max) * (height - 20) - 10;
-        return `${x},${y}`;
-      }).join(' '),
-    }));
+        return { x, y };
+      });
+      return {
+        ...item,
+        points,
+        polyline: points.map((point) => `${point.x},${point.y}`).join(' '),
+      };
+    });
     return { width, height, paths };
   }, [data, series]);
+  const hoveredRow = hoveredIndex == null ? null : data[hoveredIndex];
+  const hoveredX = hoveredIndex == null || data.length <= 1
+    ? geometry.width / 2
+    : (hoveredIndex / (data.length - 1)) * geometry.width;
+
+  function selectPointerPosition(event) {
+    if (!data.length) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width));
+    setHoveredIndex(data.length <= 1 ? 0 : Math.round(ratio * (data.length - 1)));
+  }
+
+  function moveKeyboardPosition(event) {
+    if (!data.length || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowLeft' ? -1 : 1;
+    setHoveredIndex((current) => Math.min(data.length - 1, Math.max(0, (current ?? data.length - 1) + direction)));
+  }
+
   return (
-    <div>
+    <div className="relative">
       <div className="mb-3 flex flex-wrap gap-4 text-xs font-bold text-sage-600">
         {series.map((item) => <span key={item.key} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
       </div>
-      <svg viewBox={`0 0 ${geometry.width} ${geometry.height}`} className="h-56 w-full" role="img" aria-label={series.map((item) => item.label).join('、')}>
+      {hoveredRow ? (
+        <div
+          className="pointer-events-none absolute top-9 z-10 min-w-44 rounded-xl border border-sage-700/20 bg-sage-900/95 px-4 py-3 text-xs text-white shadow-xl backdrop-blur"
+          style={{
+            left: `${data.length <= 1 ? 50 : (hoveredIndex / (data.length - 1)) * 100}%`,
+            transform: hoveredIndex <= (data.length - 1) * 0.25
+              ? 'translateX(0)'
+              : hoveredIndex >= (data.length - 1) * 0.75
+                ? 'translateX(-100%)'
+                : 'translateX(-50%)',
+          }}
+        >
+          <p className="mb-2 font-bold">北京时间 · {formatBeijingDate(hoveredRow.date, true)}</p>
+          <div className="space-y-1.5">
+            {series.map((item) => (
+              <div key={item.key} className="flex items-center justify-between gap-6">
+                <span className="flex items-center gap-2 text-white/80"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>
+                <span className="font-bold tabular-nums">{Number(hoveredRow[item.key] || 0).toLocaleString('zh-CN')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <svg
+        viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+        className="h-56 w-full cursor-crosshair outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2"
+        role="img"
+        aria-label={`${series.map((item) => item.label).join('、')}，按北京时间统计`}
+        tabIndex="0"
+        onPointerDown={selectPointerPosition}
+        onPointerMove={selectPointerPosition}
+        onPointerLeave={() => setHoveredIndex(null)}
+        onFocus={() => { if (data.length) setHoveredIndex(data.length - 1); }}
+        onBlur={() => setHoveredIndex(null)}
+        onKeyDown={moveKeyboardPosition}
+      >
         {[0, 1, 2, 3, 4].map((row) => <line key={row} x1="0" x2={geometry.width} y1={(row / 4) * geometry.height} y2={(row / 4) * geometry.height} stroke="currentColor" className="text-sage-100" />)}
-        {geometry.paths.map((item) => <polyline key={item.key} points={item.points} fill="none" stroke={item.color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />)}
+        {geometry.paths.map((item) => <polyline key={item.key} points={item.polyline} fill="none" stroke={item.color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />)}
+        {hoveredRow ? <line x1={hoveredX} x2={hoveredX} y1="0" y2={geometry.height} stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 5" className="text-sage-400" /> : null}
+        {hoveredRow ? geometry.paths.map((item) => {
+          const point = item.points[hoveredIndex];
+          return <circle key={item.key} cx={point.x} cy={point.y} r="6" fill="white" stroke={item.color} strokeWidth="4" />;
+        }) : null}
       </svg>
-      <div className="mt-2 flex justify-between text-xs text-sage-400"><span>{data[0]?.date || '-'}</span><span>{data.at(-1)?.date || '-'}</span></div>
+      <div className="mt-2 flex justify-between text-xs text-sage-400"><span>{formatBeijingDate(data[0]?.date)}</span><span>{formatBeijingDate(data.at(-1)?.date)}</span></div>
     </div>
   );
 }
@@ -585,7 +663,31 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
   const summary = data?.summary || {};
   return (
     <div className="space-y-6">
-      <SectionHeader title="运营与安全看板" description="基于系统数据库与审计记录生成；统计口径可在图表下方查看。" actions={<select className="input-field w-auto" value={days} onChange={(event) => setDays(Number(event.target.value))}><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select>} />
+      <SectionHeader
+        title="运营与安全看板"
+        description="基于系统数据库与审计记录生成；全部日期与自然日边界均按北京时间（UTC+8）统计。"
+        actions={(
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <span className="text-xs font-bold text-sage-500">选择统计时间范围</span>
+            <div className="inline-flex rounded-2xl border border-sage-200 bg-white p-1 shadow-sm" role="group" aria-label="统计时间范围">
+              {DASHBOARD_PERIODS.map((period) => (
+                <button
+                  key={period.days}
+                  type="button"
+                  className={cn(
+                    'rounded-xl px-3 py-2 text-sm font-bold transition-colors',
+                    days === period.days ? 'bg-sage-600 text-white' : 'text-sage-500 hover:bg-sage-50 hover:text-sage-700',
+                  )}
+                  aria-pressed={days === period.days}
+                  onClick={() => setDays(period.days)}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[['当前用户', summary.total_users ?? '-'], ['封禁账户', summary.banned_users ?? '-'], ['接入 OIDC 平台', summary.active_third_party_oidc_clients ?? '-'], ['全部活跃客户端', summary.active_oidc_clients ?? '-']].map(([label, value]) => <div key={label} className="glass-card rounded-2xl p-6"><p className="text-sm font-bold text-sage-500">{label}</p><p className="mt-3 text-3xl font-bold text-sage-900">{value}</p></div>)}
       </div>
