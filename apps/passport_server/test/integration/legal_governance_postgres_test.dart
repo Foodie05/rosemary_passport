@@ -21,6 +21,14 @@ void main() {
       );
       final privatePath = '${keyDirectory.path}/active.private.pem';
       final publicPath = '${keyDirectory.path}/active.public.pem';
+      final termsPath = '${keyDirectory.path}/terms-v1.md';
+      final privacyPath = '${keyDirectory.path}/privacy-v1.md';
+      await File(
+        termsPath,
+      ).writeAsString('Integration terms for Rosemary Island LLC.');
+      await File(
+        privacyPath,
+      ).writeAsString('Integration privacy policy for Rosemary Island LLC.');
       expect(
         (await Process.run('openssl', [
           'genrsa',
@@ -54,6 +62,8 @@ void main() {
         'JWT_SIGNING_KEYS_DIR': keyDirectory.path,
         'JWT_BINDING_KEY':
             'legal-integration-binding-key-with-more-than-32-characters',
+        'LEGAL_INITIAL_TERMS_FILE': termsPath,
+        'LEGAL_INITIAL_PRIVACY_FILE': privacyPath,
       });
       final database = Database(config);
       final repository = LegalRepository(database);

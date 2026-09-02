@@ -89,6 +89,10 @@ class AppConfig {
       (_env['DATA_ENCRYPTION_ACTIVE_KID'] ?? 'data-v1').trim();
   String get dataEncryptionKeysDir =>
       (_env['DATA_ENCRYPTION_KEYS_DIR'] ?? '').trim();
+  String get legalInitialTermsFile =>
+      (_env['LEGAL_INITIAL_TERMS_FILE'] ?? '').trim();
+  String get legalInitialPrivacyFile =>
+      (_env['LEGAL_INITIAL_PRIVACY_FILE'] ?? '').trim();
 
   Map<String, String> get dataEncryptionKeys {
     final directory = dataEncryptionKeysDir;

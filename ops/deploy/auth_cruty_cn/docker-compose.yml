@@ -78,6 +78,8 @@ services:
       DATA_ENCRYPTION_ACTIVE_KID: ${DATA_ENCRYPTION_ACTIVE_KID:-data-v1}
       DATA_ENCRYPTION_KEYS_DIR: /run/secrets/rosm-passport/data_keys
       DATA_ENCRYPTION_KEY_FILE: /run/secrets/rosm-passport/data_keys/${DATA_ENCRYPTION_ACTIVE_KID:-data-v1}.key
+      LEGAL_INITIAL_TERMS_FILE: /run/secrets/rosm-passport/legal/terms-v1.md
+      LEGAL_INITIAL_PRIVACY_FILE: /run/secrets/rosm-passport/legal/privacy-v1.md
       REQUIRE_FILE_SECRETS: "true"
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS}
       FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS: ${FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS:-43200}

@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARCHIVE_PATH="${ARCHIVE_PATH:-$ROOT_DIR/.local/release/auth_cruty_cn_release.tar.gz}"
+LOCAL_LEGAL_DIR="${ROSM_LOCAL_LEGAL_DIR:-$ROOT_DIR/.local/legal}"
 
 SSH_TARGET="${1:-${SSH_TARGET:-root@cruty.cn}}"
 REMOTE_RELEASE_DIR="${2:-${REMOTE_RELEASE_DIR:-/www/wwwroot/auth/auth_cruty_cn_release}}"
@@ -35,7 +36,8 @@ Defaults:
 
 The remote runtime configuration and secrets must already exist outside the
 release directory. This command never creates, downloads, or prints secrets,
-and it has no database deletion mode.
+and it has no database deletion mode. Initial legal documents are read from
+.local/legal by default and installed outside the release as root-only files.
 EOF
 }
 
@@ -49,6 +51,12 @@ for command in ssh scp tar; do require_cmd "$command"; done
 for path in "$REMOTE_RELEASE_DIR" "$REMOTE_FRONTEND_DIR" \
   "$REMOTE_RUNTIME_ENV" "$REMOTE_SECRETS_DIR" "$REMOTE_STAGE_ROOT"; do
   validate_path "$path"
+done
+for legal_file in terms-v1.md privacy-v1.md; do
+  [[ -f "$LOCAL_LEGAL_DIR/$legal_file" && \
+    ! -L "$LOCAL_LEGAL_DIR/$legal_file" && \
+    -s "$LOCAL_LEGAL_DIR/$legal_file" ]] \
+    || die "local legal document is missing, empty, or unsafe: $LOCAL_LEGAL_DIR/$legal_file"
 done
 
 info 'building credential-free release package'
@@ -117,6 +125,11 @@ trap cleanup_remote_stage EXIT
 info 'uploading credential-free release archive'
 scp "${ssh_options[@]}" "$ARCHIVE_PATH" \
   "$SSH_TARGET:$REMOTE_STAGE_DIR/release.tar.gz"
+info 'uploading private initial legal documents outside the release archive'
+scp "${ssh_options[@]}" "$LOCAL_LEGAL_DIR/terms-v1.md" \
+  "$SSH_TARGET:$REMOTE_STAGE_DIR/legal-terms-v1.md"
+scp "${ssh_options[@]}" "$LOCAL_LEGAL_DIR/privacy-v1.md" \
+  "$SSH_TARGET:$REMOTE_STAGE_DIR/legal-privacy-v1.md"
 
 info 'running guarded remote deployment'
 ssh "${ssh_options[@]}" "$SSH_TARGET" /bin/bash -s -- \
@@ -136,6 +149,22 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+legal_dir="$secrets_dir/legal"
+mkdir -p "$legal_dir"
+chown root:root "$legal_dir"
+chmod 0700 "$legal_dir"
+for legal_name in terms privacy; do
+  source_file="$stage_dir/legal-$legal_name-v1.md"
+  target_file="$legal_dir/$legal_name-v1.md"
+  [[ -f "$source_file" && ! -L "$source_file" && -s "$source_file" ]] \
+    || { printf '[remote-deploy] invalid staged legal document: %s\n' "$legal_name" >&2; exit 78; }
+  temporary_file="$(mktemp "$legal_dir/.$legal_name-v1.XXXXXXXX")"
+  cp "$source_file" "$temporary_file"
+  chown root:root "$temporary_file"
+  chmod 0400 "$temporary_file"
+  mv -f "$temporary_file" "$target_file"
+done
 
 mkdir -p "$stage_dir/release"
 tar --no-same-owner -xzf "$stage_dir/release.tar.gz" -C "$stage_dir/release"
