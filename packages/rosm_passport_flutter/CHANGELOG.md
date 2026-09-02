@@ -1,3 +1,10 @@
+## 0.8.1
+
+- Keep version-bound Terms of Use and Privacy Policy acceptance visible in the built-in sign-in and registration flow.
+- Replace the generic legal document alert with a Rosemary-styled, theme-adaptive reading dialog.
+- Present the legal acceptance row as lightweight text without a bulky container.
+- Update custom-UI integration guidance so every login submits the currently published legal versions.
+
 ## 0.8.0
 
 - Load the currently published ROSM Pass Terms of Use and Privacy Policy and require explicit acceptance before every completed sign-in or registration.

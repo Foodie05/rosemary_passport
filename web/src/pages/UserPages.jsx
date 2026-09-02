@@ -4,6 +4,7 @@ import { KeyRound, Mail, Shield } from 'lucide-react';
 import { cleanDisplayName } from '../utils';
 import { getUserErrorMessage } from '../lib/errors';
 import { cn } from '../lib/utils';
+import { RosemarySelect } from '../components/ui';
 import {
   preparePublicKeyCreationOptions,
   preparePublicKeyRequestOptions,
@@ -115,9 +116,12 @@ function StepUpFields({ methods, excludedFactor, value, onChange, sendStepUpCode
   return (
     <div className="space-y-3 rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
       <label className="text-sm font-bold text-sage-700">账户二次验证</label>
-      <select className="input-field" value={selected} onChange={(event) => onChange({ method: event.target.value, password: '', code: '', response: null })}>
-        {available.map((method) => <option key={method} value={method}>{STEP_UP_LABELS[method] || method}</option>)}
-      </select>
+      <RosemarySelect
+        label="账户二次验证方式"
+        value={selected}
+        options={available.map((method) => ({ value: method, label: STEP_UP_LABELS[method] || method }))}
+        onChange={(method) => onChange({ method, password: '', code: '', response: null })}
+      />
       {selected === 'password' ? (
         <input className="input-field" type="password" placeholder="输入当前密码" value={value.password || ''} onChange={(event) => onChange({ ...value, method: selected, password: event.target.value })} />
       ) : selected === 'passkey' ? (
