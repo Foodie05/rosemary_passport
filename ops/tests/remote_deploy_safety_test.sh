@@ -58,6 +58,13 @@ fi
 grep -q 'runtime env is missing or is a symlink' "$deploy_script"
 grep -q 'every secret file mode must be 0400' "$deploy_script"
 grep -q 'release archive contains a forbidden environment or secrets path' "$deploy_script"
+grep -q 'uploading private initial legal documents outside the release archive' \
+  "$deploy_script"
+grep -q 'chmod 0400 "$temporary_file"' "$deploy_script"
+grep -q 'LEGAL_INITIAL_TERMS_FILE' \
+  "$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
+grep -q 'LEGAL_INITIAL_PRIVACY_FILE' \
+  "$repo_root/ops/deploy/auth_cruty_cn/docker-compose.yml"
 grep -q 'mktemp -d' "$deploy_script"
 grep -q -- '--no-same-owner' "$deploy_script"
 grep -q 'valid RFC 3339 UTC timestamp' \

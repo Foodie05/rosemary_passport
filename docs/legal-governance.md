@@ -2,6 +2,8 @@
 
 ## 协议版本
 
+- 协议正文不进入 Git、镜像或发布包。仓库只保留协议管理入口与 `LEGAL_INITIAL_TERMS_FILE`、`LEGAL_INITIAL_PRIVACY_FILE` 外部文件契约。
+- 本地初始正文保存在被 Git 忽略的 `.local/legal/`；生产副本位于宿主机 root-only secrets 目录，并以只读文件挂载。仅当数据库尚无对应已发布版本时读取该文件，已有版本不会被覆盖。
 - `terms` 与 `privacy` 分别维护独立、单调递增的版本号。
 - 每种协议最多存在一个草稿；保存草稿不会影响线上用户。
 - 发布操作不可覆盖历史版本。公开接口始终返回版本号最高的已发布版本。
@@ -24,4 +26,3 @@
 ## 数据库兼容性
 
 迁移只扩展 `users`，并新增 `legal_documents`、`user_legal_acceptances` 与 `activity_logs`。旧用户自动为 `active`；本轮不删除或重解释任何历史列。旧应用可忽略新增列并继续运行。
-

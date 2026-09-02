@@ -33,6 +33,8 @@ void main() {
     expect(config.dataEncryptionKey, isEmpty);
     expect(config.dataEncryptionActiveKid, 'data-v1');
     expect(config.dataEncryptionKeys, {'data-v1': ''});
+    expect(config.legalInitialTermsFile, isEmpty);
+    expect(config.legalInitialPrivacyFile, isEmpty);
     expect(config.accessTokenTtlSeconds, 900);
     expect(config.firstPartyRefreshTokenTtlSeconds, 43200);
     expect(config.firstPartyRememberedRefreshTokenTtlSeconds, 2592000);
@@ -94,6 +96,8 @@ void main() {
       'EMAIL_CODE_HMAC_KEY': 'email-secret',
       'DATA_ENCRYPTION_KEY': 'data-secret',
       'DATA_ENCRYPTION_ACTIVE_KID': ' active-data ',
+      'LEGAL_INITIAL_TERMS_FILE': ' /run/legal/terms.md ',
+      'LEGAL_INITIAL_PRIVACY_FILE': ' /run/legal/privacy.md ',
       'FIRST_PARTY_REFRESH_TOKEN_TTL_SECONDS': '100',
       'FIRST_PARTY_REMEMBERED_REFRESH_TOKEN_TTL_SECONDS': '200',
       'REFRESH_TOKEN_TTL_SECONDS': '300',
@@ -153,6 +157,8 @@ void main() {
     expect(config.emailCodeHmacKey, 'email-secret');
     expect(config.dataEncryptionKey, 'data-secret');
     expect(config.dataEncryptionActiveKid, 'active-data');
+    expect(config.legalInitialTermsFile, '/run/legal/terms.md');
+    expect(config.legalInitialPrivacyFile, '/run/legal/privacy.md');
     expect(config.firstPartyRefreshTokenTtlSeconds, 100);
     expect(config.firstPartyRememberedRefreshTokenTtlSeconds, 200);
     expect(config.refreshTokenTtlSeconds, 300);
