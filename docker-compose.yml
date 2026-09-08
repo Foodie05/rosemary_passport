@@ -4,10 +4,10 @@ services:
     container_name: rosm-passport-postgres
     environment:
       POSTGRES_USER: rosm_passport
-      POSTGRES_PASSWORD: rosm_passport_dev
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Use --env-file apps/passport_server/.env or set DB_PASSWORD}
       POSTGRES_DB: rosm_passport
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./ops/postgres/init:/docker-entrypoint-initdb.d:ro
       - postgres_data:/var/lib/postgresql/data

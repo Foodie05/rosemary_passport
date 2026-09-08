@@ -110,6 +110,9 @@ void main() {
     captcha = _MockCaptcha();
     oidc = _MockOidcRepository();
     settings = _MockSettings();
+    when(
+      () => settings.isBootstrapLoginEnabled(),
+    ).thenAnswer((_) async => true);
     audit = _MockAudit();
     webAuthn = _MockWebAuthn();
     service = AuthService(

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:mocktail/mocktail.dart';
 import 'package:rosm_passport_server/src/config/app_config.dart';
 import 'package:rosm_passport_server/src/repositories/webauthn_repository.dart';
@@ -51,6 +54,110 @@ void main() {
       helperClient: helper,
     );
   });
+
+  test(
+    'signed passkey resolves its owner without an account and cannot authenticate another account',
+    () async {
+      final fixture = await Process.run('node', [
+        'test/fixtures/webauthn_assertion.mjs',
+      ]);
+      expect(fixture.exitCode, 0, reason: fixture.stderr.toString());
+      final data = jsonDecode(fixture.stdout as String) as Map<String, dynamic>;
+      final response = Map<String, dynamic>.from(data['response'] as Map);
+      final actualCredential = WebAuthnCredentialRecord(
+        userId: credential.userId,
+        credentialId: response['id'] as String,
+        publicKey: data['publicKey'] as String,
+        counter: 7,
+        transports: const ['internal'],
+        deviceType: 'singleDevice',
+        backedUp: false,
+        uvRequired: true,
+        uvGraceExpiresAt: null,
+        createdAt: credential.createdAt,
+      );
+      final actualChallenge = WebAuthnChallengeRecord(
+        id: challenge.id,
+        challenge: data['challenge'] as String,
+        rpId: challenge.rpId,
+        origin: challenge.origin,
+        expiresAt: challenge.expiresAt,
+      );
+      when(() => helper.enabled).thenReturn(false);
+      when(
+        () => repository.findCredential(actualCredential.credentialId),
+      ).thenAnswer((_) async => actualCredential);
+      when(
+        () => repository.findLatestChallenge(
+          userId: any(named: 'userId'),
+          email: any(named: 'email'),
+          purpose: any(named: 'purpose'),
+        ),
+      ).thenAnswer((_) async => actualChallenge);
+      when(
+        () => repository.updateCredentialCounter(
+          credentialId: any(named: 'credentialId'),
+          counter: any(named: 'counter'),
+        ),
+      ).thenAnswer((_) async {});
+      when(() => repository.markUserVerified(any())).thenAnswer((_) async {});
+      when(() => repository.deleteChallenge(any())).thenAnswer((_) async {});
+
+      expect(
+        await service.verifyAuthentication(
+          userId: 'victim-admin',
+          response: response,
+          forceUserVerification: true,
+        ),
+        isFalse,
+      );
+      verifyNever(
+        () => repository.updateCredentialCounter(
+          credentialId: any(named: 'credentialId'),
+          counter: any(named: 'counter'),
+        ),
+      );
+      expect(await service.verifyAuthentication(response: response), isTrue);
+      expect(
+        await service.verifyAuthentication(
+          userId: 'user-id',
+          response: response,
+        ),
+        isTrue,
+      );
+      final assertion = Map<String, dynamic>.from(response['response'] as Map);
+      for (final handle in [
+        '%%%',
+        base64Url.encode(utf8.encode('victim-admin')),
+        123,
+      ]) {
+        expect(
+          await service.verifyAuthentication(
+            response: {
+              ...response,
+              'response': {...assertion, 'userHandle': handle},
+            },
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        await service.verifyAuthentication(
+          response: {...response, 'rawId': 'other-id'},
+        ),
+        isFalse,
+      );
+      expect(
+        await service.verifyAuthentication(
+          response: {
+            ...response,
+            'response': {...assertion, 'signature': 'AA'},
+          },
+        ),
+        isFalse,
+      );
+    },
+  );
 
   test('health and credential management delegate safely', () async {
     when(() => helper.healthCheck()).thenAnswer((_) async => true);
@@ -211,7 +318,7 @@ void main() {
           deviceType: any(named: 'deviceType'),
           backedUp: any(named: 'backedUp'),
         ),
-      ).thenAnswer((_) async {});
+      ).thenAnswer((_) async => true);
       when(
         () => repository.deleteChallenge(challenge.id),
       ).thenAnswer((_) async {});
@@ -221,6 +328,24 @@ void main() {
           response: const {'id': 'credential-id'},
         ),
         isTrue,
+      );
+      when(
+        () => repository.insertCredential(
+          userId: any(named: 'userId'),
+          credentialId: any(named: 'credentialId'),
+          publicKey: any(named: 'publicKey'),
+          counter: any(named: 'counter'),
+          transports: any(named: 'transports'),
+          deviceType: any(named: 'deviceType'),
+          backedUp: any(named: 'backedUp'),
+        ),
+      ).thenAnswer((_) async => false);
+      expect(
+        await service.verifyRegistration(
+          userId: 'user-id',
+          response: const {'id': 'credential-id'},
+        ),
+        isFalse,
       );
     },
   );

@@ -100,6 +100,18 @@ class LoginService {
     required String password,
     String? requestIp,
   }) async {
+    final policy = await _throttles.loadPolicy();
+    final limited = await _throttles.enforceRequestGuards(
+      emailScope: _mfaEmailScope,
+      ipScope: _mfaIpScope,
+      email: email,
+      requestIp: requestIp,
+      emailLimit: policy.adminLoginCodeEmailLimit,
+      ipLimit: policy.adminLoginCodeIpLimit,
+      window: Duration(seconds: policy.adminLoginCodeWindowSeconds),
+      blockDuration: Duration(seconds: policy.adminLoginCodeBlockSeconds),
+    );
+    if (limited != null) return limited;
     final user = await _validPasswordUser(email, password);
     if (user == null) {
       return _passwordFailure;
@@ -645,6 +657,13 @@ class LoginService {
   }) async {
     final context = await _stepUpContext(challenge, factor);
     if (context == null) return _loginFailure;
+    if (!await _throttles.admitLoginStepUpAttempt(context.proofId)) {
+      return const LoginAttempt.failure(
+        code: 'rate_limited',
+        message: '二次验证尝试次数过多，请重新登录。',
+        statusCode: 429,
+      );
+    }
     final user = context.user;
     var verified = false;
     if (factor == 'password') {

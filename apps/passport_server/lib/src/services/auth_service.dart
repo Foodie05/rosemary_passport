@@ -161,6 +161,10 @@ class AuthService {
          webAuthnService: webAuthnService,
        ),
        _bootstrap = BootstrapAccessService(
+         throttleService: AuthThrottleService(
+           securityService: securityService,
+           securityPolicyService: securityPolicyService,
+         ),
          userRepository: userRepository,
          passwordHasher: passwordHasher,
          captchaService: captchaService,

@@ -4,6 +4,7 @@ class AuthenticatedUser {
   const AuthenticatedUser({
     required this.id,
     required this.email,
+    this.isEmailVerified = false,
     this.phoneNumber,
     this.isPhoneVerified = false,
     required this.nickname,
@@ -16,6 +17,7 @@ class AuthenticatedUser {
 
   final String id;
   final String email;
+  final bool isEmailVerified;
   final String? phoneNumber;
   final bool isPhoneVerified;
   final String nickname;
@@ -34,6 +36,7 @@ class AuthenticatedUser {
   Map<String, dynamic> toJson() => {
     'id': id,
     'email': email,
+    'is_email_verified': isEmailVerified,
     'phone_number': phoneNumber,
     'is_phone_verified': isPhoneVerified,
     'nickname': nickname,

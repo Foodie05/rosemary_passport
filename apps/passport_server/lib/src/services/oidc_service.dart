@@ -72,6 +72,8 @@ class OidcService {
   }
 
   Future<Map<String, dynamic>?> findClient(String clientId) {
+    // This identifier belongs exclusively to Passport's own login sessions.
+    if (clientId == 'first_party_web') return Future.value();
     return _oidcRepository.findClient(clientId);
   }
 
@@ -88,7 +90,7 @@ class OidcService {
     if (responseType != 'code') {
       return null;
     }
-    final client = await _oidcRepository.findClient(clientId);
+    final client = await findClient(clientId);
     if (client == null) {
       return null;
     }
@@ -139,29 +141,16 @@ class OidcService {
     required String redirectUri,
     required String? clientSecret,
     required String? codeVerifier,
+    String? requestIp,
   }) async {
-    final client = await _oidcRepository.findClient(clientId);
-    if (client == null) {
+    final client = await _authenticateClient(
+      clientId: clientId,
+      clientSecret: clientSecret,
+      requestIp: requestIp,
+    );
+    if (client == null ||
+        !(client['grant_types'] as List).contains('authorization_code')) {
       return null;
-    }
-
-    final isConfidential = client['is_confidential'] as bool;
-    final grantTypes = (client['grant_types'] as List<String>).toSet();
-    if (!grantTypes.contains('authorization_code')) {
-      return null;
-    }
-    final secretHash = client['client_secret_hash'] as String?;
-    if (isConfidential) {
-      if (clientSecret == null || secretHash == null) {
-        return null;
-      }
-      final validSecret = await _passwordHasher.verify(
-        secretHash,
-        clientSecret,
-      );
-      if (!validSecret) {
-        return null;
-      }
     }
 
     final authCode = await _oidcRepository.consumeAuthCode(code);
@@ -266,6 +255,7 @@ class OidcService {
     final client = await _authenticateConfidentialClient(
       clientId: clientId,
       clientSecret: clientSecret,
+      requestIp: requestIp,
     );
     if (client == null) {
       return null;
@@ -331,17 +321,19 @@ class OidcService {
     };
   }
 
-  Future<bool> revoke({
+  Future<bool?> revoke({
     required String token,
     required String clientId,
     required String? clientSecret,
+    String? requestIp,
   }) async {
     final client = await _authenticateClient(
       clientId: clientId,
       clientSecret: clientSecret,
+      requestIp: requestIp,
     );
     if (client == null) {
-      return false;
+      return null;
     }
 
     final access = await _tokenValidation.verifyActiveAccessToken(token);
@@ -397,6 +389,7 @@ class OidcService {
     final client = await _authenticateClient(
       clientId: clientId,
       clientSecret: clientSecret,
+      requestIp: requestIp,
     );
     if (client == null) {
       return null;
@@ -448,11 +441,43 @@ class OidcService {
     return client != null;
   }
 
+  Future<bool> _admitClientAuthentication(
+    String clientId,
+    String? requestIp, {
+    bool control = false,
+  }) async {
+    final security = _security;
+    if (security == null) return true;
+    final policy = _policy == null
+        ? SecurityPolicyService.defaultPolicy
+        : await _policy.load();
+    // An unauthenticated caller must not consume another caller's budget.
+    // Real HTTP entry points supply the trusted transport/proxy-derived IP.
+    final decision = await security.enforce(
+      scope: 'oidc:client-auth:${control ? 'control' : 'token'}:client-ip',
+      subject: jsonEncode([clientId, requestIp?.trim() ?? 'in-process']),
+      limit: control ? policy.oidcIntrospectIpLimit : policy.oidcTokenIpLimit,
+      window: Duration(
+        seconds: control
+            ? policy.oidcIntrospectWindowSeconds
+            : policy.oidcTokenWindowSeconds,
+      ),
+      blockDuration: Duration(
+        seconds: control
+            ? policy.oidcIntrospectBlockSeconds
+            : policy.oidcTokenBlockSeconds,
+      ),
+    );
+    return decision.allowed;
+  }
+
   Future<Map<String, dynamic>?> _authenticateClient({
     required String clientId,
     required String? clientSecret,
+    String? requestIp,
   }) async {
-    final client = await _oidcRepository.findClient(clientId);
+    if (!await _admitClientAuthentication(clientId, requestIp)) return null;
+    final client = await findClient(clientId);
     if (client == null) {
       return null;
     }
@@ -472,8 +497,11 @@ class OidcService {
   Future<Map<String, dynamic>?> _authenticateConfidentialClient({
     required String clientId,
     required String? clientSecret,
+    String? requestIp,
   }) async {
-    final client = await _oidcRepository.findClient(clientId);
+    if (!await _admitClientAuthentication(clientId, requestIp, control: true))
+      return null;
+    final client = await findClient(clientId);
     if (client == null || client['is_confidential'] != true) {
       return null;
     }

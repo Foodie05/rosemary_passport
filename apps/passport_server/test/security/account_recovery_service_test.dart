@@ -102,6 +102,131 @@ void main() {
   }
 
   test(
+    'admin recovery cannot turn a single email, phone or TOTP factor into a password',
+    () async {
+      const admin = UserRecord(
+        id: 'admin-id',
+        email: 'admin@example.invalid',
+        phoneNumber: '+8613800000000',
+        nickname: 'Admin',
+        passwordHash: 'hash',
+        passkeyHash: null,
+        securityCodeHash: null,
+        authenticatorSecret: null,
+        hasAuthenticator: true,
+        roles: ['admin'],
+        isEmailVerified: true,
+        isPhoneVerified: true,
+      );
+      when(() => users.findByEmail(any())).thenAnswer((_) async => admin);
+      when(() => users.findByPhoneNumber(any())).thenAnswer((_) async => admin);
+      when(
+        () => users.findAuthenticatorSecretByUserId(admin.id),
+      ).thenAnswer((_) async => 'secret');
+      when(
+        () => emailCodes.verifyPasswordResetCode(admin.email, any()),
+      ).thenAnswer((_) async => true);
+      when(() => phones.normalizePhone(any())).thenReturn(admin.phoneNumber);
+      when(
+        () => phones.verifyCode(
+          phoneNumber: any(named: 'phoneNumber'),
+          verifyCode: any(named: 'verifyCode'),
+          requestIp: any(named: 'requestIp'),
+        ),
+      ).thenAnswer((_) async => const PhoneVerifyCheckAttempt.success());
+      when(
+        () => authenticator.verifyCode(
+          secret: any(named: 'secret'),
+          code: any(named: 'code'),
+        ),
+      ).thenReturn(true);
+      when(
+        () => throttles.loadPolicy(),
+      ).thenAnswer((_) async => SecurityPolicyService.defaultPolicy);
+      when(
+        () => throttles.enforceRequestGuards(
+          emailScope: any(named: 'emailScope'),
+          ipScope: any(named: 'ipScope'),
+          email: any(named: 'email'),
+          requestIp: any(named: 'requestIp'),
+          emailLimit: any(named: 'emailLimit'),
+          ipLimit: any(named: 'ipLimit'),
+          window: any(named: 'window'),
+          blockDuration: any(named: 'blockDuration'),
+        ),
+      ).thenAnswer((_) async => null);
+      for (final method in ['email', 'phone', 'authenticator']) {
+        final result = await service.recoverPassword(
+          account: method == 'phone' ? admin.phoneNumber! : admin.email,
+          method: method,
+          code: '123456',
+          newPassword: 'A secure new recovery passphrase',
+        );
+        expect(result.code, 'admin_recovery_requires_mfa');
+        expect(result.statusCode, 403);
+      }
+      verifyNever(() => passwords.hash(any()));
+      verifyNever(
+        () => users.updatePasswordHash(
+          userId: any(named: 'userId'),
+          passwordHash: any(named: 'passwordHash'),
+        ),
+      );
+      when(() => users.findById(admin.id)).thenAnswer((_) async => admin);
+      when(() => webAuthn.findCredential('admin-key')).thenAnswer(
+        (_) async => WebAuthnCredentialRecord(
+          userId: admin.id,
+          credentialId: 'admin-key',
+          publicKey: 'key',
+          counter: 0,
+          transports: const ['internal'],
+          deviceType: 'singleDevice',
+          backedUp: false,
+          uvRequired: true,
+          uvGraceExpiresAt: null,
+          createdAt: DateTime.utc(2026),
+        ),
+      );
+      when(
+        () => webAuthn.verifyAuthentication(
+          userId: admin.id,
+          email: admin.email,
+          response: {'id': 'admin-key'},
+          forceUserVerification: true,
+        ),
+      ).thenAnswer((_) async => true);
+      when(() => passwords.hash(any())).thenAnswer((_) async => 'new-hash');
+      when(
+        () => users.updatePasswordHash(
+          userId: admin.id,
+          passwordHash: 'new-hash',
+        ),
+      ).thenAnswer((_) async {});
+      when(
+        () => sessions.revokeAllUserSessions(admin.id),
+      ).thenAnswer((_) async {});
+      expect(
+        (await service.recoverPassword(
+          account: admin.email,
+          method: 'passkey',
+          code: '',
+          passkeyResponse: {'id': 'admin-key'},
+          newPassword: 'A secure new recovery passphrase',
+        )).ok,
+        isTrue,
+      );
+      verify(
+        () => webAuthn.verifyAuthentication(
+          userId: admin.id,
+          email: admin.email,
+          response: {'id': 'admin-key'},
+          forceUserVerification: true,
+        ),
+      ).called(1);
+    },
+  );
+
+  test(
     'email recovery send remains non-enumerating and rate limited',
     () async {
       stubEmailDelivery();

@@ -49,6 +49,7 @@ jobs:
           ./ops/tests/legacy_cutover_layout_test.sh
           ./ops/tests/deploy_transaction_rollback_test.sh
           ./ops/tests/pitr_drill_safety_test.sh
+          ./ops/tests/local_database_config_test.sh
           ./ops/tests/sla_observation_test.sh
           ./ops/tests/frontend_csp_test.sh
       - name: Validate pull request title
@@ -120,6 +121,14 @@ jobs:
         run: |
           dart run build_runner build --delete-conflicting-outputs
           git diff --exit-code -- lib/src/models
+      # Dart 3.13.2's SourceReport crashes after Isolate.run workloads while
+      # collecting branch coverage. Keep all compiler/analyzer gates on 3.13.2,
+      # but collect coverage with the production-tested 3.12.2 VM until fixed.
+      - name: Prepare coverage Dart SDK switch
+        run: rm -f "$RUNNER_TEMP/dartsdk-linux-x64-release.zip"
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: 3.12.2
       - name: Unit and PostgreSQL integration tests
         working-directory: apps/passport_server
         env:
@@ -128,20 +137,32 @@ jobs:
           TEST_DB_USER: postgres
           TEST_DB_PASSWORD: postgres
           TEST_DB_NAME: rosm_passport_test
+        run: dart run tool/run_coverage.dart
+      # package:test can omit the service's own script when this suite runs
+      # under the parent coverage process. A direct invocation preserves the
+      # strict account-management branch gate without weakening thresholds.
+      - name: Supplement account-management coverage
+        working-directory: apps/passport_server
         run: >-
           dart --branch-coverage run test
+          test/security/account_management_service_test.dart
           --concurrency=1
           --reporter=expanded
-          --coverage-path=coverage/lcov.info
+          --coverage-path=coverage/account-management.info
           --branch-coverage
       - name: Coverage gate
         working-directory: apps/passport_server
-        run: dart run tool/check_coverage.dart coverage/lcov.info
+        run: >-
+          dart run tool/check_coverage.dart
+          coverage/lcov.info
+          coverage/account-management.info
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: server-coverage
-          path: apps/passport_server/coverage/lcov.info
+          path: |
+            apps/passport_server/coverage/lcov.info
+            apps/passport_server/coverage/account-management.info
 
   web:
     runs-on: ubuntu-24.04

@@ -101,9 +101,43 @@ void main() {
     expect(idPayload['nonce'], 'nonce-value');
     expect(idPayload['phone_number'], user.phoneNumber);
     expect(idPayload['phone_number_verified'], isTrue);
+    expect(idPayload['email_verified'], isFalse);
+    expect(
+      service
+          .verify(pair.refreshToken, expectedType: 'refresh')
+          ?.payload['scope'],
+      'openid profile email phone',
+    );
     expect(service.firstPartyRefreshTokenTtlSeconds(rememberMe: false), 1200);
     expect(service.firstPartyRefreshTokenTtlSeconds(rememberMe: true), 86400);
   });
+
+  test(
+    'verified email is asserted only when the stored account flag is true',
+    () {
+      final tokens = TokenService(config());
+      final pair = tokens.issueTokenPair(
+        const AuthenticatedUser(
+          id: 'verified-user',
+          email: 'verified@example.invalid',
+          isEmailVerified: true,
+          nickname: 'Verified',
+          roles: ['user'],
+        ),
+        scopes: ['openid', 'email'],
+      );
+      expect(
+        (JWT.decode(pair.idToken!).payload as Map)['email_verified'],
+        isTrue,
+      );
+      expect(
+        tokens
+            .verify(pair.refreshToken, expectedType: 'refresh')
+            ?.payload['scope'],
+        'openid email',
+      );
+    },
+  );
 
   test('active keyring verifies a token issued by the retiring key', () {
     const user = AuthenticatedUser(

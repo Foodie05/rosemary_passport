@@ -56,6 +56,11 @@ ensure_docker_ready() {
 }
 
 create_env_if_needed() {
+  local db_password_setting=''
+  if [[ -f "$ENV_FILE" ]]; then
+    db_password_setting="$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" | head -n 1)"
+  fi
+  [[ -n "$db_password_setting" ]] || db_password_setting="$(openssl rand -hex 32)"
   if [[ -f "$ENV_FILE" ]]; then
     if grep -q '^JWT_PRIVATE_KEY_PEM_B64=' "$ENV_FILE" &&
       grep -q '^JWT_PUBLIC_KEY_PEM_B64=' "$ENV_FILE"; then
@@ -105,7 +110,7 @@ SERVER_BASE_URL=http://localhost:8080
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_USER=rosm_passport
-DB_PASSWORD=rosm_passport_dev
+DB_PASSWORD=$db_password_setting
 DB_NAME=rosm_passport
 DB_SSL_MODE=disable
 JWT_ISSUER=rosm-passport
@@ -185,22 +190,38 @@ kill_port_if_needed 5173
 
 cd "$ROOT_DIR"
 log "启动 PostgreSQL 容器..."
-docker compose up -d postgres
+docker compose --env-file "$ENV_FILE" up -d postgres
 
 log "等待 PostgreSQL 启动..."
 for _ in {1..30}; do
-  if docker compose exec -T postgres pg_isready -U rosm_passport -d rosm_passport >/dev/null 2>&1; then
+  if docker compose --env-file "$ENV_FILE" exec -T postgres pg_isready -U rosm_passport -d rosm_passport >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-if ! docker compose exec -T postgres pg_isready -U rosm_passport -d rosm_passport >/dev/null 2>&1; then
+if ! docker compose --env-file "$ENV_FILE" exec -T postgres pg_isready -U rosm_passport -d rosm_passport >/dev/null 2>&1; then
   log "PostgreSQL 启动超时，请检查 Docker 状态与容器日志。"
   exit 1
 fi
 
-docker compose exec -T -e PGOPTIONS='-c client_min_messages=warning' postgres \
+# Existing volumes ignore POSTGRES_PASSWORD at container startup. Rotate the
+# historical development default in PostgreSQL before updating the app config.
+if grep -qx 'DB_PASSWORD=rosm_passport_dev' "$ENV_FILE"; then
+  db_password="$(openssl rand -hex 32)"
+  env_tmp="$(mktemp "${ENV_FILE}.XXXXXX")"
+  sed "s/^DB_PASSWORD=rosm_passport_dev$/DB_PASSWORD=$db_password/" "$ENV_FILE" >"$env_tmp"
+  chmod 0600 "$env_tmp"
+  docker compose --env-file "$ENV_FILE" exec -T postgres \
+    psql -v ON_ERROR_STOP=1 -U rosm_passport -d rosm_passport >/dev/null <<SQL
+ALTER ROLE rosm_passport PASSWORD '$db_password';
+SQL
+  mv "$env_tmp" "$ENV_FILE"
+  unset db_password
+  log "已轮换旧版开发数据库默认密码。"
+fi
+
+docker compose --env-file "$ENV_FILE" exec -T -e PGOPTIONS='-c client_min_messages=warning' postgres \
   psql -v ON_ERROR_STOP=1 -U rosm_passport -d rosm_passport \
   -f /docker-entrypoint-initdb.d/001_init.sql >/dev/null
 
@@ -217,13 +238,13 @@ log "安装前端依赖..."
 source "$ADMIN_CRED_FILE"
 
 admin_exists="$(
-  docker compose exec -T postgres \
+  docker compose --env-file "$ENV_FILE" exec -T postgres \
     psql -U rosm_passport -d rosm_passport -tAc \
     "select count(*) from users where lower(email) = lower('$(printf '%s' "$LOCAL_ADMIN_EMAIL" | sed "s/'/''/g")')" \
     | tr -d '[:space:]'
 )"
 user_count="$(
-  docker compose exec -T postgres \
+  docker compose --env-file "$ENV_FILE" exec -T postgres \
     psql -U rosm_passport -d rosm_passport -tAc 'select count(*) from users' \
     | tr -d '[:space:]'
 )"

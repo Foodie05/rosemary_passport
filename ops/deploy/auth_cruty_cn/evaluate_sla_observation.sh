@@ -20,10 +20,12 @@ for command in awk date find jq openssl sha256sum sort tail; do require_cmd "$co
 records=()
 while IFS= read -r record; do
   records+=("$record")
-done < <(find "$evidence_dir/records" -maxdepth 1 -type f -name '*.json' | sort | tail -n "$expected_days")
-(( ${#records[@]} == expected_days )) \
+done < <(find "$evidence_dir/records" -maxdepth 1 -type f -name '*.json' | sort)
+(( ${#records[@]} >= expected_days )) \
   || die "expected $expected_days daily records, found ${#records[@]}"
 
+window_start=$(( ${#records[@]} - expected_days ))
+record_index=0
 previous_hash='GENESIS'
 previous_epoch=''
 for record_file in "${records[@]}"; do
@@ -38,16 +40,20 @@ for record_file in "${records[@]}"; do
   entry_hash="$(jq -er '.entry_hash' "$record_file")"
   payload="$(jq -cS 'del(.entry_hash)' "$record_file")"
   calculated_hash="$(printf '%s' "$payload" | sha256sum | awk '{print $1}')"
-  [[ "$result" == passed ]] || die "failed observation: $date_value"
+
   [[ "$recorded_previous" == "$previous_hash" ]] || die "hash chain mismatch: $date_value"
   [[ "$entry_hash" == "$calculated_hash" ]] || die "entry hash mismatch: $date_value"
   current_epoch="$(to_epoch "$date_value")"
-  if [[ -n "$previous_epoch" ]]; then
-    (( current_epoch - previous_epoch == 86400 )) || die "dates are not consecutive: $date_value"
+  if (( record_index >= window_start )); then
+    [[ "$result" == passed ]] || die "failed observation: $date_value"
+    if [[ -n "$previous_epoch" ]]; then
+      (( current_epoch - previous_epoch == 86400 )) || die "dates are not consecutive: $date_value"
+    fi
+    previous_epoch="$current_epoch"
   fi
   previous_hash="$entry_hash"
-  previous_epoch="$current_epoch"
+  record_index=$(( record_index + 1 ))
 done
 printf '{"result":"passed","observed_days":%s,"first_date":"%s","last_date":"%s","final_hash":"%s"}\n' \
-  "$expected_days" "$(jq -r '.date' "${records[0]}")" \
-  "$(jq -r '.date' "${records[expected_days-1]}")" "$previous_hash"
+  "$expected_days" "$(jq -r '.date' "${records[window_start]}")" \
+  "$(jq -r '.date' "${records[${#records[@]}-1]}")" "$previous_hash"

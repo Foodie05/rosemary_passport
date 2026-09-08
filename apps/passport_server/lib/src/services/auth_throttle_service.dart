@@ -275,6 +275,20 @@ class AuthThrottleService {
     return decision.allowed;
   }
 
+  Future<bool> admitLoginStepUpAttempt(String proofId) async {
+    final security = _security;
+    if (security == null) return true;
+    // One shared, atomic budget across all factors, longer than the proof TTL.
+    final decision = await security.enforce(
+      scope: 'auth:login-step-up-attempt',
+      subject: proofId,
+      limit: 5,
+      window: const Duration(minutes: 15),
+      blockDuration: const Duration(minutes: 15),
+    );
+    return decision.allowed;
+  }
+
   int? maxRetryAfter(int? left, int? right) {
     if (left == null) {
       return right;

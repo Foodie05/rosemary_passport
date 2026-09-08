@@ -126,6 +126,25 @@ void main() {
     tokens = _MockTokens();
     emailCodes = _MockEmailCodes();
     throttles = _MockThrottles();
+    when(
+      () => throttles.loadPolicy(),
+    ).thenAnswer((_) async => SecurityPolicyService.defaultPolicy);
+    when(
+      () => throttles.admitLoginStepUpAttempt(any()),
+    ).thenAnswer((_) async => true);
+    when(
+      () => throttles.enforceRequestGuards(
+        emailScope: any(named: 'emailScope'),
+        ipScope: any(named: 'ipScope'),
+        email: any(named: 'email'),
+        requestIp: any(named: 'requestIp'),
+        emailLimit: any(named: 'emailLimit'),
+        ipLimit: any(named: 'ipLimit'),
+        window: any(named: 'window'),
+        blockDuration: any(named: 'blockDuration'),
+      ),
+    ).thenAnswer((_) async => null);
+
     sessions = _MockSessions();
     audit = _MockAudit();
     authenticator = _MockAuthenticator();
@@ -966,6 +985,19 @@ void main() {
         'verification_failed',
       );
       verify(() => throttles.consumeOneTimeProof('step-up-id')).called(2);
+      when(
+        () => throttles.admitLoginStepUpAttempt('step-up-id'),
+      ).thenAnswer((_) async => false);
+      clearInteractions(passwords);
+      expect(
+        (await service.completeLoginStepUp(
+          challenge: 'step-up-challenge',
+          factor: 'password',
+          proof: const {'password': 'correct-password'},
+        )).statusCode,
+        429,
+      );
+      verifyNever(() => passwords.verify(any(), any()));
     },
   );
 

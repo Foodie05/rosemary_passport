@@ -24,6 +24,6 @@ kill_port_if_needed 8080
 kill_port_if_needed 5173
 
 cd "$ROOT_DIR"
-docker compose stop postgres >/dev/null || true
+docker compose --env-file "$ROOT_DIR/apps/passport_server/.env" stop postgres >/dev/null || true
 
 echo "[local-down] 本地服务已停止"

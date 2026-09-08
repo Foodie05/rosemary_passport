@@ -54,6 +54,9 @@ void main() {
     passwords = _MockPasswords();
     captcha = _MockCaptcha();
     settings = _MockSettings();
+    when(
+      () => settings.isBootstrapLoginEnabled(),
+    ).thenAnswer((_) async => true);
     service = BootstrapAccessService(
       userRepository: users,
       passwordHasher: passwords,
@@ -97,6 +100,16 @@ void main() {
     );
     expect(service.mustBindAdminEmail(admin), isTrue);
     expect(service.mustBindAdminEmail(user), isFalse);
+    clearInteractions(passwords);
+    when(() => users.findByEmail(any())).thenAnswer((_) async => user);
+    expect(
+      await service.shouldBypassCaptcha(
+        email: user.email,
+        password: 'anything',
+      ),
+      isFalse,
+    );
+    verifyNever(() => passwords.verify(any(), any()));
   });
 
   test('user-id bypass requires an existing active bootstrap admin', () async {
