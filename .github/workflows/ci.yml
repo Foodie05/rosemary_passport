@@ -124,6 +124,8 @@ jobs:
       # Dart 3.13.2's SourceReport crashes after Isolate.run workloads while
       # collecting branch coverage. Keep all compiler/analyzer gates on 3.13.2,
       # but collect coverage with the production-tested 3.12.2 VM until fixed.
+      - name: Prepare coverage Dart SDK switch
+        run: rm -f "$RUNNER_TEMP/dartsdk-linux-x64-release.zip"
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
         with:
           sdk: 3.12.2
