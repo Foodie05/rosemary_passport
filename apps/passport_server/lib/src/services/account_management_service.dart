@@ -63,7 +63,12 @@ class AccountManagementService {
       );
     }
 
-    var updatedEmail = false;
+    if (newEmail != null && newEmail.trim().isNotEmpty) {
+      return const AccountUpdateAttempt.failure(
+        code: 'email_verification_required',
+        message: '请通过绑定邮箱流程验证新邮箱后再修改。',
+      );
+    }
     var updatedPassword = false;
     var updatedNickname = false;
     if (nickname != null && nickname.trim().isNotEmpty) {
@@ -97,27 +102,6 @@ class AccountManagementService {
       }
     }
 
-    if (newEmail != null && newEmail.trim().isNotEmpty) {
-      final targetEmail = newEmail.trim().toLowerCase();
-      if (user.roles.contains('admin') &&
-          isReservedBootstrapEmail(targetEmail)) {
-        return const AccountUpdateAttempt.failure(
-          code: 'invalid_email',
-          message: '管理员邮箱不能使用保留的本地域名。',
-        );
-      }
-      final existing = await _users.findByEmail(targetEmail);
-      if (existing != null && existing.id != user.id) {
-        return const AccountUpdateAttempt.failure(
-          code: 'email_exists',
-          message: '邮箱已被占用。',
-          statusCode: 409,
-        );
-      }
-      await _users.updateEmail(userId: user.id, email: targetEmail);
-      updatedEmail = true;
-    }
-
     if (newPassword != null && newPassword.trim().isNotEmpty) {
       final policy = _passwordPolicy.validate(newPassword);
       if (!policy.ok) {
@@ -131,16 +115,11 @@ class AccountManagementService {
       updatedPassword = true;
     }
 
-    if (updatedEmail || updatedPassword) {
+    if (updatedPassword) {
       await _sessions.revokeAllUserSessions(user.id);
     }
-    if (updatedEmail && await isBootstrapAdmin(user)) {
-      await _settings.closeBootstrapLogin(
-        boundEmail: newEmail!.trim().toLowerCase(),
-      );
-    }
     return AccountUpdateAttempt.success(
-      updatedEmail: updatedEmail,
+      updatedEmail: false,
       updatedPassword: updatedPassword,
       updatedNickname: updatedNickname,
     );

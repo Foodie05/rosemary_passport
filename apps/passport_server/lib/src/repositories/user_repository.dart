@@ -55,6 +55,7 @@ class UserRecord {
   }) => AuthenticatedUser(
     id: id,
     email: email,
+    isEmailVerified: isEmailVerified,
     phoneNumber: phoneNumber,
     isPhoneVerified: isPhoneVerified,
     nickname: nickname,

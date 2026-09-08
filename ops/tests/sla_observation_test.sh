@@ -100,6 +100,23 @@ duplicate_status=$?
 set -e
 [[ "$duplicate_status" -ne 0 ]]
 
+ROSM_OBSERVATION_DATE_OVERRIDE=2026-08-15 \
+  "$recorder" "$test_dir/release" "$test_dir/runtime.env" \
+    "$test_dir/secrets" "$test_dir/evidence" >/dev/null
+summary="$($evaluator "$test_dir/evidence" 14)"
+[[ "$(jq -r '.first_date' <<<"$summary")" == 2026-08-02 ]]
+[[ "$(jq -r '.last_date' <<<"$summary")" == 2026-08-15 ]]
+
+# Even evidence outside the requested suffix must still be authenticated.
+cp "$test_dir/evidence/records/2026-08-01.json" "$test_dir/first-record.json"
+jq '.result="failed"' "$test_dir/first-record.json" >"$test_dir/evidence/records/2026-08-01.json"
+if "$evaluator" "$test_dir/evidence" 14 >/dev/null 2>&1; then
+  echo 'tampering outside the rolling window was accepted' >&2
+  exit 1
+fi
+cp "$test_dir/first-record.json" "$test_dir/evidence/records/2026-08-01.json"
+
+cp "$test_dir/evidence/records/2026-08-14.json" "$test_dir/day14.json"
 jq '.result="failed"' "$test_dir/evidence/records/2026-08-14.json" \
   >"$test_dir/tampered.json"
 mv "$test_dir/tampered.json" "$test_dir/evidence/records/2026-08-14.json"
@@ -108,4 +125,25 @@ set +e
 tamper_status=$?
 set -e
 [[ "$tamper_status" -ne 0 ]]
+cp "$test_dir/day14.json" "$test_dir/evidence/records/2026-08-14.json"
+
+# A genuine signed failure before the requested window does not invalidate
+# a subsequent complete passing window, but is still part of the trusted chain.
+previous_hash=GENESIS
+for record_file in "$test_dir/evidence/records/"*.json; do
+  result=passed
+  [[ "${record_file##*/}" != 2026-08-01.json ]] || result=failed
+  payload="$(jq -cS --arg previous "$previous_hash" --arg result "$result" \
+    'del(.entry_hash) | .previous_hash=$previous | .result=$result' "$record_file")"
+  entry_hash="$(printf '%s' "$payload" | sha256sum | awk '{print $1}')"
+  jq --arg hash "$entry_hash" '.entry_hash=$hash' <<<"$payload" >"$record_file"
+  "$repo_root/ops/deploy/auth_cruty_cn/ed25519_signature.sh" sign \
+    "$test_dir/secrets/audit_signing.private.pem" "$record_file" "$record_file.sig"
+  previous_hash="$entry_hash"
+done
+"$evaluator" "$test_dir/evidence" 14 >/dev/null
+if "$evaluator" "$test_dir/evidence" 15 >/dev/null 2>&1; then
+  echo 'failed observation inside the requested window was accepted' >&2
+  exit 1
+fi
 echo 'SLA observation evidence tests passed.'

@@ -10,6 +10,7 @@ import '../lib/src/repositories/legal_repository.dart';
 import '../lib/src/repositories/user_repository.dart';
 import '../lib/src/security/token_service.dart';
 import '../lib/src/security/password_policy.dart';
+import '../lib/src/security/password_hasher.dart';
 import '../lib/src/services/audit_service.dart';
 import '../lib/src/services/activity_log_service.dart';
 import '../lib/src/services/admin_settings_service.dart';
@@ -97,6 +98,12 @@ Middleware _errorBoundary() {
     return (context) async {
       try {
         return await handler(context);
+      } on PasswordWorkUnavailable {
+        return errorResponse(
+          'service_busy',
+          '服务繁忙，请稍后重试。',
+          statusCode: 503,
+        ).copyWith(headers: {'retry-after': '1'});
       } catch (error, stackTrace) {
         final request = context.request;
         String? requestId;

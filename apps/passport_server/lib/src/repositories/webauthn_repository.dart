@@ -131,7 +131,7 @@ class WebAuthnRepository {
     return result.first[0] as int;
   }
 
-  Future<void> insertCredential({
+  Future<bool> insertCredential({
     required String userId,
     required String credentialId,
     required String publicKey,
@@ -140,7 +140,7 @@ class WebAuthnRepository {
     String? deviceType,
     required bool backedUp,
   }) async {
-    await _db.execute(
+    final result = await _db.execute(
       '''
       insert into user_webauthn_credentials(
         user_id, credential_id, public_key, counter, transports, device_type, backed_up,
@@ -158,15 +158,8 @@ class WebAuthnRepository {
         true,
         null
       )
-      on conflict (credential_id) do update
-      set public_key = excluded.public_key,
-          counter = excluded.counter,
-          transports = excluded.transports,
-          device_type = excluded.device_type,
-          backed_up = excluded.backed_up
-          ,uv_verified_at = now()
-          ,uv_required = true
-          ,uv_grace_expires_at = null
+      on conflict (credential_id) do nothing
+      returning credential_id
       ''',
       params: {
         'user_id': userId,
@@ -178,6 +171,7 @@ class WebAuthnRepository {
         'backed_up': backedUp,
       },
     );
+    return result.isNotEmpty;
   }
 
   Future<void> updateCredentialCounter({

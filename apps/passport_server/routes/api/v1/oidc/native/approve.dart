@@ -16,7 +16,7 @@ Future<Response> onRequest(RequestContext context) async {
     return invalidNativeAuthorizationResponse();
   }
 
-  final user = await currentUser(context);
+  final user = await currentUser(context, requireFirstParty: true);
   if (user == null) {
     return errorResponse(
       'unauthorized',

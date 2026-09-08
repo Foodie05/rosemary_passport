@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import '../../lib/src/config/app_config.dart';
 import '../../lib/src/services/oidc_service.dart';
 import '../../lib/src/utils/http.dart';
 import '../../lib/src/utils/oidc_error_page.dart';
@@ -42,13 +43,16 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final authenticated = await context
-      .read<OidcService>()
-      .authenticateRevocationClient(
-        clientId: clientId,
-        clientSecret: clientSecret,
-      );
-  if (!authenticated) {
+  final revoked = await context.read<OidcService>().revoke(
+    token: token,
+    clientId: clientId,
+    clientSecret: clientSecret,
+    requestIp: clientIpFromRequest(
+      context.request,
+      config: context.read<AppConfig>(),
+    ),
+  );
+  if (revoked == null) {
     return oidcErrorResponse(
       context,
       code: 'invalid_client',
@@ -59,10 +63,5 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final revoked = await context.read<OidcService>().revoke(
-    token: token,
-    clientId: clientId,
-    clientSecret: clientSecret,
-  );
   return jsonResponse({'revoked': revoked});
 }

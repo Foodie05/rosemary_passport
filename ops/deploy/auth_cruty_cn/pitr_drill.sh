@@ -79,7 +79,7 @@ printf '[pitr-drill] inserting recovery marker %s\n' "$marker_id"
 source_sql "insert into sla_recovery_markers(marker_id) values ('$marker_id')"
 source_counts_json="$(source_sql "select json_build_object(
   'users',(select count(*) from users),
-  'roles',(select count(*) from roles),
+  'roles',(select count(*) from user_roles),
   'oidc_clients',(select count(*) from oidc_clients),
   'system_settings',(select count(*) from system_settings),
   'audit_logs',(select count(*) from audit_logs),
@@ -159,7 +159,7 @@ rpo_seconds="$((failure_epoch - $(date -u -d "$marker_time UTC" '+%s')))"
 counts_json="$(docker exec "$container_name" psql -U "$postgres_user" -d "$postgres_db" -Atc \
   "select json_build_object(
     'users',(select count(*) from users),
-    'roles',(select count(*) from roles),
+    'roles',(select count(*) from user_roles),
     'oidc_clients',(select count(*) from oidc_clients),
     'system_settings',(select count(*) from system_settings),
     'audit_logs',(select count(*) from audit_logs),

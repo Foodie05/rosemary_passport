@@ -142,6 +142,26 @@ class SessionService {
       return null;
     }
 
+    // Signed refresh claims retain the original grant through every rotation.
+    // Legacy delegated tokens did not record it and must be reauthorized.
+    final rawScope = payload['scope'];
+    if (rawScope != null && rawScope is! String) return null;
+    if (rawScope == null && clientId != 'first_party_web') return null;
+    var scopes = (rawScope as String? ?? 'openid profile email phone')
+        .split(' ')
+        .where((scope) => scope.isNotEmpty)
+        .toSet();
+    if (clientId != 'first_party_web') {
+      final client = await _oidc.findClient(clientId);
+      if (client == null ||
+          !(client['grant_types'] as List).contains('refresh_token')) {
+        return null;
+      }
+      scopes = scopes.intersection(
+        (client['scopes'] as List).cast<String>().toSet(),
+      );
+    }
+
     final refreshRecord = await _oidc.findRefreshToken(tokenId);
     if (refreshRecord == null ||
         (refreshRecord['client_id'] as String?) != clientId) {
@@ -165,6 +185,7 @@ class SessionService {
       user.toAuthenticatedUser(),
       clientId: clientId,
       familyId: familyId,
+      scopes: scopes.toList(),
       refreshTokenTtlSeconds: refreshTtl,
       rememberSession: rememberSession,
     );

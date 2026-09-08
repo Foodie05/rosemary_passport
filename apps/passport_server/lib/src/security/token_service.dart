@@ -19,6 +19,7 @@ class TokenPair {
     required this.familyId,
     required this.refreshExpiresIn,
     this.idToken,
+    this.scopes,
   });
 
   final String accessToken;
@@ -30,12 +31,14 @@ class TokenPair {
   final String familyId;
   final int refreshExpiresIn;
   final String? idToken;
+  final List<String>? scopes;
 
   Map<String, dynamic> toJson() => {
     'access_token': accessToken,
     'refresh_token': refreshToken,
     'token_type': tokenType,
     'expires_in': expiresIn,
+    if (scopes != null) 'scope': scopes!.join(' '),
     if (idToken != null) 'id_token': idToken,
   };
 }
@@ -132,6 +135,7 @@ class TokenService {
 
     final refreshClaims = <String, dynamic>{
       'sub': user.id,
+      'scope': scopes.join(' '),
       'client_id': clientId,
       'jti': refreshJti,
       'typ': 'refresh',
@@ -174,7 +178,8 @@ class TokenService {
               if (scopes.contains('email')) 'email': user.email,
               if (scopes.contains('profile')) 'name': user.nickname,
               if (scopes.contains('profile')) 'nickname': user.nickname,
-              if (scopes.contains('email')) 'email_verified': true,
+              if (scopes.contains('email'))
+                'email_verified': user.isEmailVerified,
               if (scopes.contains('phone') &&
                   (user.phoneNumber ?? '').trim().isNotEmpty)
                 'phone_number': user.phoneNumber,
@@ -205,6 +210,7 @@ class TokenService {
       familyId: resolvedFamilyId,
       refreshExpiresIn: resolvedRefreshTokenTtlSeconds,
       idToken: idToken,
+      scopes: List.unmodifiable(scopes),
     );
   }
 

@@ -141,7 +141,7 @@ class WebAuthnService {
     final registrationInfo = Map<String, dynamic>.from(
       payload['registrationInfo'] as Map? ?? const {},
     );
-    await _repository.insertCredential(
+    final inserted = await _repository.insertCredential(
       userId: userId,
       credentialId: registrationInfo['credentialID'].toString(),
       publicKey: registrationInfo['credentialPublicKey'].toString(),
@@ -152,6 +152,7 @@ class WebAuthnService {
       deviceType: registrationInfo['deviceType']?.toString(),
       backedUp: registrationInfo['backedUp'] == true,
     );
+    if (!inserted) return false;
     await _repository.deleteChallenge(challenge.id);
     return true;
   }
@@ -208,10 +209,31 @@ class WebAuthnService {
     if (credentialId.isEmpty) {
       return false;
     }
+    if (response['id'] != null &&
+        response['rawId'] != null &&
+        response['id'] != response['rawId']) {
+      return false;
+    }
 
     final credential = await _repository.findCredential(credentialId);
-    if (credential == null) {
+    if (credential == null || (userId != null && credential.userId != userId)) {
       return false;
+    }
+
+    // The credential owner is authoritative in discoverable login. An account
+    // selected earlier (including MFA/recovery) must own this same credential.
+    final assertion = response['response'];
+    final userHandle = assertion is Map ? assertion['userHandle'] : null;
+    if (userHandle != null) {
+      if (userHandle is! String) return false;
+      try {
+        if (utf8.decode(base64Url.decode(base64Url.normalize(userHandle))) !=
+            credential.userId) {
+          return false;
+        }
+      } on FormatException {
+        return false;
+      }
     }
 
     final resolvedUserId = userId ?? credential.userId;

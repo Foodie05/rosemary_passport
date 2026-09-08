@@ -160,7 +160,7 @@ void main() {
         currentPassword: '',
         newEmail: 'new@example.invalid',
       )).code,
-      'invalid_request',
+      'email_verification_required',
     );
     when(() => passwords.verify(any(), any())).thenAnswer((_) async => false);
     expect(
@@ -184,7 +184,7 @@ void main() {
           currentPassword: 'password',
           newEmail: 'reserved@rosm.local',
         )).code,
-        'invalid_email',
+        'email_verification_required',
       );
 
       when(() => users.findById(any())).thenAnswer((_) async => user);
@@ -195,7 +195,7 @@ void main() {
           currentPassword: 'password',
           newEmail: other.email,
         )).code,
-        'email_exists',
+        'email_verification_required',
       );
       expect(
         (await service.updateAccount(
@@ -232,14 +232,16 @@ void main() {
       final result = await service.updateAccount(
         userId: admin.id,
         currentPassword: 'password',
-        newEmail: 'ADMIN@EXAMPLE.INVALID',
         newPassword: 'A secure historical-compatible passphrase',
       );
-      expect(result.updatedEmail, isTrue);
+      expect(result.updatedEmail, isFalse);
       expect(result.updatedPassword, isTrue);
-      verify(
-        () => settings.closeBootstrapLogin(boundEmail: 'admin@example.invalid'),
-      ).called(1);
+      verifyNever(
+        () => users.updateEmail(
+          userId: any(named: 'userId'),
+          email: any(named: 'email'),
+        ),
+      );
     },
   );
 

@@ -316,6 +316,13 @@ class AccountRecoveryService {
         statusCode: 401,
       );
     }
+    if (resolvedUser.roles.contains('admin') && normalizedMethod != 'passkey') {
+      return const EmailActionAttempt.failure(
+        code: 'admin_recovery_requires_mfa',
+        message: '管理员请使用通行密钥恢复，或通过邮箱/手机号登录并完成二次验证后，在账户设置中修改密码。',
+        statusCode: 403,
+      );
+    }
     final passwordHash = await _passwords.hash(newPassword.trim());
     await _users.updatePasswordHash(
       userId: resolvedUser.id,

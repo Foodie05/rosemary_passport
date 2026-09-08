@@ -23,7 +23,7 @@ Future<Response> onRequest(RequestContext context) async {
     );
   }
 
-  final user = await currentUser(context);
+  final user = await currentUser(context, requireFirstParty: true);
   final config = context.read<AppConfig>();
   if (context.request.uri.queryParameters['switch_account'] == '1') {
     final accessToken = readCookieValue(

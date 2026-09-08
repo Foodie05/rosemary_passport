@@ -6,24 +6,39 @@ import '../services/token_validation_service.dart';
 import '../utils/auth_cookie.dart';
 import '../utils/http.dart';
 
-Future<AuthenticatedUser?> currentUser(RequestContext context) async {
+Future<AuthenticatedUser?> currentUser(
+  RequestContext context, {
+  bool requireFirstParty = false,
+}) async {
   final auth = context.request.headers['authorization'];
+  final cookieToken = readCookieValue(
+    context.request.headers['cookie'],
+    kAccessTokenCookieName,
+  );
   String? token;
   if (auth != null && auth.startsWith('Bearer ')) {
     token = auth.substring('Bearer '.length).trim();
   } else {
-    token = readCookieValue(
-      context.request.headers['cookie'],
-      kAccessTokenCookieName,
-    );
+    token = cookieToken;
   }
-  if (token == null || token.isEmpty) {
+  if ((token == null || token.isEmpty) &&
+      (!requireFirstParty || cookieToken == null || cookieToken.isEmpty)) {
     return null;
   }
-  final verified = await context
-      .read<TokenValidationService>()
-      .verifyActiveAccessToken(token);
-  if (verified == null) {
+  final validator = context.read<TokenValidationService>();
+  var verified = token == null || token.isEmpty
+      ? null
+      : await validator.verifyActiveAccessToken(token);
+  if (requireFirstParty &&
+      verified?.payload['client_id'] != 'first_party_web' &&
+      cookieToken != null &&
+      cookieToken.isNotEmpty &&
+      cookieToken != token) {
+    verified = await validator.verifyActiveAccessToken(cookieToken);
+  }
+  if (verified == null ||
+      (requireFirstParty &&
+          verified.payload['client_id'] != 'first_party_web')) {
     return null;
   }
 
@@ -77,7 +92,7 @@ Middleware requireAuth() {
 Middleware requireAdmin() {
   return (handler) {
     return (context) async {
-      final user = await currentUser(context);
+      final user = await currentUser(context, requireFirstParty: true);
       if (user == null) {
         return errorResponse(
           'unauthorized',

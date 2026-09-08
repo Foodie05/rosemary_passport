@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:collection';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -6,22 +9,76 @@ import 'package:argon2/argon2.dart';
 
 import '../config/app_config.dart';
 
+class PasswordWorkUnavailable implements Exception {
+  const PasswordWorkUnavailable();
+}
+
 class PasswordHasher {
   PasswordHasher(this._config);
 
   final AppConfig _config;
-  final _secure = Random.secure();
+  static var _activeJobs = 0;
+  static final _waiting = Queue<Completer<void>>();
+
+  // Bound both memory-intensive workers and waiting requests per server isolate.
+  // Work never runs on the HTTP event loop, including verification of old hashes.
+  static Future<Object> _runJob(List<Object> job) async {
+    if (_activeJobs >= 2) {
+      if (_waiting.length >= 16) {
+        throw const PasswordWorkUnavailable();
+      }
+      final ready = Completer<void>();
+      _waiting.add(ready);
+      await ready.future;
+    } else {
+      _activeJobs++;
+    }
+    try {
+      return await Isolate.run(
+        () => job[0] == 'hash'
+            ? _hash(
+                job[1] as String,
+                job[2] as int,
+                job[3] as int,
+                job[4] as int,
+              )
+            : _verify(job[1] as String, job[2] as String),
+      );
+    } finally {
+      if (_waiting.isNotEmpty) {
+        _waiting.removeFirst().complete();
+      } else {
+        _activeJobs--;
+      }
+    }
+  }
 
   Future<String> hash(String password) async {
+    return await _runJob([
+          'hash',
+          password,
+          _config.argon2MemoryKb,
+          _config.argon2Iterations,
+          _config.argon2Parallelism,
+        ])
+        as String;
+  }
+
+  Future<bool> verify(String hashedPassword, String password) async {
+    return await _runJob(['verify', hashedPassword, password]) as bool;
+  }
+
+  static String _hash(String password, int memory, int iterations, int lanes) {
+    final secure = Random.secure();
     final salt = Uint8List.fromList(
-      List<int>.generate(16, (_) => _secure.nextInt(256)),
+      List<int>.generate(16, (_) => secure.nextInt(256)),
     );
     final parameters = Argon2Parameters(
       Argon2Parameters.ARGON2_id,
       salt,
-      iterations: _config.argon2Iterations,
-      memory: _config.argon2MemoryKb,
-      lanes: _config.argon2Parallelism,
+      iterations: iterations,
+      memory: memory,
+      lanes: lanes,
     );
 
     final generator = Argon2BytesGenerator()..init(parameters);
@@ -35,10 +92,10 @@ class PasswordHasher {
 
     final saltB64 = base64Url.encode(salt).replaceAll('=', '');
     final hashB64 = base64Url.encode(output).replaceAll('=', '');
-    return 'argon2id:m=${_config.argon2MemoryKb},t=${_config.argon2Iterations},p=${_config.argon2Parallelism}:$saltB64:$hashB64';
+    return 'argon2id:m=$memory,t=$iterations,p=$lanes:$saltB64:$hashB64';
   }
 
-  Future<bool> verify(String hashedPassword, String password) async {
+  static bool _verify(String hashedPassword, String password) {
     try {
       final parts = hashedPassword.split(':');
       if (parts.length != 4 || !parts.first.startsWith('argon2id')) {
@@ -73,7 +130,7 @@ class PasswordHasher {
     }
   }
 
-  bool _timingSafeEquals(List<int> a, List<int> b) {
+  static bool _timingSafeEquals(List<int> a, List<int> b) {
     if (a.length != b.length) {
       return false;
     }
