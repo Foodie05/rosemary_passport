@@ -67,13 +67,6 @@ Future<int> _runSuite(String testFile, String coveragePath) async {
       '--coverage=$coveragePath',
       '--branch-coverage',
     ];
-    if (testFile.contains('account_management_service_test.dart')) {
-      stdout.writeln('Using explicit package coverage for $testFile');
-      arguments.insert(
-        arguments.length - 1,
-        '--coverage-package=rosm_passport_server',
-      );
-    }
     final result = await Process.start(
       Platform.resolvedExecutable,
       arguments,

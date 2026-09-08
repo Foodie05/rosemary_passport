@@ -1,56 +1,64 @@
 import 'dart:io';
 
 void main(List<String> arguments) {
-  if (arguments.length != 1) {
+  if (arguments.isEmpty) {
     stderr.writeln(
-      'Usage: dart run tool/check_coverage.dart coverage/lcov.info',
+      'Usage: dart run tool/check_coverage.dart coverage/lcov.info [...]',
     );
     exitCode = 64;
     return;
   }
-  final file = File(arguments.single);
-  if (!file.existsSync()) {
-    stderr.writeln('Coverage file is missing: ${file.path}');
-    exitCode = 1;
-    return;
-  }
-
   final records = <String, _Coverage>{};
-  String? source;
-  var current = _Coverage();
-  for (final line in file.readAsLinesSync()) {
-    if (line.startsWith('SF:')) {
-      source = line.substring(3);
-      current = _Coverage();
-    } else if (line.startsWith('LF:')) {
-      current.linesFound = int.parse(line.substring(3));
-    } else if (line.startsWith('LH:')) {
-      current.linesHit = int.parse(line.substring(3));
-    } else if (line.startsWith('BRF:')) {
-      if (!current.hasBranchRecords) {
-        current.branchesFound = int.parse(line.substring(4));
+  for (final path in arguments) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      stderr.writeln('Coverage file is missing: ${file.path}');
+      exitCode = 1;
+      return;
+    }
+
+    String? source;
+    var current = _Coverage();
+    for (final line in file.readAsLinesSync()) {
+      if (line.startsWith('SF:')) {
+        source = line.substring(3);
+        current = _Coverage();
+      } else if (line.startsWith('LF:')) {
+        current.linesFound = int.parse(line.substring(3));
+      } else if (line.startsWith('LH:')) {
+        current.linesHit = int.parse(line.substring(3));
+      } else if (line.startsWith('BRF:')) {
+        if (!current.hasBranchRecords) {
+          current.branchesFound = int.parse(line.substring(4));
+        }
+      } else if (line.startsWith('BRH:')) {
+        if (!current.hasBranchRecords) {
+          current.branchesHit = int.parse(line.substring(4));
+        }
+      } else if (line.startsWith('BRDA:')) {
+        // Dart's LCOV formatter emits individual branch records without the
+        // optional BRF/BRH summary lines used by some native toolchains.
+        if (!current.hasBranchRecords) {
+          current.branchesFound = 0;
+          current.branchesHit = 0;
+          current.hasBranchRecords = true;
+        }
+        current.branchesFound++;
+        final taken = line.split(',').last;
+        final count = int.tryParse(taken);
+        if (count != null && count > 0) {
+          current.branchesHit++;
+        }
+      } else if (line == 'end_of_record' && source != null) {
+        final key = _coverageKey(source);
+        final existing = records[key];
+        // Supplemental suites repeat dependencies. Retain the most complete
+        // record and replace only a record omitted by the primary collector.
+        if (existing == null || current.isMoreCompleteThan(existing)) {
+          records[key] = current;
+        }
+        source = null;
       }
-    } else if (line.startsWith('BRH:')) {
-      if (!current.hasBranchRecords) {
-        current.branchesHit = int.parse(line.substring(4));
-      }
-    } else if (line.startsWith('BRDA:')) {
-      // Dart's LCOV formatter emits individual branch records without the
-      // optional BRF/BRH summary lines used by some native toolchains.
-      if (!current.hasBranchRecords) {
-        current.branchesFound = 0;
-        current.branchesHit = 0;
-        current.hasBranchRecords = true;
-      }
-      current.branchesFound++;
-      final taken = line.split(',').last;
-      final count = int.tryParse(taken);
-      if (count != null && count > 0) {
-        current.branchesHit++;
-      }
-    } else if (line == 'end_of_record' && source != null) {
-      records[source] = current;
-      source = null;
     }
   }
 
@@ -110,6 +118,11 @@ void main(List<String> arguments) {
   }
 }
 
+String _coverageKey(String source) {
+  final libraryIndex = source.lastIndexOf('/lib/');
+  return libraryIndex == -1 ? source : source.substring(libraryIndex);
+}
+
 class _Coverage {
   int linesFound = 0;
   int linesHit = 0;
@@ -120,6 +133,10 @@ class _Coverage {
   double get linePercent => linesFound == 0 ? 0 : linesHit * 100 / linesFound;
   double get branchPercent =>
       branchesFound == 0 ? 0 : branchesHit * 100 / branchesFound;
+
+  bool isMoreCompleteThan(_Coverage other) =>
+      linesHit > other.linesHit ||
+      (linesHit == other.linesHit && branchesHit > other.branchesHit);
 
   void add(_Coverage other) {
     linesFound += other.linesFound;
