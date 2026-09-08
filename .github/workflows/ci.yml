@@ -121,6 +121,12 @@ jobs:
         run: |
           dart run build_runner build --delete-conflicting-outputs
           git diff --exit-code -- lib/src/models
+      # Dart 3.13.2's SourceReport crashes after Isolate.run workloads while
+      # collecting branch coverage. Keep all compiler/analyzer gates on 3.13.2,
+      # but collect coverage with the production-tested 3.12.2 VM until fixed.
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1
+        with:
+          sdk: 3.12.2
       - name: Unit and PostgreSQL integration tests
         working-directory: apps/passport_server
         env:
