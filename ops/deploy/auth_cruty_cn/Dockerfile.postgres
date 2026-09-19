@@ -2,6 +2,7 @@ ARG POSTGRES_IMAGE=postgres:16.15-bookworm
 FROM ${POSTGRES_IMAGE}
 
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends awscli openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
