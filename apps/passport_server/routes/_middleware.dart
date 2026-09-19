@@ -1,23 +1,25 @@
-import 'package:dart_frog/dart_frog.dart';
 import 'dart:convert';
+
+import 'package:dart_frog/dart_frog.dart';
 import 'package:uuid/uuid.dart';
 
 import '../lib/src/bootstrap.dart';
 import '../lib/src/config/app_config.dart';
-import '../lib/src/repositories/oidc_repository.dart';
 import '../lib/src/repositories/admin_analytics_repository.dart';
 import '../lib/src/repositories/legal_repository.dart';
+import '../lib/src/repositories/oidc_repository.dart';
+import '../lib/src/repositories/security_repository.dart';
 import '../lib/src/repositories/user_repository.dart';
-import '../lib/src/security/token_service.dart';
-import '../lib/src/security/password_policy.dart';
 import '../lib/src/security/password_hasher.dart';
-import '../lib/src/services/audit_service.dart';
+import '../lib/src/security/password_policy.dart';
+import '../lib/src/security/token_service.dart';
 import '../lib/src/services/activity_log_service.dart';
 import '../lib/src/services/admin_settings_service.dart';
+import '../lib/src/services/audit_service.dart';
 import '../lib/src/services/auth_service.dart';
+import '../lib/src/services/legal_service.dart';
 import '../lib/src/services/oidc_admin_service.dart';
 import '../lib/src/services/oidc_service.dart';
-import '../lib/src/services/legal_service.dart';
 import '../lib/src/services/phone_verification_service.dart';
 import '../lib/src/services/security_service.dart';
 import '../lib/src/services/token_validation_service.dart';
@@ -60,6 +62,7 @@ Handler middleware(Handler handler) {
       )
       .use(provider<AdminSettingsService>((_) => services.adminSettingsService))
       .use(provider<SecurityService>((_) => services.securityService))
+      .use(provider<SecurityRepository>((_) => services.securityRepository))
       .use(
         provider<PhoneVerificationService>(
           (_) => services.phoneVerificationService,

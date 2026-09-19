@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, BookOpen, Check, CircleHelp, Copy, FileText, Globe, Key, Mail, Pencil, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, X } from 'lucide-react';
+import { Activity, Ban, BookOpen, Check, CircleHelp, Clock3, Copy, FileText, Globe, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
@@ -695,6 +695,146 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
         <div className="glass-card rounded-2xl p-6 xl:col-span-2"><h2 className="mb-5 text-lg font-bold">邮箱与短信验证码发送</h2><MiniLineChart data={data?.verification_activity || []} series={[{ key: 'email_codes', label: '邮箱发放尝试', color: '#587c5d' }, { key: 'sms_codes', label: '短信成功响应', color: '#6689b8' }]} /></div>
       </div>
       <div className="rounded-2xl border border-sage-200 bg-sage-50 p-5 text-xs leading-6 text-sage-600">{Object.values(data?.definitions || {}).map((definition) => <p key={definition}>• {definition}</p>)}</div>
+    </div>
+  );
+}
+
+const COOLDOWN_SUBJECT_TYPES = [
+  { value: 'all', label: '全部主体' },
+  { value: 'email', label: '邮箱' },
+  { value: 'phone', label: '手机号' },
+  { value: 'ip', label: 'IP 地址' },
+];
+
+function cooldownScopeLabel(scope) {
+  if (scope.includes(':register:')) return '注册发码';
+  if (scope.includes(':mfa-login:')) return '登录双因素';
+  if (scope.includes(':login:')) return '验证码登录';
+  if (scope.includes(':bind-email:')) return '绑定邮箱';
+  if (scope.includes(':password-reset:')) return '密码重置';
+  if (scope.includes(':step-up:')) return '敏感操作验证';
+  if (scope.includes(':phone:send:')) return '手机发码';
+  if (scope.includes(':phone:verify:')) return '手机码验证';
+  return '验证码风控';
+}
+
+function formatBeijingDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour12: false,
+  });
+}
+
+function formatRemaining(record, now) {
+  if (!record.blocked_until) return '未处于冷却';
+  const seconds = Math.max(0, Math.ceil((new Date(record.blocked_until).getTime() - now) / 1000));
+  if (seconds <= 0) return '已结束';
+  const minutes = Math.floor(seconds / 60);
+  return minutes > 0 ? `${minutes} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+}
+
+export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, resetCooldown, safely }) {
+  const { confirm } = useRosemaryDialog();
+  const [search, setSearch] = useState('');
+  const [subjectType, setSubjectType] = useState('all');
+  const [activeOnly, setActiveOnly] = useState(false);
+  const [resetting, setResetting] = useState('');
+  const [now, setNow] = useState(Date.now());
+
+  const refresh = (page = 1) => loadCooldowns({ page, search, subjectType, activeOnly });
+  useEffect(() => { void safely(() => refresh(1), '冷却状态加载失败'); }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  async function handleReset(record) {
+    const approved = await confirm({
+      title: '重置这条冷却记录？',
+      message: `将立即清除“${cooldownScopeLabel(record.scope)}”针对 ${record.subject} 的冷却与尝试计数。此操作会写入安全审计日志。`,
+      confirmLabel: '确认重置',
+      tone: 'warning',
+    });
+    if (!approved) return;
+    const key = `${record.scope}\u0000${record.subject}`;
+    setResetting(key);
+    try {
+      await safely(async () => {
+        await resetCooldown(record.scope, record.subject);
+        await refresh(pagination.page || 1);
+      }, '冷却状态重置失败');
+    } finally {
+      setResetting('');
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="状态管理"
+        description="查看验证码发放与校验产生的冷却、尝试窗口和来源 IP；包括尚未注册的邮箱与手机号。"
+        actions={<button type="button" className="btn-secondary flex items-center gap-2" onClick={() => void safely(() => refresh(pagination.page || 1), '冷却状态刷新失败')}><RefreshCw size={17} />刷新</button>}
+      />
+
+      <div className="inline-flex rounded-2xl border border-sage-200 bg-white p-1 shadow-sm" role="tablist" aria-label="状态管理分类">
+        <button type="button" role="tab" aria-selected="true" className="rounded-xl bg-sage-600 px-4 py-2 text-sm font-bold text-white">冷却管理</button>
+      </div>
+
+      <div className="glass-card space-y-4 rounded-2xl p-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400" size={18} />
+            <input className="input-field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、手机号、IP 或冷却类型" onKeyDown={(event) => { if (event.key === 'Enter') void safely(() => refresh(1), '冷却状态加载失败'); }} />
+          </div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="主体类型">
+            {COOLDOWN_SUBJECT_TYPES.map((item) => (
+              <button key={item.value} type="button" aria-pressed={subjectType === item.value} className={cn('rounded-xl px-3 py-2 text-sm font-bold transition-colors', subjectType === item.value ? 'bg-sage-600 text-white' : 'bg-sage-100 text-sage-600 hover:bg-sage-200')} onClick={() => setSubjectType(item.value)}>{item.label}</button>
+            ))}
+          </div>
+          <RosemaryCheckbox checked={activeOnly} onCheckedChange={setActiveOnly} ariaLabel="仅显示冷却中">仅显示冷却中</RosemaryCheckbox>
+          <button type="button" className="btn-primary" onClick={() => void safely(() => refresh(1), '冷却状态加载失败')}>应用筛选</button>
+        </div>
+        <p className="flex items-center gap-2 text-xs leading-5 text-sage-500"><Wifi size={15} />主体与来源 IP 仅在管理员页面显示；重置行为会进入脱敏审计链。</p>
+      </div>
+
+      <div className="glass-card overflow-hidden rounded-2xl">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] border-collapse text-left">
+            <thead><tr className="border-b border-sage-100 bg-sage-50/60">
+              {['类型', '主体 / IP', '尝试次数', '计数窗口开始', '最后更新', '冷却截止', '剩余时间', '操作'].map((label) => <th key={label} className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">{label}</th>)}
+            </tr></thead>
+            <tbody className="divide-y divide-sage-50">
+              {cooldowns.map((record) => {
+                const key = `${record.scope}\u0000${record.subject}`;
+                const active = record.blocked_until && new Date(record.blocked_until).getTime() > now;
+                return (
+                  <tr key={key} className="transition-colors hover:bg-sage-50/60">
+                    <td className="px-5 py-4"><p className="font-bold text-sage-800">{cooldownScopeLabel(record.scope)}</p><p className="mt-1 font-mono text-[11px] text-sage-400">{record.scope.includes(':cooldown:') ? '发送冷却' : '频率窗口'}</p></td>
+                    <td className="px-5 py-4"><p className="max-w-[300px] break-all font-mono text-sm text-sage-800">{record.subject}</p><span className="mt-1 inline-flex rounded-full bg-sage-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sage-600">{record.subject_type === 'ip' ? 'IP' : record.subject_type === 'phone' ? '手机' : '邮箱'}</span></td>
+                    <td className="px-5 py-4 text-lg font-bold text-sage-800">{record.hits ?? 0}</td>
+                    <td className="px-5 py-4 text-sm text-sage-600">{formatBeijingDateTime(record.window_started_at)}</td>
+                    <td className="px-5 py-4 text-sm text-sage-600">{formatBeijingDateTime(record.updated_at)}</td>
+                    <td className="px-5 py-4 text-sm text-sage-600">{formatBeijingDateTime(record.blocked_until)}</td>
+                    <td className="px-5 py-4"><span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', active ? 'bg-amber-100 text-amber-700' : 'bg-sage-100 text-sage-500')}><Clock3 size={13} />{formatRemaining(record, now)}</span></td>
+                    <td className="px-5 py-4"><button type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</button></td>
+                  </tr>
+                );
+              })}
+              {!cooldowns.length ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-sage-400"><Activity className="mx-auto mb-3" size={30} />暂无符合条件的验证码冷却记录</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-col gap-3 border-t border-sage-100 p-4 text-sm text-sage-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</p>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</button>
+            <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => refresh(pagination.page + 1), '冷却状态加载失败')}>下一页</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
