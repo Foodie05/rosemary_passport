@@ -17,10 +17,151 @@ class ThrottleState {
       blockedUntil != null && blockedUntil!.isAfter(DateTime.now().toUtc());
 }
 
+class ThrottleRecord {
+  const ThrottleRecord({
+    required this.scope,
+    required this.subject,
+    required this.subjectType,
+    required this.hits,
+    required this.windowStartedAt,
+    required this.updatedAt,
+    required this.isActive,
+    required this.remainingSeconds,
+    this.blockedUntil,
+  });
+
+  final String scope;
+  final String subject;
+  final String subjectType;
+  final int hits;
+  final DateTime windowStartedAt;
+  final DateTime? blockedUntil;
+  final DateTime updatedAt;
+  final bool isActive;
+  final int remainingSeconds;
+
+  Map<String, dynamic> toJson() => {
+    'scope': scope,
+    'subject': subject,
+    'subject_type': subjectType,
+    'hits': hits,
+    'window_started_at': windowStartedAt.toUtc().toIso8601String(),
+    'blocked_until': blockedUntil?.toUtc().toIso8601String(),
+    'updated_at': updatedAt.toUtc().toIso8601String(),
+    'is_active': isActive,
+    'remaining_seconds': remainingSeconds,
+  };
+}
+
+class ThrottlePage {
+  const ThrottlePage({required this.records, required this.total});
+
+  final List<ThrottleRecord> records;
+  final int total;
+}
+
 class SecurityRepository {
   SecurityRepository(this._db);
 
   final Database _db;
+
+  Future<ThrottlePage> listVerificationCodeThrottles({
+    required int limit,
+    required int offset,
+    String search = '',
+    String subjectType = 'all',
+    bool activeOnly = false,
+  }) async {
+    final filters = <String>["scope like 'verification-code:%'"];
+    final params = <String, Object?>{};
+    if (search.isNotEmpty) {
+      filters.add('(scope ilike @search or subject ilike @search)');
+      params['search'] = '%$search%';
+    }
+    if (subjectType != 'all') {
+      filters.add('''
+        case
+          when scope like '%:ip' then 'ip'
+          when scope like '%:phone' then 'phone'
+          else 'email'
+        end = @subject_type
+      ''');
+      params['subject_type'] = subjectType;
+    }
+    if (activeOnly) {
+      filters.add('blocked_until > clock_timestamp()');
+    }
+    final where = filters.join(' and ');
+    final rows = await _db.execute(
+      '''
+      select scope,
+             subject,
+             case
+               when scope like '%:ip' then 'ip'
+               when scope like '%:phone' then 'phone'
+               else 'email'
+             end as subject_type,
+             hits,
+             window_started_at,
+             blocked_until,
+             updated_at,
+             blocked_until > clock_timestamp() as is_active,
+             case
+               when blocked_until > clock_timestamp()
+                 then greatest(
+                   1,
+                   ceil(extract(epoch from blocked_until - clock_timestamp()))
+                 )::integer
+               else 0
+             end as remaining_seconds
+      from security_throttles
+      where $where
+      order by (blocked_until > clock_timestamp()) desc, updated_at desc,
+               scope, subject
+      limit @limit offset @offset
+      ''',
+      params: {...params, 'limit': limit, 'offset': offset},
+    );
+    final count = await _db.execute(
+      'select count(*) from security_throttles where $where',
+      params: params,
+    );
+    return ThrottlePage(
+      records: rows
+          .map(
+            (row) => ThrottleRecord(
+              scope: row[0] as String,
+              subject: row[1] as String,
+              subjectType: row[2] as String,
+              hits: row[3] as int,
+              windowStartedAt: row[4] as DateTime,
+              blockedUntil: row[5] as DateTime?,
+              updatedAt: row[6] as DateTime,
+              isActive: row[7] as bool,
+              remainingSeconds: row[8] as int,
+            ),
+          )
+          .toList(),
+      total: count.first[0] as int,
+    );
+  }
+
+  Future<bool> deleteVerificationCodeThrottle({
+    required String scope,
+    required String subject,
+  }) async {
+    final result = await _db.execute(
+      '''
+      delete from security_throttles
+      where scope = @scope
+        and subject = @subject
+        and scope like 'verification-code:%'
+      returning scope
+      ''',
+      params: {'scope': scope, 'subject': subject},
+    );
+    return result.isNotEmpty;
+  }
 
   Future<ThrottleState?> findThrottle({
     required String scope,

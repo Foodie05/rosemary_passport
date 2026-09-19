@@ -22,6 +22,7 @@ const AdminServiceConfig = lazyNamed(loadAdminPages, 'AdminServiceConfig');
 const AdminUsers = lazyNamed(loadAdminPages, 'AdminUsers');
 const AdminDashboard = lazyNamed(loadAdminPages, 'AdminDashboard');
 const AdminLegalDocuments = lazyNamed(loadAdminPages, 'AdminLegalDocuments');
+const AdminStatusManagement = lazyNamed(loadAdminPages, 'AdminStatusManagement');
 const ForgotPasswordPage = lazyNamed(loadAuthPages, 'ForgotPasswordPage');
 const LoginPage = lazyNamed(loadAuthPages, 'LoginPage');
 const PostRegisterBindingPrompt = lazyNamed(loadAuthPages, 'PostRegisterBindingPrompt');
@@ -112,6 +113,10 @@ function AppRoutes({
   usersPagination,
   dashboard,
   loadDashboard,
+  cooldowns,
+  cooldownPagination,
+  loadCooldowns,
+  resetCooldown,
   adminLegalDocuments,
   loadAdminLegalDocuments,
   saveLegalDraft,
@@ -254,6 +259,7 @@ function AppRoutes({
         <Route path="/admin" element={isLoggedIn && isAdmin ? <AdminLayout session={session} logout={logout} mustBindEmail={mustBindEmail} /> : <Navigate to={isLoggedIn ? '/account' : '/login'} replace />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard data={dashboard} loadDashboard={loadDashboard} safely={safely} />} />
+          <Route path="status" element={<AdminStatusManagement cooldowns={cooldowns} pagination={cooldownPagination} loadCooldowns={loadCooldowns} resetCooldown={resetCooldown} safely={safely} />} />
           <Route
             path="account"
             element={
@@ -434,6 +440,13 @@ function App() {
   const [oidcClients, setOidcClients] = useState([]);
   const [users, setUsers] = useState([]);
   const [dashboard, setDashboard] = useState(null);
+  const [cooldowns, setCooldowns] = useState([]);
+  const [cooldownPagination, setCooldownPagination] = useState({
+    page: 1,
+    page_size: 25,
+    total: 0,
+    total_pages: 0,
+  });
   const [adminLegalDocuments, setAdminLegalDocuments] = useState([]);
   const [usersPagination, setUsersPagination] = useState({
     page: 1,
@@ -862,6 +875,29 @@ function App() {
     setDashboard(data);
     return data;
   }, []);
+
+  const loadCooldowns = useCallback(async ({ page = 1, search = '', subjectType = 'all', activeOnly = false } = {}) => {
+    const params = new URLSearchParams({
+      page: `${page}`,
+      page_size: '25',
+      subject_type: subjectType,
+      active_only: activeOnly ? 'true' : 'false',
+    });
+    if (search.trim()) params.set('search', search.trim());
+    const data = await api(`/api/v1/admin/status/cooldowns?${params.toString()}`, { auth: true });
+    setCooldowns(data.cooldowns || []);
+    setCooldownPagination(data.pagination || { page, page_size: 25, total: 0, total_pages: 0 });
+    return data;
+  }, []);
+
+  async function resetCooldown(scope, subject) {
+    await api('/api/v1/admin/status/cooldowns', {
+      method: 'DELETE',
+      auth: true,
+      body: { scope, subject },
+    });
+    showToast('冷却与对应计数已重置。', 'success');
+  }
 
   const loadAdminLegalDocuments = useCallback(async () => {
     const data = await api('/api/v1/admin/legal/documents', { auth: true });
@@ -2387,6 +2423,10 @@ function App() {
         usersPagination={usersPagination}
         dashboard={dashboard}
         loadDashboard={loadDashboard}
+        cooldowns={cooldowns}
+        cooldownPagination={cooldownPagination}
+        loadCooldowns={loadCooldowns}
+        resetCooldown={resetCooldown}
         adminLegalDocuments={adminLegalDocuments}
         loadAdminLegalDocuments={loadAdminLegalDocuments}
         saveLegalDraft={saveLegalDraft}
