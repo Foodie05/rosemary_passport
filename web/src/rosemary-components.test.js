@@ -6,6 +6,7 @@ const auth = readFileSync(new URL('./pages/AuthPages.jsx', import.meta.url), 'ut
 const admin = readFileSync(new URL('./pages/AdminPages.jsx', import.meta.url), 'utf8');
 const user = readFileSync(new URL('./pages/UserPages.jsx', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('./components/ui.jsx', import.meta.url), 'utf8');
+const dialog = readFileSync(new URL('./components/Dialog.jsx', import.meta.url), 'utf8');
 const main = readFileSync(new URL('./main.jsx', import.meta.url), 'utf8');
 const activePages = `${auth}\n${admin}\n${user}`;
 
@@ -20,7 +21,8 @@ test('active pages use Rosemary controls instead of browser-native widgets', () 
 test('confirmation and alert flows use the shared Rosemary dialog provider', () => {
   assert.match(main, /<RosemaryDialogProvider>/);
   assert.match(ui, /role="alertdialog"/);
-  assert.match(ui, /aria-modal="true"/);
+  assert.match(dialog, /aria-modal=\{present \? 'true' : undefined\}/);
+  assert.match(dialog, /element.showModal\(\)/);
   assert.match(ui, /useRosemaryDialog/);
 });
 

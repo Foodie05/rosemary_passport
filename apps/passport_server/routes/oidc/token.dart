@@ -13,7 +13,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Use POST.',
       statusCode: 405,
       title: '这个应用暂时无法完成登录',
-      description: '应用向 ROSM 发起了不受支持的令牌请求方式。',
+      description: '应用向 Rosemary Epass 发起了不受支持的令牌请求方式。',
     );
   }
 
@@ -25,7 +25,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Request body must be JSON or form encoded.',
       statusCode: 400,
       title: '这个应用暂时无法完成登录',
-      description: '应用发来的令牌请求格式不正确，ROSM 无法继续处理。',
+      description: '应用发来的令牌请求格式不正确，Rosemary Epass 无法继续处理。',
     );
   }
   final grantType = body['grant_type']?.toString();
@@ -59,7 +59,7 @@ Future<Response> onRequest(RequestContext context) async {
         message: 'code, client_id, redirect_uri are required.',
         statusCode: 400,
         title: '这个应用暂时无法完成登录',
-        description: '应用缺少必要的授权码交换参数，ROSM 无法完成登录确认。',
+        description: '应用缺少必要的授权码交换参数，Rosemary Epass 无法完成登录确认。',
       );
     }
 
@@ -79,7 +79,7 @@ Future<Response> onRequest(RequestContext context) async {
         message: 'Authorization code exchange failed.',
         statusCode: 400,
         title: '这个应用暂时无法完成登录',
-        description: '应用未能正确完成授权码交换，ROSM 无法向它确认登录结果。',
+        description: '应用未能正确完成授权码交换，Rosemary Epass 无法向它确认登录结果。',
       );
     }
     return jsonResponse(tokens);
@@ -96,7 +96,7 @@ Future<Response> onRequest(RequestContext context) async {
         message: 'refresh_token and client_id are required.',
         statusCode: 400,
         title: '这个应用暂时无法继续访问',
-        description: '应用缺少必要的刷新参数，ROSM 无法为它续签登录状态。',
+        description: '应用缺少必要的刷新参数，Rosemary Epass 无法为它续签登录状态。',
       );
     }
 
@@ -113,7 +113,7 @@ Future<Response> onRequest(RequestContext context) async {
         message: 'Refresh token invalid.',
         statusCode: 400,
         title: '这个应用暂时无法继续访问',
-        description: '应用提交的刷新凭据无效，ROSM 无法继续维持这次登录。',
+        description: '应用提交的刷新凭据无效，Rosemary Epass 无法继续维持这次登录。',
       );
     }
     return jsonResponse(pair);

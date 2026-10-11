@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 class AuthenticatorService {
-  AuthenticatorService({String issuer = 'ROSM Pass'}) : _issuer = issuer;
+  AuthenticatorService({String issuer = 'Rosemary Epass'}) : _issuer = issuer;
 
   final String _issuer;
   final _random = Random.secure();

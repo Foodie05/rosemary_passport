@@ -1,11 +1,32 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:rosm_passport_server/src/security/password_policy.dart';
 import 'package:test/test.dart';
 
 void main() {
   final policy = PasswordPolicy();
 
-  test('accepts a long passphrase without requiring character classes', () {
-    expect(policy.validate('correct horse battery staple').ok, isTrue);
+  test('client and server share new-password acceptance cases', () {
+    final cases =
+        jsonDecode(
+              File(
+                '../../testdata/password-policy-cases.json',
+              ).readAsStringSync(),
+            )
+            as List;
+    for (final item in cases) {
+      final value = item as Map<String, dynamic>;
+      expect(
+        policy.validate(value['password'] as String).ok,
+        value['accepted'],
+        reason: 'Policy mismatch: ${value['password']}',
+      );
+    }
+  });
+
+  test('accepts a passphrase with two character categories', () {
+    expect(policy.validate('correct horse battery staple!').ok, isTrue);
   });
 
   test('rejects short, repeated, common, and overlong passwords', () {
@@ -20,7 +41,7 @@ void main() {
   });
 
   test('does not reject a passphrase merely for containing a common word', () {
-    expect(policy.validate('my welcome phrase is private').ok, isTrue);
+    expect(policy.validate('my welcome phrase is private!').ok, isTrue);
     expect(policy.validate('correct-horse-2026-battery').ok, isTrue);
   });
 }

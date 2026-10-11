@@ -1,103 +1,31 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, Info, X } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { useVisualPresence } from '../design/SelectionMotion';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { Dialog } from './Dialog';
 
 const RosemaryDialogContext = createContext(null);
 
 export function RosemaryDialogProvider({ children }) {
   const [dialog, setDialog] = useState(null);
-  const dialogRef = useRef(null);
-  const primaryActionRef = useRef(null);
-  const previousFocusRef = useRef(null);
-
+  const pending = useRef(null);
   const requestDialog = useCallback((kind, options) => new Promise((resolve) => {
-    dialogRef.current?.resolve(false);
-    previousFocusRef.current = document.activeElement;
-    const next = { kind, resolve, ...options };
-    dialogRef.current = next;
-    setDialog(next);
+    pending.current?.resolve(false);
+    pending.current = { kind, ...options, resolve };
+    setDialog(pending.current);
   }), []);
-
-  const confirm = useCallback(
-    (options) => requestDialog('confirm', options),
-    [requestDialog],
-  );
-  const alert = useCallback(
-    (options) => requestDialog('alert', options),
-    [requestDialog],
-  );
-
-  const closeDialog = useCallback((result) => {
-    const current = dialogRef.current;
-    dialogRef.current = null;
-    setDialog(null);
-    current?.resolve(result);
-    queueMicrotask(() => previousFocusRef.current?.focus?.());
-  }, []);
-
-  useEffect(() => {
-    if (!dialog) return undefined;
-    primaryActionRef.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') closeDialog(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [dialog, closeDialog]);
-
-  const tone = dialog?.tone || 'default';
-  const ToneIcon = tone === 'danger' || tone === 'warning'
-    ? AlertTriangle
-    : dialog?.kind === 'alert'
-      ? Info
-      : CheckCircle2;
-
-  return (
-    <RosemaryDialogContext.Provider value={{ confirm, alert }}>
-      {children}
-      {dialog ? createPortal(
-        <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-sage-950/45 p-4 backdrop-blur-sm" role="presentation">
-          <section className="glass-card w-full max-w-md overflow-hidden rounded-[2rem] border border-white/70 shadow-2xl shadow-sage-950/20" role="alertdialog" aria-modal="true" aria-labelledby="rosemary-dialog-title" aria-describedby="rosemary-dialog-description">
-            <div className="flex items-start gap-4 px-6 pb-4 pt-6 sm:px-7 sm:pt-7">
-              <span className={cn(
-                'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl',
-                tone === 'danger' ? 'bg-red-100 text-red-700' : tone === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-sage-100 text-sage-700',
-              )}>
-                <ToneIcon size={22} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 id="rosemary-dialog-title" className="text-xl font-bold text-sage-950">{dialog.title || '请确认'}</h2>
-                <p id="rosemary-dialog-description" className="mt-2 whitespace-pre-line text-sm leading-6 text-sage-600">{dialog.message}</p>
-              </div>
-              <button type="button" onClick={() => closeDialog(false)} className="rounded-xl p-2 text-sage-400 transition-colors hover:bg-sage-100 hover:text-sage-700" aria-label="关闭弹窗">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex flex-col-reverse gap-3 border-t border-sage-100 bg-sage-50/60 px-6 py-4 sm:flex-row sm:justify-end sm:px-7">
-              {dialog.kind === 'confirm' ? (
-                <button type="button" className="btn-secondary" onClick={() => closeDialog(false)}>{dialog.cancelLabel || '取消'}</button>
-              ) : null}
-              <button
-                ref={primaryActionRef}
-                type="button"
-                className={cn('btn-primary', tone === 'danger' && 'bg-red-600 hover:bg-red-700')}
-                onClick={() => closeDialog(true)}
-              >
-                {dialog.confirmLabel || (dialog.kind === 'alert' ? '知道了' : '确认')}
-              </button>
-            </div>
-          </section>
-        </div>,
-        document.body,
-      ) : null}
-    </RosemaryDialogContext.Provider>
-  );
+  const confirm = useCallback((options) => requestDialog('confirm', options), [requestDialog]);
+  const alert = useCallback((options) => requestDialog('alert', options), [requestDialog]);
+  const close = (result) => { pending.current?.resolve(result); pending.current = null; setDialog(null); };
+  useEffect(() => () => pending.current?.resolve(false), []);
+  return <RosemaryDialogContext.Provider value={{ confirm, alert }}>
+    {children}
+    <AnimatePresence>{dialog && <Dialog key="shared-dialog" role="alertdialog" title={dialog.title || '请确认'} onClose={() => close(false)} actions={<>
+      {dialog.kind === 'confirm' && <button type="button" className="btn-secondary" onClick={() => close(false)}>{dialog.cancelLabel || '取消'}</button>}
+      <button type="button" className={cn('btn-primary', dialog.tone === 'danger' && 'btn-danger')} onClick={() => close(true)}>{dialog.confirmLabel || (dialog.kind === 'alert' ? '知道了' : '确认')}</button>
+    </>}><p className="whitespace-pre-line text-sm text-muted">{dialog.message}</p></Dialog>}</AnimatePresence>
+  </RosemaryDialogContext.Provider>;
 }
 
 export function useRosemaryDialog() {
@@ -107,90 +35,72 @@ export function useRosemaryDialog() {
 }
 
 export function RosemaryCheckbox({ checked, onCheckedChange, disabled = false, children, className = '', ariaLabel }) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={Boolean(checked)}
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={() => onCheckedChange?.(!checked)}
-      className={cn(
-        'inline-flex items-start gap-2.5 text-left text-sm text-sage-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-        className,
-      )}
-    >
-      <span className={cn(
-        'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all',
-        checked ? 'border-sage-600 bg-sage-600 text-white shadow-sm' : 'border-sage-300 bg-white text-transparent hover:border-sage-500',
-      )} aria-hidden="true">
-        <Check size={13} strokeWidth={3} />
-      </span>
-      {children ? <span className="min-w-0 leading-6">{children}</span> : null}
-    </button>
-  );
+  return <label className={cn('epass-checkbox', className)}>
+    <span className="epass-checkbox-control">
+      <input type="checkbox" checked={Boolean(checked)} disabled={disabled} aria-label={ariaLabel} onChange={(event) => onCheckedChange?.(event.target.checked)} />
+      <Check size={16} aria-hidden="true" />
+    </span>
+    {children && <span>{children}</span>}
+  </label>;
 }
 
 export function RosemarySelect({ value, onChange, options, label, disabled = false, className = '' }) {
+  const id = useId();
+  const trigger = useRef(null);
+  const popup = useRef(null);
+  const prefix = useRef({ text: '', time: 0 });
   const [open, setOpen] = useState(false);
-  const containerRef = useRef(null);
-  const selected = options.find((option) => option.value === value) || options[0];
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointerDown = (event) => {
-      if (!containerRef.current?.contains(event.target)) setOpen(false);
-    };
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
+  const present = useVisualPresence(open);
+  const [active, setActive] = useState(-1);
+  const selected = options.findIndex((option) => option.value === value);
+  const enabled = options.map((option, i) => option.disabled ? -1 : i).filter((i) => i >= 0);
+  const unavailable = disabled || !enabled.length;
+  function show(index) { if (!unavailable) { setActive(index ?? (enabled.includes(selected) ? selected : enabled[0])); setOpen(true); } }
+  function commit(index) { if (!open || !options[index] || options[index].disabled) return; onChange(options[index].value); setOpen(false); trigger.current?.focus(); }
+  useLayoutEffect(() => {
+    if (!open) return;
+    const panel = popup.current;
+    const rect = trigger.current.getBoundingClientRect();
+    if (panel.showPopover) panel.showPopover();
+    panel.style.width = `${Math.min(Math.max(rect.width, 160), innerWidth - 32)}px`;
+    const height = panel.getBoundingClientRect().height;
+    panel.style.left = `${Math.max(16, Math.min(rect.left, innerWidth - panel.offsetWidth - 16))}px`;
+    panel.style.top = `${Math.max(16, Math.min(rect.bottom + height + 8 > innerHeight - 16 ? rect.top - height - 8 : rect.bottom + 8, innerHeight - height - 16))}px`;
+    panel.dataset.side = rect.bottom + height + 8 > innerHeight - 16 ? 'above' : 'below';
   }, [open]);
-
-  return (
-    <div ref={containerRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        disabled={disabled}
-        className="input-field flex w-full items-center justify-between gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={label}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="min-w-0 truncate font-medium text-sage-800">{selected?.label || '请选择'}</span>
-        <ChevronDown size={18} className={cn('shrink-0 text-sage-500 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-2xl border border-sage-200 bg-white p-1.5 shadow-xl shadow-sage-900/10" role="listbox" aria-label={label}>
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={option.value === value}
-              className={cn(
-                'flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors',
-                option.value === value ? 'bg-sage-100 font-bold text-sage-900' : 'text-sage-600 hover:bg-sage-50 hover:text-sage-900',
-              )}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-            >
-              <span>{option.label}</span>
-              {option.value === value ? <Check size={16} className="text-sage-600" /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event) => { if (!trigger.current?.contains(event.target) && !popup.current?.contains(event.target)) setOpen(false); };
+    const scroll = (event) => { if (!popup.current?.contains(event.target)) setOpen(false); };
+    const resize = () => setOpen(false);
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('focusin', outside);
+    window.addEventListener('scroll', scroll, true);
+    window.addEventListener('resize', resize);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('focusin', outside); window.removeEventListener('scroll', scroll, true); window.removeEventListener('resize', resize); };
+  }, [open]);
+  useEffect(() => { setOpen(false); }, [value, unavailable]);
+  useEffect(() => { if (open) document.getElementById(`${id}-${active}`)?.scrollIntoView({ block: 'nearest' }); }, [active, open, id]);
+  return <div className={cn('relative', className)}>
+    <button ref={trigger} type="button" role="combobox" disabled={unavailable} aria-label={label} aria-expanded={open} aria-haspopup="listbox" aria-controls={open ? id : undefined} aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined} className="input-field flex items-center justify-between gap-3 text-left" onClick={() => open ? setOpen(false) : show()} onKeyDown={(event) => {
+      const key = event.key;
+      if (key === 'Tab') { setOpen(false); return; }
+      if (key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); return; }
+      if (key === 'Enter' || key === ' ') { event.preventDefault(); open ? commit(active) : show(); }
+      else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) {
+        event.preventDefault();
+        if (!open) show(key === 'End' ? enabled.at(-1) : key === 'Home' ? enabled[0] : undefined);
+        else setActive(key === 'Home' ? enabled[0] : key === 'End' ? enabled.at(-1) : enabled[Math.max(0, Math.min(enabled.length - 1, enabled.indexOf(active) + (key === 'ArrowDown' ? 1 : -1)))]);
+      } else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const now = Date.now(); const text = (now - prefix.current.time < 700 ? prefix.current.text : '') + key.toLocaleLowerCase(); prefix.current = { text, time: now };
+        const match = enabled.find((i) => options[i].label.toLocaleLowerCase().startsWith(text));
+        if (match !== undefined) { event.preventDefault(); open ? setActive(match) : show(match); }
+      }
+    }}><span className="min-w-0 truncate">{options[selected]?.label || '请选择'}</span><ChevronDown size={20} aria-hidden="true" /></button>
+    {present && <div data-motion-state={open ? 'open' : 'exiting'} inert={!open ? '' : undefined} aria-hidden={!open || undefined} ref={popup} popover="manual" role="listbox" id={id} aria-label={label} className="epass-select-list">
+      {options.map((option, i) => <div key={option.value} id={`${id}-${i}`} role="option" aria-selected={i === selected} aria-disabled={option.disabled || undefined} data-active={i === active} className="epass-select-option" onPointerMove={() => open && !option.disabled && setActive(i)} onPointerDown={(event) => event.preventDefault()} onClick={() => commit(i)}><span>{option.label}</span>{i === selected && <Check size={16} aria-hidden="true" />}</div>)}
+    </div>}
+  </div>;
 }
 
 export function Panel({ title, description, actions, children }) {

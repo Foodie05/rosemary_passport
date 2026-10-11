@@ -170,7 +170,7 @@ class AppConfig {
   String get smtpUser => _env['SMTP_USER'] ?? '';
   String get smtpPassword => _secret('SMTP_PASSWORD');
   String get smtpFrom =>
-      _env['SMTP_FROM'] ?? 'ROSM Passport <no-reply@localhost>';
+      _env['SMTP_FROM'] ?? 'Rosemary Epass <no-reply@localhost>';
   bool get smtpSecure =>
       (_env['SMTP_SECURE'] ?? 'false').toLowerCase() == 'true';
   int get emailCodeTtlSeconds =>

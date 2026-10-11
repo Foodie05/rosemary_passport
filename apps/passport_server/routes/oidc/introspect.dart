@@ -59,7 +59,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Client authentication failed.',
       statusCode: 401,
       title: '这个应用暂时无法校验登录状态',
-      description: '应用未能通过 ROSM 的身份校验，因此无法继续验证登录状态。',
+      description: '应用未能通过 Rosemary Epass 的身份校验，因此无法继续验证登录状态。',
     );
   }
   return jsonResponse(result);

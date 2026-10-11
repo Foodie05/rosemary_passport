@@ -1,6 +1,8 @@
 library rosm_passport_flutter;
 
 export 'src/models.dart';
+export 'src/password_policy.dart';
+export 'src/new_password_field.dart';
 export 'src/rosm_aliyun_captcha.dart';
 export 'src/rosemary_account_management.dart';
 export 'src/rosemary_sign_in.dart';

@@ -78,7 +78,7 @@ class WebAuthnService {
     final rpId = _rpIdFromOrigin(origin);
     final credentials = await _repository.listCredentialsForUser(userId);
     final payload = await _runHelper('webauthn-register-options.mjs', {
-      'rpName': 'ROSM Pass',
+      'rpName': 'Rosemary Epass',
       'rpID': rpId,
       'userID': userId,
       'userName': email,

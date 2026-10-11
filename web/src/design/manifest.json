@@ -1,0 +1,92 @@
+{
+  "product": "Rosemary Epass",
+  "designSystem": {
+    "site": "https://design.cruty.cn",
+    "repository": "https://github.com/Foodie05/Rosemary-Design-System",
+    "version": "v2.0.0-beta.2-banner.2",
+    "commit": "a36510e38277a2f84ab4150e074bbfbee55ddefd",
+    "tokensSource": "src/generated/tokens.css",
+    "tokensSha256": "294120f5c74c8ade573afb819c704883447feb215b9db3115dfbcdb8f18e20e2",
+    "guides": [
+      "public/guide/motion.md",
+      "src/components/common/SelectionMotion.tsx",
+      "src/hooks/usePresence.ts",
+      "src/pageMotion.ts",
+      "src/index.css",
+      "public/guide/content.md"
+    ]
+  },
+  "brand": {
+    "name": "Rosemary Epass",
+    "logo": "web/public/brand/rosemary.png",
+    "logoSource": "https://tianyue.s3.bitiful.net/logo/rosemary_pure.png",
+    "direction": "Organic Precision",
+    "palette": "Official light/dark semantic tokens; paper and pine",
+    "identityCompatibility": "Existing storage keys, issuer URLs, RP IDs and published legal records are preserved."
+  },
+  "tokens": {
+    "web": "web/src/design/rosemary-tokens.css",
+    "standalone": "apps/passport_server/lib/src/utils/epass_tokens.dart",
+    "sync": "python3 scripts/sync_epass_tokens.py",
+    "flutter": "packages/rosm_passport_flutter/lib/src/epass_tokens.dart"
+  },
+  "motion": {
+    "timingSource": "CSS semantic tokens, resolved at runtime for Web Animations",
+    "selection": "Measured shared indicator; immediate single live panel; interrupted movement resumes current transform",
+    "dialogs": "Native modality closes immediately; only inert, aria-hidden visual exit is retained",
+    "navigation": "View Transition snapshots for internal links and explicit navigation; single live-content transition for history/redirect fallback; initial load and query-only changes stay static",
+    "preferences": "Reactive system reduced motion plus persisted rosemary_motion; spinners pause when document is hidden"
+  },
+  "validation": {
+    "date": "2026-10-11",
+    "browser": "Codex In-app Browser",
+    "frontendTests": 34,
+    "backendFocusedTests": 26,
+    "motionBrowserAssertions": 20,
+    "motionHarness": "web/tests/browser/motion.html (Vite dev server; reload before each run)",
+    "motionReport": "output/epass/motion-verification.json",
+    "manualChecks": [
+      "Desktop light/dark login, account and dashboard",
+      "320px login, registration, recovery and documentation: no horizontal page overflow",
+      "390px admin user table: contained horizontal scrolling",
+      "320px native account dialog, keyboard select, Escape and restored trigger focus",
+      "320px navigation drawer",
+      "Standalone authorization consent and error pages; local logo visible",
+      "Login/register page direction and main-content focus",
+      "13 page fixtures at 320px without horizontal page overflow",
+      "320px OIDC editor; Escape restores trigger focus",
+      "Live registration feedback: length, common password, edge whitespace, valid two-category passphrase",
+      "Admin new-user weak-password feedback and disabled create action",
+      "User details opened with Enter",
+      "Documentation native contents link locates a stable chapter ID"
+    ],
+    "limitations": [
+      "Account/admin previews use synthetic local fixtures; no live backend end-to-end login or credential changes were performed.",
+      "Safari, Firefox, real mobile hardware, screen readers and OS-level preference changes have not been manually verified.",
+      "Animation values and intermediate computed state were tested in browser; no frame-by-frame video review was performed.",
+      "No production deployment performed."
+    ],
+    "pageLayoutReport": "output/epass/page-layout-verification.json"
+  },
+  "passwordPolicy": {
+    "reference": "https://support.google.com/accounts/answer/32040?hl=zh-Hans",
+    "rules": "8–128 printable ASCII characters; at least two of letters, digits and symbols; spaces do not count as symbols; no edge spaces; reject known common/decorated/repeated patterns",
+    "advice": "Long unique passphrases; avoid account information; use a password manager. Cross-site or historical password reuse is not assessed by the client.",
+    "feedback": "Immediate local checks with linked field descriptions and polite status; invalid passwords disable submission in registration, recovery and admin creation.",
+    "parityFixture": "testdata/password-policy-cases.json",
+    "compatibility": "New-password policy only. Existing weak and non-ASCII hashes still verify.",
+    "referenceNote": "Google guidance informs advice; the 8-character minimum and two-category requirement are product requirements."
+  },
+  "flutterSdk": {
+    "package": "rosemary_reference",
+    "version": "0.3.0-prototype.2",
+    "commit": "a36510e38277a2f84ab4150e074bbfbee55ddefd",
+    "usage": [
+      "official theme extension",
+      "platform-adaptive primary buttons",
+      "lifecycle-aware native spinner"
+    ],
+    "status": "Upstream Prototype; manual assistive-technology acceptance not complete",
+    "runtime": "Flutter >=3.44 / Dart >=3.12"
+  }
+}

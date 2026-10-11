@@ -14,7 +14,7 @@ test('dashboard offers explicit time ranges and Beijing calendar labels', () => 
   }
   assert.match(admin, /formatBeijingDate/);
   assert.match(admin, /北京时间（UTC\+8）/);
-  assert.match(admin, /aria-label="统计时间范围"/);
+  assert.match(admin, /<SelectionGroup value={days} label="统计时间范围"/);
 });
 
 test('line charts expose every series value at the selected point', () => {

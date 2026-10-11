@@ -17,7 +17,8 @@ export function ThemeProvider({ children }) {
     if (typeof window === 'undefined') {
       return 'system';
     }
-    const stored = window.localStorage.getItem(STORAGE_KEY);
+    let stored;
+    try { stored = window.localStorage.getItem(STORAGE_KEY); } catch {}
     return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
   });
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
@@ -33,7 +34,7 @@ export function ThemeProvider({ children }) {
   const resolvedTheme = preference === 'system' ? systemTheme : preference;
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, preference);
+    try { window.localStorage.setItem(STORAGE_KEY, preference); } catch {}
     document.documentElement.dataset.theme = resolvedTheme;
     document.documentElement.dataset.themePreference = preference;
     document.documentElement.style.colorScheme = resolvedTheme;
@@ -61,30 +62,6 @@ export function useTheme() {
 
 export function ThemeToggle({ className = '' }) {
   const { preference, setPreference } = useTheme();
-  const options = [
-    { value: 'system', label: '系统', icon: Laptop },
-    { value: 'light', label: '浅色', icon: Sun },
-    { value: 'dark', label: '深色', icon: Moon },
-  ];
-
-  return (
-    <div className={cn('inline-flex items-center rounded-2xl border border-sage-200 bg-white/70 p-1 shadow-sm backdrop-blur-md', className)}>
-      {options.map(({ value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setPreference(value)}
-          className={cn(
-            'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all',
-            preference === value ? 'bg-sage-600 text-white shadow-sm' : 'text-sage-600 hover:bg-sage-100',
-          )}
-          aria-pressed={preference === value}
-          title={label}
-        >
-          <Icon size={16} />
-          <span className="hidden sm:inline">{label}</span>
-        </button>
-      ))}
-    </div>
-  );
+  const options = [{ value: 'system', label: '跟随系统', icon: Laptop }, { value: 'light', label: '浅色主题', icon: Sun }, { value: 'dark', label: '深色主题', icon: Moon }];
+  return <div className={cn('epass-theme', className)} role="group" aria-label="网站主题">{options.map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setPreference(value)} aria-pressed={preference === value} aria-label={label} title={label}><Icon size={18} aria-hidden="true" /></button>)}</div>;
 }

@@ -63,13 +63,13 @@ class LegalService {
   Future<void> _ensureInitialDocuments() async {
     await _ensureInitial(
       type: 'terms',
-      title: 'ROSM Pass 使用条款',
+      title: 'Rosemary Epass 使用条款',
       configuredPath: _config.legalInitialTermsFile,
       configurationName: 'LEGAL_INITIAL_TERMS_FILE',
     );
     await _ensureInitial(
       type: 'privacy',
-      title: 'ROSM Pass 隐私政策',
+      title: 'Rosemary Epass 隐私政策',
       configuredPath: _config.legalInitialPrivacyFile,
       configurationName: 'LEGAL_INITIAL_PRIVACY_FILE',
     );

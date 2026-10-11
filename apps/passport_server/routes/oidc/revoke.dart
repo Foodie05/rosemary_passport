@@ -39,7 +39,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'token and client_id are required.',
       statusCode: 400,
       title: '这个应用暂时无法退出登录',
-      description: '应用缺少必要的退出参数，ROSM 无法完成这次登出请求。',
+      description: '应用缺少必要的退出参数，Rosemary Epass 无法完成这次登出请求。',
     );
   }
 
@@ -59,7 +59,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Client authentication failed.',
       statusCode: 401,
       title: '这个应用暂时无法退出登录',
-      description: '应用未能通过 ROSM 的身份校验，因此无法撤销当前登录状态。',
+      description: '应用未能通过 Rosemary Epass 的身份校验，因此无法撤销当前登录状态。',
     );
   }
 

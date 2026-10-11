@@ -1,82 +1,147 @@
 import 'package:flutter/material.dart';
+import 'package:rosemary_reference/rosemary.dart';
 
+import 'epass_tokens.dart';
 import 'models.dart';
-
-const _seedColor = Color(0xFF5F7F63);
 
 Brightness resolveRosmPassportBrightness(
   BuildContext context,
   RosmPassportThemeMode mode,
-) {
-  return switch (mode) {
-    RosmPassportThemeMode.system => MediaQuery.platformBrightnessOf(context),
-    RosmPassportThemeMode.light => Brightness.light,
-    RosmPassportThemeMode.dark => Brightness.dark,
-  };
-}
+) => switch (mode) {
+  RosmPassportThemeMode.system => MediaQuery.platformBrightnessOf(context),
+  RosmPassportThemeMode.light => Brightness.light,
+  RosmPassportThemeMode.dark => Brightness.dark,
+};
 
 ThemeData buildRosmPassportTheme(
   BuildContext context,
   RosmPassportThemeMode mode,
 ) {
   final brightness = resolveRosmPassportBrightness(context, mode);
-  final scheme = ColorScheme.fromSeed(
-    seedColor: _seedColor,
-    brightness: brightness,
-  );
+  final dark = brightness == Brightness.dark;
+  final primary = dark
+      ? RosmEpassDarkTokens.accent
+      : RosmEpassLightTokens.accent;
+  final canvas = dark
+      ? RosmEpassDarkTokens.canvas
+      : RosmEpassLightTokens.canvas;
+  final surface = dark
+      ? RosmEpassDarkTokens.surface
+      : RosmEpassLightTokens.surface;
+  final subtle = dark
+      ? RosmEpassDarkTokens.surfaceSubtle
+      : RosmEpassLightTokens.surfaceSubtle;
+  final ink = dark ? RosmEpassDarkTokens.text : RosmEpassLightTokens.text;
+  final muted = dark
+      ? RosmEpassDarkTokens.textSecondary
+      : RosmEpassLightTokens.textSecondary;
+  final border = dark
+      ? RosmEpassDarkTokens.border
+      : RosmEpassLightTokens.border;
+  final control = dark
+      ? RosmEpassDarkTokens.borderControl
+      : RosmEpassLightTokens.borderControl;
+  final scheme =
+      ColorScheme.fromSeed(seedColor: primary, brightness: brightness).copyWith(
+        primary: primary,
+        onPrimary: dark
+            ? RosmEpassDarkTokens.onAccent
+            : RosmEpassLightTokens.onAccent,
+        primaryContainer: dark
+            ? RosmEpassDarkTokens.accentSubtle
+            : RosmEpassLightTokens.accentSubtle,
+        onPrimaryContainer: ink,
+        secondary: primary,
+        onSecondary: dark
+            ? RosmEpassDarkTokens.onAccent
+            : RosmEpassLightTokens.onAccent,
+        secondaryContainer: subtle,
+        onSecondaryContainer: ink,
+        surface: canvas,
+        surfaceContainerLowest: surface,
+        surfaceContainerLow: surface,
+        surfaceContainer: subtle,
+        surfaceContainerHigh: subtle,
+        surfaceContainerHighest: subtle,
+        onSurface: ink,
+        onSurfaceVariant: muted,
+        outline: control,
+        outlineVariant: border,
+        error: dark ? RosmEpassDarkTokens.danger : RosmEpassLightTokens.danger,
+        errorContainer: dark
+            ? RosmEpassDarkTokens.dangerSubtle
+            : RosmEpassLightTokens.dangerSubtle,
+        onErrorContainer: dark
+            ? RosmEpassDarkTokens.danger
+            : RosmEpassLightTokens.danger,
+      );
   final inherited = Theme.of(context);
+  final duration = MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : RosmEpassMotion.hover;
+  OutlineInputBorder outline(Color color, [double width = 1]) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
+        borderSide: BorderSide(color: color, width: width),
+      );
   final textTheme = inherited.textTheme.apply(
-    bodyColor: scheme.onSurface,
-    displayColor: scheme.onSurface,
+    bodyColor: ink,
+    displayColor: ink,
   );
-
-  return ThemeData(
-    useMaterial3: true,
+  return rosemaryThemeData(brightness).copyWith(
     brightness: brightness,
     colorScheme: scheme,
-    textTheme: textTheme,
-    scaffoldBackgroundColor: scheme.surface,
+    textTheme: textTheme.copyWith(
+      headlineLarge: textTheme.headlineLarge?.copyWith(
+        fontFamily: 'Georgia',
+        fontFamilyFallback: const ['Noto Serif SC', 'Songti SC', 'serif'],
+        fontWeight: FontWeight.w400,
+      ),
+    ),
+    scaffoldBackgroundColor: canvas,
+    iconTheme: IconThemeData(size: 20, color: muted),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: scheme.surfaceContainerLowest,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      labelStyle: TextStyle(
-        color: scheme.onSurfaceVariant,
-        fontWeight: FontWeight.w700,
-      ),
-      floatingLabelStyle: TextStyle(
-        color: scheme.primary,
-        fontWeight: FontWeight.w700,
-      ),
-      prefixIconColor: scheme.onSurfaceVariant,
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: scheme.outlineVariant),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: scheme.primary, width: 1.4),
-      ),
+      fillColor: surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      labelStyle: TextStyle(color: muted, fontWeight: FontWeight.w500),
+      floatingLabelStyle: TextStyle(color: primary),
+      prefixIconColor: muted,
+      enabledBorder: outline(control),
+      focusedBorder: outline(primary, 2),
+      errorBorder: outline(scheme.error),
+      focusedErrorBorder: outline(scheme.error, 2),
+      disabledBorder: outline(border),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      side: BorderSide(color: control),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: scheme.primary,
+        backgroundColor: primary,
         foregroundColor: scheme.onPrimary,
-        minimumSize: const Size.fromHeight(58),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        elevation: 3,
-        shadowColor: scheme.shadow.withAlpha(51),
-      ),
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
+        ),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        elevation: 0,
+      ).copyWith(animationDuration: duration),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: scheme.primary,
-        side: BorderSide(color: scheme.outline),
-        minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      ),
+        foregroundColor: ink,
+        backgroundColor: surface,
+        side: BorderSide(color: control),
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
+        ),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ).copyWith(animationDuration: duration),
     ),
   );
 }
