@@ -1850,15 +1850,10 @@ class _FactorButton extends StatelessWidget {
 }
 
 class _ButtonContent extends StatelessWidget {
-  const _ButtonContent({
-    required this.busy,
-    required this.label,
-    this.light = false,
-  });
+  const _ButtonContent({required this.busy, required this.label});
 
   final bool busy;
   final String label;
-  final bool light;
 
   @override
   Widget build(BuildContext context) {
@@ -1869,7 +1864,7 @@ class _ButtonContent extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        RosmEpassProgress(color: light ? colors.onPrimary : colors.primary),
+        RosmEpassProgress(color: colors.primary),
         const SizedBox(width: 8),
         Flexible(child: Text(label)),
       ],

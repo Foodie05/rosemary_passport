@@ -89,6 +89,7 @@ ThemeData buildRosmPassportTheme(
     displayColor: ink,
   );
   return rosemaryThemeData(brightness).copyWith(
+    platform: inherited.platform,
     brightness: brightness,
     colorScheme: scheme,
     textTheme: textTheme.copyWith(
