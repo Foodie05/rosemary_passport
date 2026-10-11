@@ -1,8 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:rosemary_reference/rosemary.dart';
 
 import 'models.dart';
+import 'epass_motion.dart';
+import 'epass_tokens.dart';
+import 'new_password_field.dart';
+import 'password_policy.dart';
 import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_client.dart';
 import 'rosm_passport_theme.dart';
@@ -526,9 +531,17 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLowest,
+      sheetAnimationStyle: AnimationStyle(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : RosmEpassMotion.panel,
+        reverseDuration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : RosmEpassMotion.exit,
+      ),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
         return Theme(
@@ -647,7 +660,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
           ],
         ),
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: RosmEpassProgress())
             : account == null
             ? _AccountError(
                 message: _error ?? '无法读取账号信息。',
@@ -763,18 +776,13 @@ class _ProfileCard extends StatelessWidget {
                   onSubmitted: (_) => onSaveNickname(),
                 ),
               ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: busy ? null : onSaveNickname,
-                child: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('保存'),
-              ),
             ],
+          ),
+          const SizedBox(height: 12),
+          RosemaryButton(
+            onPressed: busy ? null : onSaveNickname,
+            loading: busy,
+            label: '保存',
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -899,31 +907,38 @@ class _PasswordSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('验证码会发送到当前邮箱：$email'),
-        const SizedBox(height: 12),
-        TextField(
-          controller: newPassword,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: '新密码'),
-        ),
-        const SizedBox(height: 12),
-        _CodeRow(
-          controller: code,
-          label: '邮箱验证码',
-          busy: busy,
-          cooldownLabel: cooldownLabel,
-          sendDisabled: sendDisabled,
-          onSend: onSend,
-        ),
-        const SizedBox(height: 18),
-        FilledButton(
-          onPressed: busy ? null : onSubmit,
-          child: _BusyText(busy: busy, text: '重置密码'),
-        ),
-      ],
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: newPassword,
+      builder: (context, value, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('验证码会发送到当前邮箱：$email'),
+          const SizedBox(height: 12),
+          RosmNewPasswordField(
+            controller: newPassword,
+            label: '新密码',
+            enabled: !busy,
+          ),
+          const SizedBox(height: 12),
+          _CodeRow(
+            controller: code,
+            label: '邮箱验证码',
+            busy: busy,
+            cooldownLabel: cooldownLabel,
+            sendDisabled: sendDisabled,
+            onSend: onSend,
+          ),
+          const SizedBox(height: 18),
+          RosemaryButton(
+            onPressed:
+                busy || !const RosmPasswordPolicy().evaluate(value.text).ok
+                ? null
+                : onSubmit,
+            loading: busy,
+            label: '重置密码',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1005,9 +1020,10 @@ class _CodeSheetFields extends StatelessWidget {
           onSend: onSend,
         ),
         const SizedBox(height: 18),
-        FilledButton(
+        RosemaryButton(
           onPressed: busy ? null : onSubmit,
-          child: _BusyText(busy: busy, text: submitLabel),
+          loading: busy,
+          label: submitLabel,
         ),
       ],
     );
@@ -1087,9 +1103,10 @@ class _AuthenticatorSheet extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (current == null)
-          FilledButton(
+          RosemaryButton(
             onPressed: busy ? null : onBegin,
-            child: _BusyText(busy: busy, text: '生成密钥'),
+            loading: busy,
+            label: '生成密钥',
           )
         else ...[
           _AccountCard(
@@ -1116,9 +1133,10 @@ class _AuthenticatorSheet extends StatelessWidget {
             decoration: const InputDecoration(labelText: '动态验证码'),
           ),
           const SizedBox(height: 18),
-          FilledButton(
+          RosemaryButton(
             onPressed: busy ? null : onSubmit,
-            child: _BusyText(busy: busy, text: '完成设置'),
+            loading: busy,
+            label: '完成设置',
           ),
         ],
       ],
@@ -1222,7 +1240,7 @@ class _AccountCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surfaceContainerLowest,
         border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: child,
     );
@@ -1273,10 +1291,13 @@ class _BusyText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!busy) return Text(text);
-    return const SizedBox(
-      width: 18,
-      height: 18,
-      child: CircularProgressIndicator(strokeWidth: 2),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RosmEpassProgress(color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 8),
+        Flexible(child: Text(text)),
+      ],
     );
   }
 }
@@ -1322,7 +1343,7 @@ class _AccountError extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: Text(actionLabel)),
+            RosemaryButton(onPressed: onRetry, label: actionLabel),
           ],
         ),
       ),

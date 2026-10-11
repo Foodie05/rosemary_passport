@@ -18,7 +18,7 @@ test('login exposes password recovery independently of the selected login method
   assert.ok(recoveryLink > persistentControls, 'recovery link must remain visible below every login method');
 });
 
-test('password recovery uses the shared ROSM Pass authentication frame', () => {
+test('password recovery uses the shared Rosemary Epass authentication frame', () => {
   const recoveryPage = source.slice(
     source.indexOf('export function ForgotPasswordPage'),
     source.indexOf('export function PostRegisterPasskeyPrompt'),
@@ -26,7 +26,7 @@ test('password recovery uses the shared ROSM Pass authentication frame', () => {
 
   assert.match(recoveryPage, /<AuthPageFrame>/);
   assert.match(recoveryPage, /<BrandSection \/>/);
-  assert.match(recoveryPage, /grid min-h-dvh grid-cols-1 bg-white lg:grid-cols-2/);
+  assert.match(recoveryPage, /epass-auth-grid/);
 });
 
 test('direct code login uses a dedicated factor-choice step-up page', () => {

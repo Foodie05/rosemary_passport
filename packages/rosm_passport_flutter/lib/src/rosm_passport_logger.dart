@@ -196,7 +196,7 @@ class RosmPassportLogger {
       } on Object catch (sinkError, sinkStackTrace) {
         if (outputToDeveloperLog) {
           developer.log(
-            'ROSM Passport log sink failed.',
+            'Rosemary Epass log sink failed.',
             name: 'rosm_passport_flutter',
             level: RosmLogLevel.error.priority,
             error: sinkError,

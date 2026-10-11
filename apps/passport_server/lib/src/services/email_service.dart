@@ -93,10 +93,10 @@ class EmailService {
 
   Map<String, String> _defaultTemplate() {
     return {
-      'subject': 'ROSM通行证验证码',
+      'subject': 'Rosemary Epass验证码',
       'html':
-          '<div style="font-family:Arial,sans-serif;padding:16px"><h2 style="margin:0 0 10px;color:#0b6b61">ROSM通行证</h2><p>您的验证码是：<strong>{{code}}</strong></p><p style="color:#667085">有效期5分钟</p></div>',
-      'text': 'ROSM通行证验证码: {{code}}，有效期5分钟。',
+          '<div style="font-family:system-ui,sans-serif;padding:24px;background:#f6f5ef;color:#242e29"><h2 style="margin:0 0 16px;color:#315747;font-family:Georgia,serif;font-weight:400">Rosemary Epass</h2><p>您的验证码是：<strong>{{code}}</strong></p><p style="color:#58645d">有效期5分钟</p></div>',
+      'text': 'Rosemary Epass验证码: {{code}}，有效期5分钟。',
     };
   }
 

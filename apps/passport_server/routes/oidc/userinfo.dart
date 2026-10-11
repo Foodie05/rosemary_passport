@@ -24,7 +24,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Bearer token required.',
       statusCode: 401,
       title: '这个应用暂时无法读取您的信息',
-      description: '应用没有带上有效的登录凭据，因此 ROSM 无法返回您的账户信息。',
+      description: '应用没有带上有效的登录凭据，因此 Rosemary Epass 无法返回您的账户信息。',
     );
   }
 
@@ -37,7 +37,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Token invalid.',
       statusCode: 401,
       title: '这个应用暂时无法读取您的信息',
-      description: '应用提供的登录凭据已经失效或无效，ROSM 无法继续返回账户信息。',
+      description: '应用提供的登录凭据已经失效或无效，Rosemary Epass 无法继续返回账户信息。',
     );
   }
   return jsonResponse(userInfo);

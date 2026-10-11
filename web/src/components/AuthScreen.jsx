@@ -22,7 +22,7 @@ export function AuthScreen({
   return (
     <section className="auth-shell">
       <div className="auth-copy">
-        <p className="eyebrow">ROSM Passport</p>
+        <p className="eyebrow">Rosemary Epass</p>
         <h1>身份系统后台，换一种更轻盈的打开方式。</h1>
         <p className="lede">
           登录、注册、配置与 OIDC 接入仍然保留，但界面重新组织得更清晰，更适合日常管理。

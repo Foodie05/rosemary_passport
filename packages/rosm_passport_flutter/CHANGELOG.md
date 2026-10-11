@@ -1,3 +1,12 @@
+## 0.9.0 — 2026-10-11
+
+- Rename built-in product branding to Rosemary Epass and bundle the official logo.
+- Integrate official Rosemary Design Flutter SDK 0.3.0-prototype.2 at a fixed commit; align semantic light/dark colors, fields, controls, panels and motion. Primary actions adapt to iOS/Android and retain their labels while loading.
+- Add `RosmPasswordPolicy`, `RosmPasswordValidation` and `RosmNewPasswordField` for immediate registration/recovery/account-password feedback. New passwords require 8–128 characters and two of letters/digits/symbols; the usual hint omits the upper limit.
+- Validate new-password client calls before HTTP; preserve legacy password login and existing public API identifiers.
+- Keep a single live form during selection transitions; honor reactive system reduced motion. Preserve MFA code focus and keyboard visibility after sending.
+- **Runtime change:** require Flutter >=3.44 / Dart >=3.12 to use the official design SDK. Upstream remains Prototype; manual screen-reader/device acceptance is not claimed.
+
 ## 0.8.1
 
 - Keep version-bound Terms of Use and Privacy Policy acceptance visible in the built-in sign-in and registration flow.

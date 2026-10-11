@@ -160,7 +160,7 @@ void main() {
           account: method == 'phone' ? admin.phoneNumber! : admin.email,
           method: method,
           code: '123456',
-          newPassword: 'A secure new recovery passphrase',
+          newPassword: 'A secure new recovery passphrase!',
         );
         expect(result.code, 'admin_recovery_requires_mfa');
         expect(result.statusCode, 403);
@@ -211,7 +211,7 @@ void main() {
           method: 'passkey',
           code: '',
           passkeyResponse: {'id': 'admin-key'},
-          newPassword: 'A secure new recovery passphrase',
+          newPassword: 'A secure new recovery passphrase!',
         )).ok,
         isTrue,
       );

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'password_policy.dart';
 import 'pkce.dart';
 import 'rosm_aliyun_captcha.dart';
 import 'rosm_passport_logger.dart';
@@ -201,6 +202,8 @@ class RosmPassportClient {
     String? newEmail,
     String? newPassword,
   }) async {
+    if (newPassword != null)
+      const RosmPasswordPolicy().requireValid(newPassword);
     final json = await _patchJson('/api/v1/me', {
       if (nickname != null) 'nickname': nickname,
       if (currentPassword != null) 'current_password': currentPassword,
@@ -275,6 +278,7 @@ class RosmPassportClient {
     required String newPassword,
     required String emailCode,
   }) async {
+    const RosmPasswordPolicy().requireValid(newPassword);
     final json = await _postJson('/api/v1/me/reset-password', {
       'new_password': newPassword,
       'email_code': emailCode,
@@ -470,6 +474,7 @@ class RosmPassportClient {
     String? registrationHandoff,
     RosmLegalAcceptance? legalAcceptance,
   }) async {
+    const RosmPasswordPolicy().requireValid(password);
     final json = await _postJson(
       '/api/v1/auth/register',
       RosmEmailRegisterRequest(
@@ -491,6 +496,7 @@ class RosmPassportClient {
     String? registrationHandoff,
     RosmLegalAcceptance? legalAcceptance,
   }) async {
+    const RosmPasswordPolicy().requireValid(password);
     final json = await _postJson('/api/v1/auth/register-phone', {
       'phone_number': phoneNumber,
       'nickname': nickname,
@@ -577,6 +583,7 @@ class RosmPassportClient {
     required String code,
     required String newPassword,
   }) async {
+    const RosmPasswordPolicy().requireValid(newPassword);
     final json = await _postJson(
       '/api/v1/auth/reset-password-by-code',
       RosmPasswordResetByCodeRequest(

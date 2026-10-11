@@ -1,5 +1,8 @@
+import { AnimatePresence } from 'motion/react';
+import { Notice } from './components/Notice';
+import { useNavigate } from './design/NavigationMotion';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AdminLayout, UserLayout } from './components/Layouts';
 import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_TOGGLE_DEFAULTS } from './constants';
 import { useTheme } from './theme';
@@ -155,7 +158,7 @@ function AppRoutes({
     : '';
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50" aria-busy="true" />}>
+    <Suspense fallback={<div className="min-h-screen bg-canvas" aria-busy="true" data-route-loading />}>
       <Routes location={location}>
         <Route path="/legal/terms" element={<LegalDocumentPage document={legalDocuments?.terms} loading={legalLoading} />} />
         <Route path="/legal/privacy" element={<LegalDocumentPage document={legalDocuments?.privacy} loading={legalLoading} />} />
@@ -382,12 +385,12 @@ function OidcContinueRedirect() {
   }, []);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-sage-50 px-5 text-center" aria-busy="true">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas px-5 text-center" aria-busy="true">
       <form ref={formRef} method="get" action={authorizationEndpoint} className="space-y-4">
         {authorizationParameters.map(([name, value], index) => (
           <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
         ))}
-        <p className="text-sm font-semibold text-sage-700">正在继续授权流程…</p>
+        <p className="text-sm font-semibold text-ink">正在继续授权流程…</p>
         <button type="submit" className="btn-primary px-5 py-3 text-sm font-bold">
           继续授权
         </button>
@@ -2266,11 +2269,11 @@ function App() {
         aria-hidden="true"
         style={{ position: 'fixed', left: '-9999px', top: 0, width: 1, height: 1, opacity: 0 }}
       />
-      {toast && (
-        <div className={`fixed right-5 top-5 z-50 rounded-2xl px-4 py-3 text-sm font-medium shadow-lg ${toast.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-sage-900 text-white'}`}>
+      <AnimatePresence>{toast && (
+        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`fixed right-4 top-4 z-50 max-w-[calc(100vw-2rem)] rounded-control border border-line px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
           {toast.message}
-        </div>
-      )}
+        </Notice>
+      )}</AnimatePresence>
         <PostRegisterBindingPrompt
           open={postRegisterBindingPromptOpen}
           registrationMethod={postRegisterMethod}

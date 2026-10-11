@@ -4,7 +4,7 @@ import '../lib/src/utils/http.dart';
 
 Response onRequest(RequestContext context) {
   return jsonResponse({
-    'name': 'ROSM Passport',
+    'name': 'Rosemary Epass',
     'service': 'sso',
     'status': 'ok',
     'timestamp': DateTime.now().toUtc().toIso8601String(),

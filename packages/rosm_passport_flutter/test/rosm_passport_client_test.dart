@@ -233,7 +233,7 @@ void main() {
     await client.registerWithEmail(
       email: 'new@example.com',
       nickname: 'New User',
-      password: 'a secure passphrase',
+      password: 'a secure passphrase!',
       registrationHandoff: 'signed-handoff',
     );
 
@@ -241,7 +241,7 @@ void main() {
     expect(jsonDecode(captured.body), {
       'email': 'new@example.com',
       'nickname': 'New User',
-      'password': 'a secure passphrase',
+      'password': 'a secure passphrase!',
       'registration_handoff': 'signed-handoff',
     });
   });

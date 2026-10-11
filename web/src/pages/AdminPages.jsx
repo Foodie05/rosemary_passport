@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Activity, Ban, BookOpen, Check, CircleHelp, Clock3, Copy, FileText, Globe, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from 'lucide-react';
+import { Link } from '../design/NavigationMotion';
+import { AnimatePresence } from 'motion/react';
+import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react';
+
+import { Activity, Ban, BookOpen, Check, Clock3, Copy, FileText, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from 'lucide-react';
+import { NewPasswordField } from '../components/NewPasswordField';
+import { evaluatePassword } from '../lib/password-policy';
+import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
+import { Dialog } from '../components/Dialog';
+import { Brand, SiteFooter } from '../components/Brand';
+import { ThemeToggle } from '../theme';
 import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
@@ -72,7 +80,7 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
-const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/master/packages/rosm_passport_flutter';
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.9.0/packages/rosm_passport_flutter';
 const DASHBOARD_PERIODS = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
@@ -110,65 +118,20 @@ function isMobileCustomRedirectUri(value) {
 }
 
 function SectionHeader({ title, description, actions }) {
-  return (
-    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-      <div>
-        <h2 className="text-2xl font-bold text-sage-900">{title}</h2>
-        <p className="mt-1 text-sage-500">{description}</p>
-      </div>
-      {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
-    </div>
-  );
+  return <header className="epass-page-heading flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><h1>{title}</h1><p>{description}</p></div>{actions && <div className="flex flex-wrap gap-3">{actions}</div>}</header>;
 }
 
 function SettingsShell({ icon: Icon, title, description, children, onSubmit, actions }) {
-  return (
-    <div className="max-w-6xl space-y-8">
-      <div className="flex items-center gap-4">
-        <div className="rounded-2xl bg-sage-600 p-4 text-white shadow-lg shadow-sage-600/20">
-          <Icon size={32} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-sage-900">{title}</h2>
-          <p className="mt-1 text-sage-500">{description}</p>
-        </div>
-      </div>
-      <form onSubmit={onSubmit} className="glass-card space-y-8 rounded-3xl p-5 sm:p-8">
-        {children}
-        {actions ? <div className="flex flex-wrap justify-end gap-3 border-t border-sage-100 pt-6">{actions}</div> : null}
-      </form>
-    </div>
-  );
+  return <div className="max-w-6xl space-y-8"><SectionHeader title={title} description={description} /><form onSubmit={onSubmit} className="epass-settings-form space-y-8">{children}{actions && <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-6">{actions}</div>}</form></div>;
 }
 
 function ConfigField({ label, hint, defaultValue, children }) {
-  return (
-    <div className="space-y-2">
-      <label className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-sage-700">
-        <span className="min-w-0 break-words">{label}</span>
-        {defaultValue !== undefined ? (
-          <span className="rounded-full bg-sage-100 px-2 py-0.5 text-[11px] font-semibold text-sage-500">
-            默认 {String(defaultValue)}
-          </span>
-        ) : null}
-        {hint ? <HelpHint hint={hint} /> : null}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function HelpHint({ hint }) {
-  return (
-    <span className="group relative inline-flex">
-      <span className="inline-flex cursor-help text-sage-400 transition-colors hover:text-sage-600">
-        <CircleHelp size={14} />
-      </span>
-      <span className="policy-tooltip" role="tooltip">
-        {hint}
-      </span>
-    </span>
-  );
+  const id = useId();
+  const child = Children.toArray(children)[0];
+  const grouped = isValidElement(child) && child.type === 'div';
+  const caption = <>{label}{defaultValue !== undefined && <span className="ml-2 font-normal text-muted">默认 {String(defaultValue)}</span>}</>;
+  const content = <>{Children.map(children, (item) => isValidElement(item) && !grouped ? cloneElement(item, { id, 'aria-describedby': hint ? `${id}-hint` : undefined }) : item)}{hint && <p id={`${id}-hint`} className="text-sm leading-6 text-muted">{hint}</p>}</>;
+  return grouped ? <fieldset className="min-w-0 space-y-2"><legend className="mb-2 text-sm font-medium text-ink">{caption}</legend>{content}</fieldset> : <div className="min-w-0 space-y-2"><label htmlFor={id} className="block text-sm font-medium text-ink">{caption}</label>{content}</div>;
 }
 
 const PROVIDER_PATTERN = /^@[a-z0-9.-]+\.[a-z]{2,}$/i;
@@ -199,16 +162,15 @@ function ProviderListSection({
   onRemove,
 }) {
   return (
-    <div className="space-y-4 rounded-3xl border border-sage-100 bg-white p-5">
+    <div className="space-y-4 rounded-panel border border-line bg-surface p-5">
       <div>
-        <h3 className="text-base font-bold text-sage-900">{title}</h3>
-        <p className="mt-1 text-sm text-sage-500">{description}</p>
+        <h3 className="text-base font-bold text-ink">{title}</h3>
+        <p className="mt-1 text-sm text-muted">{description}</p>
       </div>
-      <div className="rounded-2xl border border-dashed border-sage-200 bg-sage-50 px-4 py-3 text-sm text-sage-500">
-        支持上传 `txt` 文件批量导入，一行一个邮箱提供商。若未填写 `@`，系统会自动补成 `@xxx.com`。
-      </div>
+      <p className="text-sm leading-6 text-muted">可导入 txt 文件，每行一个邮箱域名；例如 gmail.com 或 @gmail.com。</p>
       <div className="flex flex-col gap-3 md:flex-row">
         <input
+          aria-label="邮箱提供商域名"
           className="input-field"
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
@@ -218,34 +180,24 @@ function ProviderListSection({
           添加提供商
         </button>
       </div>
-      <div>
-        <label className="inline-flex cursor-pointer items-center rounded-xl border border-sage-200 bg-white px-4 py-2 text-sm font-medium text-sage-700 transition-colors hover:bg-sage-50">
-          导入 txt 文件
-          <input
-            type="file"
-            accept=".txt,text/plain"
-            className="hidden"
-            onChange={(event) => onImport(event.target.files?.[0] || null)}
-          />
-        </label>
-      </div>
+      <label className="block space-y-2 text-sm font-medium text-ink"><span>批量导入提供商</span><input type="file" accept=".txt,text/plain" className="epass-file-input" onChange={(event) => { onImport(event.target.files?.[0] || null); event.target.value = ''; }} /></label>
       <div className="flex flex-wrap gap-2">
         {providers.length ? (
           providers.map((provider) => (
-            <span key={provider} className="inline-flex max-w-full items-center gap-2 rounded-full border border-sage-200 bg-sage-50 px-3 py-1.5 text-sm font-medium text-sage-700">
+            <span key={provider} className="inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink">
               <span className="min-w-0 break-all">{provider}</span>
               <button
                 type="button"
-                className="shrink-0 rounded-full text-sage-400 transition-colors hover:text-red-500"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-muted transition-colors hover:text-danger"
                 onClick={() => onRemove(provider)}
                 aria-label={`移除 ${provider}`}
               >
-                <Trash2 size={14} />
+                <Trash2 size={20} />
               </button>
             </span>
           ))
         ) : (
-          <p className="text-sm text-sage-400">当前没有配置任何邮箱提供商。</p>
+          <p className="text-sm text-muted">当前没有配置任何邮箱提供商。</p>
         )}
       </div>
     </div>
@@ -253,53 +205,20 @@ function ProviderListSection({
 }
 
 function ToggleCard({ title, defaultEnabled, hint, checked, onChange }) {
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-2xl border border-sage-100 bg-white p-5 text-sm text-sage-700">
-      <span className="min-w-0 space-y-2">
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span className="min-w-0 break-words font-bold text-sage-900">{title}</span>
-          <span className="rounded-full bg-sage-100 px-2 py-0.5 text-[11px] font-semibold text-sage-500">
-            默认 {defaultEnabled ? '开启' : '关闭'}
-          </span>
-          <HelpHint hint={hint} />
-        </span>
-      </span>
-      <RosemaryCheckbox
-        checked={checked}
-        onCheckedChange={onChange}
-        ariaLabel={title}
-        className="shrink-0"
-      />
-    </div>
-  );
+  return <div className="epass-toggle-row"><div className="min-w-0"><p className="font-medium text-ink">{title}</p><p className="mt-2 text-sm leading-6 text-muted">{hint}</p><p className="mt-1 text-sm text-muted">默认{defaultEnabled ? '开启' : '关闭'}</p></div><RosemaryCheckbox checked={checked} onCheckedChange={onChange} ariaLabel={title} className="shrink-0" /></div>;
 }
 
-function Modal({ title, children, onClose, actions }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-sage-900/20 p-3 backdrop-blur-sm sm:items-center sm:p-6">
-      <div className="my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl sm:max-h-[calc(100dvh-3rem)]">
-        <div className="flex items-center justify-between border-b border-sage-100 px-4 py-4 sm:px-6">
-          <h3 className="text-xl font-bold text-sage-900">{title}</h3>
-          <button type="button" className="rounded-xl p-2 text-sage-400 hover:bg-sage-50 hover:text-sage-700" onClick={onClose}>
-            <X size={18} />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-          <div className="space-y-5">{children}</div>
-        </div>
-        <div className="flex flex-col-reverse gap-3 border-t border-sage-100 bg-white px-4 py-4 [&>*]:w-full sm:flex-row sm:justify-end sm:px-6 sm:[&>*]:w-auto">{actions}</div>
-      </div>
-    </div>
-  );
+function Modal({ title, children, onClose, actions, className }) {
+  return <Dialog title={title} onClose={onClose} actions={actions} className={className}><div className="space-y-5">{children}</div></Dialog>;
 }
 
 function InlineCode({ children }) {
-  return <code className="rounded bg-sage-100 px-1.5 py-0.5 text-[13px] text-sage-700">{children}</code>;
+  return <code className="rounded bg-subtle px-1.5 py-0.5 text-[13px] text-ink">{children}</code>;
 }
 
 function CodeBlock({ children }) {
   return (
-    <pre className="overflow-x-auto rounded-2xl border border-sage-700 bg-sage-900 p-4 text-sm leading-6 text-sage-100 shadow-inner">
+    <pre className="overflow-x-auto rounded-panel border border-accent bg-subtle p-4 text-sm leading-6 text-ink">
       <code>{children}</code>
     </pre>
   );
@@ -307,9 +226,9 @@ function CodeBlock({ children }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div className="rounded-2xl border border-sage-100 bg-white p-4">
-      <p className="text-xs font-bold uppercase tracking-wider text-sage-400">{label}</p>
-      <p className="mt-2 break-all text-sm font-medium text-sage-800">{value || '未提供'}</p>
+    <div className="rounded-panel border border-line bg-surface p-4">
+      <p className="text-xs font-bold uppercase tracking-wider text-muted">{label}</p>
+      <p className="mt-2 break-all text-sm font-medium text-ink">{value || '未提供'}</p>
     </div>
   );
 }
@@ -330,18 +249,15 @@ export function AdminServiceConfig({
       onSubmit={saveServiceConfig}
       actions={(
         <div className="flex flex-wrap gap-3">
-          <button className="btn-secondary" type="button" onClick={testSmtpConnection}>验证 SMTP 连接</button>
-          <button className="btn-secondary" type="button" onClick={testAliyunCaptchaConnection}>验证阿里云验证码</button>
-          <button className="btn-secondary" type="button" onClick={testPhoneSmsConnection}>验证短信配置</button>
           <button className="btn-primary" type="submit">保存服务配置</button>
         </div>
       )}
     >
       <div className="space-y-8">
-        <div className="space-y-5">
+        <section className="epass-settings-section">
           <div>
-            <h3 className="text-lg font-bold text-sage-900">SMTP 邮箱配置</h3>
-            <p className="mt-1 text-sm text-sage-500">使用账号密码方式配置发信服务，用于登录验证码、注册验证和密码重置。</p>
+            <h2 className="epass-section-title">SMTP 邮箱配置</h2>
+            <p className="mt-1 text-sm text-muted">使用账号密码方式配置发信服务，用于登录验证码、注册验证和密码重置。</p>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ConfigField label="SMTP Host">
@@ -366,13 +282,14 @@ export function AdminServiceConfig({
           <RosemaryCheckbox checked={Boolean(systemForm.smtp_secure)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, smtp_secure: checked }))}>
             启用安全连接
           </RosemaryCheckbox>
-        </div>
+          <button className="btn-secondary" type="button" onClick={testSmtpConnection}>验证 SMTP 连接</button>
+        </section>
 
-        <div className="border-t border-sage-100 pt-8">
+        <section className="epass-settings-section">
           <div className="space-y-5">
             <div>
-              <h3 className="text-lg font-bold text-sage-900">阿里云验证码 2.0</h3>
-              <p className="mt-1 text-sm text-sage-500">Prefix 与场景 ID 来自验证码 2.0 控制台；AccessKey 来自 RAM 用户，需授予 AliyunYundunAFSFullAccess。</p>
+              <h2 className="epass-section-title">阿里云验证码 2.0</h2>
+              <p className="mt-1 text-sm text-muted">Prefix 与场景 ID 来自验证码 2.0 控制台；AccessKey 来自 RAM 用户，需授予 AliyunYundunAFSFullAccess。</p>
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ConfigField label="Prefix">
@@ -392,13 +309,14 @@ export function AdminServiceConfig({
               注册必须验证邮箱
             </RosemaryCheckbox>
           </div>
-        </div>
+          <button className="btn-secondary" type="button" onClick={testAliyunCaptchaConnection}>验证阿里云验证码</button>
+        </section>
 
-        <div className="border-t border-sage-100 pt-8">
+        <section className="epass-settings-section">
           <div className="space-y-5">
             <div>
-              <h3 className="text-lg font-bold text-sage-900">手机号验证（阿里云）</h3>
-              <p className="mt-1 text-sm text-sage-500">将验证码发送与校验所需参数集中管理，供手机号登录、MFA 与手机号绑定使用。</p>
+              <h2 className="epass-section-title">手机号验证（阿里云）</h2>
+              <p className="mt-1 text-sm text-muted">将验证码发送与校验所需参数集中管理，供手机号登录、MFA 与手机号绑定使用。</p>
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ConfigField label="AccessKey ID">
@@ -421,7 +339,8 @@ export function AdminServiceConfig({
               启用手机号验证码能力（登录 / MFA / 绑定）
             </RosemaryCheckbox>
           </div>
-        </div>
+          <button className="btn-secondary" type="button" onClick={testPhoneSmsConnection}>验证短信配置</button>
+        </section>
       </div>
     </SettingsShell>
   );
@@ -459,10 +378,10 @@ export function AdminSecurityPolicy({
       actions={<button className="btn-primary" type="submit">保存安全策略</button>}
     >
       <div className="space-y-8">
-        <div className="space-y-5 rounded-3xl border border-sage-100 bg-sage-50/70 p-6">
+        <div className="space-y-6 rounded-panel border border-line bg-surface p-6">
           <div>
-            <h3 className="text-lg font-bold text-sage-900">策略开关</h3>
-            <p className="mt-1 text-sm text-sage-500">这里只保留最关键的两个总开关，避免它们单独占据整列空间。</p>
+            <h2 className="epass-section-title">策略开关</h2>
+            <p className="mt-1 text-sm text-muted">分别限制同一账户与同一来源 IP 的高频请求。</p>
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <ToggleCard
@@ -483,10 +402,10 @@ export function AdminSecurityPolicy({
         </div>
 
         {SECURITY_GROUPS.filter((group) => group.fields.length > 0).map((group) => (
-          <div key={group.title} className="space-y-5 rounded-3xl border border-sage-100 bg-sage-50/70 p-6">
+          <div key={group.title} className="space-y-6 rounded-panel border border-line bg-surface p-6">
             <div>
-              <h3 className="text-lg font-bold text-sage-900">{group.title}</h3>
-              <p className="mt-1 text-sm text-sage-500">{group.description}</p>
+              <h2 className="epass-section-title">{group.title}</h2>
+              <p className="mt-1 text-sm text-muted">{group.description}</p>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {group.fields.map((key) => (
@@ -509,43 +428,20 @@ export function AdminSecurityPolicy({
           </div>
         ))}
 
-        <div className="space-y-5 rounded-3xl border border-sage-100 bg-sage-50/70 p-6">
+        <div className="space-y-6 rounded-panel border border-line bg-surface p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-sage-900">注册邮箱管理</h3>
-              <p className="mt-1 text-sm text-sage-500">
+              <h2 className="epass-section-title">注册邮箱管理</h2>
+              <p className="mt-1 text-sm text-muted">
                 白名单模式下仅允许名单中的邮箱提供商注册；黑名单模式下仅拦截黑名单中的邮箱提供商。两套名单独立保存，可随时切换。
               </p>
             </div>
-            <div className="inline-flex rounded-2xl border border-sage-200 bg-white p-1">
-              <button
-                type="button"
-                className={cn(
-                  'rounded-xl px-4 py-2 text-sm font-bold transition-all',
-                  (systemForm.registration_email_provider_mode || 'blacklist') === 'blacklist'
-                    ? 'bg-sage-600 text-white shadow-sm'
-                    : 'text-sage-500 hover:text-sage-700',
-                )}
-                onClick={() => setSystemForm((current) => ({ ...current, registration_email_provider_mode: 'blacklist' }))}
-              >
-                黑名单模式
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded-xl px-4 py-2 text-sm font-bold transition-all',
-                  systemForm.registration_email_provider_mode === 'whitelist'
-                    ? 'bg-sage-600 text-white shadow-sm'
-                    : 'text-sage-500 hover:text-sage-700',
-                )}
-                onClick={() => setSystemForm((current) => ({ ...current, registration_email_provider_mode: 'whitelist' }))}
-              >
-                白名单模式
-              </button>
-            </div>
+            <SelectionGroup value={providerMode} label="邮箱提供商管理模式" className="epass-compact-methods">
+              {[['blacklist', '黑名单模式'], ['whitelist', '白名单模式']].map(([mode, label]) => <button key={mode} type="button" aria-pressed={providerMode === mode} onClick={() => setSystemForm((current) => ({ ...current, registration_email_provider_mode: mode }))}>{label}</button>)}
+            </SelectionGroup>
           </div>
 
-          <ProviderListSection
+          <SelectionContent value={providerMode} index={providerMode === 'blacklist' ? 0 : 1}><ProviderListSection
             title={activeProviderTitle}
             description={activeProviderDescription}
             providers={systemForm[activeProviderListKey] || []}
@@ -554,7 +450,7 @@ export function AdminSecurityPolicy({
             onAdd={() => addRegistrationProvider(activeProviderListKey, activeProviderInputKey)}
             onImport={(file) => importRegistrationProviders(activeProviderListKey, file)}
             onRemove={(provider) => removeRegistrationProvider(activeProviderListKey, provider)}
-          />
+          /></SelectionContent>
         </div>
       </div>
     </SettingsShell>
@@ -603,12 +499,12 @@ function MiniLineChart({ data, series }) {
 
   return (
     <div className="relative">
-      <div className="mb-3 flex flex-wrap gap-4 text-xs font-bold text-sage-600">
+      <div className="mb-3 flex flex-wrap gap-4 text-xs font-bold text-muted">
         {series.map((item) => <span key={item.key} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
       </div>
       {hoveredRow ? (
         <div
-          className="pointer-events-none absolute top-9 z-10 min-w-44 rounded-xl border border-sage-700/20 bg-sage-900/95 px-4 py-3 text-xs text-white shadow-xl backdrop-blur"
+          className="pointer-events-none absolute top-9 z-10 min-w-44 rounded-control border border-accent bg-ink px-4 py-3 text-xs text-canvas"
           style={{
             left: `${data.length <= 1 ? 50 : (hoveredIndex / (data.length - 1)) * 100}%`,
             transform: hoveredIndex <= (data.length - 1) * 0.25
@@ -622,7 +518,7 @@ function MiniLineChart({ data, series }) {
           <div className="space-y-1.5">
             {series.map((item) => (
               <div key={item.key} className="flex items-center justify-between gap-6">
-                <span className="flex items-center gap-2 text-white/80"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>
+                <span className="flex items-center gap-2 text-canvas"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>
                 <span className="font-bold tabular-nums">{Number(hoveredRow[item.key] || 0).toLocaleString('zh-CN')}</span>
               </div>
             ))}
@@ -631,7 +527,7 @@ function MiniLineChart({ data, series }) {
       ) : null}
       <svg
         viewBox={`0 0 ${geometry.width} ${geometry.height}`}
-        className="h-56 w-full cursor-crosshair outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-2"
+        className="h-56 w-full cursor-crosshair outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
         role="img"
         aria-label={`${series.map((item) => item.label).join('、')}，按北京时间统计`}
         tabIndex="0"
@@ -642,15 +538,15 @@ function MiniLineChart({ data, series }) {
         onBlur={() => setHoveredIndex(null)}
         onKeyDown={moveKeyboardPosition}
       >
-        {[0, 1, 2, 3, 4].map((row) => <line key={row} x1="0" x2={geometry.width} y1={(row / 4) * geometry.height} y2={(row / 4) * geometry.height} stroke="currentColor" className="text-sage-100" />)}
+        {[0, 1, 2, 3, 4].map((row) => <line key={row} x1="0" x2={geometry.width} y1={(row / 4) * geometry.height} y2={(row / 4) * geometry.height} stroke="currentColor" className="text-line" />)}
         {geometry.paths.map((item) => <polyline key={item.key} points={item.polyline} fill="none" stroke={item.color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />)}
-        {hoveredRow ? <line x1={hoveredX} x2={hoveredX} y1="0" y2={geometry.height} stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 5" className="text-sage-400" /> : null}
+        {hoveredRow ? <line x1={hoveredX} x2={hoveredX} y1="0" y2={geometry.height} stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 5" className="text-muted" /> : null}
         {hoveredRow ? geometry.paths.map((item) => {
           const point = item.points[hoveredIndex];
-          return <circle key={item.key} cx={point.x} cy={point.y} r="6" fill="white" stroke={item.color} strokeWidth="4" />;
+          return <circle key={item.key} cx={point.x} cy={point.y} r="6" fill="var(--color-surface)" stroke={item.color} strokeWidth="4" />;
         }) : null}
       </svg>
-      <div className="mt-2 flex justify-between text-xs text-sage-400"><span>{formatBeijingDate(data[0]?.date)}</span><span>{formatBeijingDate(data.at(-1)?.date)}</span></div>
+      <div className="mt-2 flex justify-between text-xs text-muted"><span>{formatBeijingDate(data[0]?.date)}</span><span>{formatBeijingDate(data.at(-1)?.date)}</span></div>
     </div>
   );
 }
@@ -663,38 +559,25 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
     <div className="space-y-6">
       <SectionHeader
         title="运营与安全看板"
-        description="基于系统数据库与审计记录生成；全部日期与自然日边界均按北京时间（UTC+8）统计。"
+        description="账户与认证活动概览。统计时区：北京时间（UTC+8）。"
         actions={(
           <div className="flex flex-col items-start gap-2 md:items-end">
-            <span className="text-xs font-bold text-sage-500">选择统计时间范围</span>
-            <div className="inline-flex rounded-2xl border border-sage-200 bg-white p-1 shadow-sm" role="group" aria-label="统计时间范围">
-              {DASHBOARD_PERIODS.map((period) => (
-                <button
-                  key={period.days}
-                  type="button"
-                  className={cn(
-                    'rounded-xl px-3 py-2 text-sm font-bold transition-colors',
-                    days === period.days ? 'bg-sage-600 text-white' : 'text-sage-500 hover:bg-sage-50 hover:text-sage-700',
-                  )}
-                  aria-pressed={days === period.days}
-                  onClick={() => setDays(period.days)}
-                >
-                  {period.label}
-                </button>
-              ))}
-            </div>
+            <span className="text-xs font-bold text-muted">选择统计时间范围</span>
+            <SelectionGroup value={days} label="统计时间范围" className="epass-compact-methods">
+              {DASHBOARD_PERIODS.map((period) => <button key={period.days} type="button" aria-pressed={days === period.days} onClick={() => setDays(period.days)}>{period.label}</button>)}
+            </SelectionGroup>
           </div>
         )}
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[['当前用户', summary.total_users ?? '-'], ['封禁账户', summary.banned_users ?? '-'], ['接入 OIDC 平台', summary.active_third_party_oidc_clients ?? '-'], ['全部活跃客户端', summary.active_oidc_clients ?? '-']].map(([label, value]) => <div key={label} className="glass-card rounded-2xl p-6"><p className="text-sm font-bold text-sage-500">{label}</p><p className="mt-3 text-3xl font-bold text-sage-900">{value}</p></div>)}
+      <div className="epass-stat-strip">
+        {[['当前用户', summary.total_users ?? '-'], ['封禁账户', summary.banned_users ?? '-'], ['接入 OIDC 平台', summary.active_third_party_oidc_clients ?? '-'], ['全部活跃客户端', summary.active_oidc_clients ?? '-']].map(([label, value]) => <div key={label} className="epass-stat"><p>{label}</p><strong>{value}</strong></div>)}
       </div>
       <div className="grid gap-6 xl:grid-cols-2">
-        <div className="glass-card rounded-2xl p-6"><h2 className="mb-5 text-lg font-bold">用户数量变化</h2><MiniLineChart data={data?.user_growth || []} series={[{ key: 'total_users', label: '累计用户', color: '#587c5d' }, { key: 'new_users', label: '当日新增', color: '#a7c58b' }]} /></div>
-        <div className="glass-card rounded-2xl p-6"><h2 className="mb-5 text-lg font-bold">登录与 OIDC 授权</h2><MiniLineChart data={data?.authentication_activity || []} series={[{ key: 'logins', label: '登录', color: '#587c5d' }, { key: 'authorizations', label: '授权码', color: '#d59b52' }]} /></div>
-        <div className="glass-card rounded-2xl p-6 xl:col-span-2"><h2 className="mb-5 text-lg font-bold">邮箱与短信验证码发送</h2><MiniLineChart data={data?.verification_activity || []} series={[{ key: 'email_codes', label: '邮箱发放尝试', color: '#587c5d' }, { key: 'sms_codes', label: '短信成功响应', color: '#6689b8' }]} /></div>
+        <div className="surface-panel rounded-panel p-6"><h2 className="mb-5 text-lg font-bold">用户数量变化</h2><MiniLineChart data={data?.user_growth || []} series={[{ key: 'total_users', label: '累计用户', color: 'var(--r-semantic-color-chart-one)' }, { key: 'new_users', label: '当日新增', color: 'var(--r-semantic-color-chart-two)' }]} /></div>
+        <div className="surface-panel rounded-panel p-6"><h2 className="mb-5 text-lg font-bold">登录与 OIDC 授权</h2><MiniLineChart data={data?.authentication_activity || []} series={[{ key: 'logins', label: '登录', color: 'var(--r-semantic-color-chart-one)' }, { key: 'authorizations', label: '授权码', color: 'var(--r-semantic-color-chart-four)' }]} /></div>
+        <div className="surface-panel rounded-panel p-6 xl:col-span-2"><h2 className="mb-5 text-lg font-bold">邮箱与短信验证码发送</h2><MiniLineChart data={data?.verification_activity || []} series={[{ key: 'email_codes', label: '邮箱发放尝试', color: 'var(--r-semantic-color-chart-one)' }, { key: 'sms_codes', label: '短信成功响应', color: 'var(--r-semantic-color-chart-three)' }]} /></div>
       </div>
-      <div className="rounded-2xl border border-sage-200 bg-sage-50 p-5 text-xs leading-6 text-sage-600">{Object.values(data?.definitions || {}).map((definition) => <p key={definition}>• {definition}</p>)}</div>
+      {Object.keys(data?.definitions || {}).length > 0 && <details className="epass-disclosure"><summary>统计口径</summary><div className="space-y-2 py-4 text-sm leading-6 text-muted">{Object.values(data.definitions).map((definition) => <p key={definition}>{definition}</p>)}</div></details>}
     </div>
   );
 }
@@ -779,55 +662,53 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
         actions={<button type="button" className="btn-secondary flex items-center gap-2" onClick={() => void safely(() => refresh(pagination.page || 1), '冷却状态刷新失败')}><RefreshCw size={17} />刷新</button>}
       />
 
-      <div className="inline-flex rounded-2xl border border-sage-200 bg-white p-1 shadow-sm" role="tablist" aria-label="状态管理分类">
-        <button type="button" role="tab" aria-selected="true" className="rounded-xl bg-sage-600 px-4 py-2 text-sm font-bold text-white">冷却管理</button>
-      </div>
+      <h2 className="epass-section-title">冷却管理</h2>
 
-      <div className="glass-card space-y-4 rounded-2xl p-4">
+      <div className="surface-panel space-y-4 rounded-panel p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400" size={18} />
-            <input className="input-field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、手机号、IP 或冷却类型" onKeyDown={(event) => { if (event.key === 'Enter') void safely(() => refresh(1), '冷却状态加载失败'); }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+            <input aria-label="搜索冷却记录" className="input-field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、手机号、IP 或冷却类型" onKeyDown={(event) => { if (event.key === 'Enter') void safely(() => refresh(1), '冷却状态加载失败'); }} />
           </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="主体类型">
+          <SelectionGroup value={subjectType} label="主体类型" className="epass-segments epass-compact-methods" indicator={false}>
             {COOLDOWN_SUBJECT_TYPES.map((item) => (
-              <button key={item.value} type="button" aria-pressed={subjectType === item.value} className={cn('rounded-xl px-3 py-2 text-sm font-bold transition-colors', subjectType === item.value ? 'bg-sage-600 text-white' : 'bg-sage-100 text-sage-600 hover:bg-sage-200')} onClick={() => setSubjectType(item.value)}>{item.label}</button>
+              <button key={item.value} type="button" aria-pressed={subjectType === item.value} className={cn('rounded-control px-3 py-2 text-sm font-bold transition-colors', subjectType === item.value ? 'text-ink' : 'text-muted hover:text-ink')} onClick={() => setSubjectType(item.value)}>{item.label}</button>
             ))}
-          </div>
+          </SelectionGroup>
           <RosemaryCheckbox checked={activeOnly} onCheckedChange={setActiveOnly} ariaLabel="仅显示冷却中">仅显示冷却中</RosemaryCheckbox>
           <button type="button" className="btn-primary" onClick={() => void safely(() => refresh(1), '冷却状态加载失败')}>应用筛选</button>
         </div>
-        <p className="flex items-center gap-2 text-xs leading-5 text-sage-500"><Wifi size={15} />主体与来源 IP 仅在管理员页面显示；重置行为会进入脱敏审计链。</p>
+        <p className="flex items-center gap-2 text-xs leading-5 text-muted"><Wifi size={15} />主体与来源 IP 仅在管理员页面显示；重置行为会进入脱敏审计链。</p>
       </div>
 
-      <div className="glass-card overflow-hidden rounded-2xl">
-        <div className="overflow-x-auto">
+      <div className="surface-panel overflow-hidden rounded-panel">
+        <div className="overflow-x-auto" role="region" aria-label="数据表格，可横向滚动" tabIndex={0}>
           <table className="w-full min-w-[1120px] border-collapse text-left">
-            <thead><tr className="border-b border-sage-100 bg-sage-50/60">
-              {['类型', '主体 / IP', '尝试次数', '计数窗口开始', '最后更新', '冷却截止', '剩余时间', '操作'].map((label) => <th key={label} className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">{label}</th>)}
+            <thead><tr className="border-b border-line bg-canvas">
+              {['类型', '主体 / IP', '尝试次数', '计数窗口开始', '最后更新', '冷却截止', '剩余时间', '操作'].map((label) => <th scope="col" key={label} className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-muted">{label}</th>)}
             </tr></thead>
-            <tbody className="divide-y divide-sage-50">
+            <tbody className="divide-y divide-line">
               {cooldowns.map((record) => {
                 const key = `${record.scope}\u0000${record.subject}`;
                 const active = record.blocked_until && new Date(record.blocked_until).getTime() > now;
                 return (
-                  <tr key={key} className="transition-colors hover:bg-sage-50/60">
-                    <td className="px-5 py-4"><p className="font-bold text-sage-800">{cooldownScopeLabel(record.scope)}</p><p className="mt-1 font-mono text-[11px] text-sage-400">{record.scope.includes(':cooldown:') ? '发送冷却' : '频率窗口'}</p></td>
-                    <td className="px-5 py-4"><p className="max-w-[300px] break-all font-mono text-sm text-sage-800">{record.subject}</p><span className="mt-1 inline-flex rounded-full bg-sage-100 px-2 py-0.5 text-[10px] font-bold uppercase text-sage-600">{record.subject_type === 'ip' ? 'IP' : record.subject_type === 'phone' ? '手机' : '邮箱'}</span></td>
-                    <td className="px-5 py-4 text-lg font-bold text-sage-800">{record.hits ?? 0}</td>
-                    <td className="px-5 py-4 text-sm text-sage-600">{formatBeijingDateTime(record.window_started_at)}</td>
-                    <td className="px-5 py-4 text-sm text-sage-600">{formatBeijingDateTime(record.updated_at)}</td>
-                    <td className="px-5 py-4 text-sm text-sage-600">{formatBeijingDateTime(record.blocked_until)}</td>
-                    <td className="px-5 py-4"><span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', active ? 'bg-amber-100 text-amber-700' : 'bg-sage-100 text-sage-500')}><Clock3 size={13} />{formatRemaining(record, now)}</span></td>
+                  <tr key={key} className="transition-colors hover:bg-canvas">
+                    <td className="px-5 py-4"><p className="font-bold text-ink">{cooldownScopeLabel(record.scope)}</p><p className="mt-1 font-mono text-xs text-muted">{record.scope.includes(':cooldown:') ? '发送冷却' : '频率窗口'}</p></td>
+                    <td className="px-5 py-4"><p className="max-w-[300px] break-all font-mono text-sm text-ink">{record.subject}</p><span className="mt-1 inline-flex rounded-full bg-subtle px-2 py-0.5 text-xs font-bold uppercase text-muted">{record.subject_type === 'ip' ? 'IP' : record.subject_type === 'phone' ? '手机' : '邮箱'}</span></td>
+                    <td className="px-5 py-4 text-lg font-bold text-ink">{record.hits ?? 0}</td>
+                    <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.window_started_at)}</td>
+                    <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.updated_at)}</td>
+                    <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.blocked_until)}</td>
+                    <td className="px-5 py-4"><span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', active ? 'bg-warning-subtle text-warning' : 'bg-subtle text-muted')}><Clock3 size={13} />{formatRemaining(record, now)}</span></td>
                     <td className="px-5 py-4"><button type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</button></td>
                   </tr>
                 );
               })}
-              {!cooldowns.length ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-sage-400"><Activity className="mx-auto mb-3" size={30} />暂无符合条件的验证码冷却记录</td></tr> : null}
+              {!cooldowns.length ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-muted"><Activity className="mx-auto mb-3" size={30} />暂无符合条件的验证码冷却记录</td></tr> : null}
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col gap-3 border-t border-sage-100 p-4 text-sm text-sage-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</button>
@@ -848,18 +729,18 @@ export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publi
   const draft = selected.find((item) => item.status === 'draft');
   useEffect(() => {
     const source = draft || selected.find((item) => item.status === 'published');
-    setForm({ title: source?.title || (type === 'terms' ? 'ROSM Pass 使用条款' : 'ROSM Pass 隐私政策'), content: source?.content || '' });
+    setForm({ title: source?.title || (type === 'terms' ? 'Rosemary Epass 使用条款' : 'Rosemary Epass 隐私政策'), content: source?.content || '' });
   }, [type, draft?.id, documents]);
   return (
     <div className="space-y-6">
       <SectionHeader title="使用条款与隐私政策" description="保存形成下一版本草稿；发布后立即成为当前版本，并要求用户在后续登录时重新明确同意。" />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="glass-card rounded-2xl p-6">
-          <div className="mb-5 flex gap-2">{[['terms', '使用条款'], ['privacy', '隐私政策']].map(([value, label]) => <button key={value} type="button" onClick={() => setType(value)} className={cn('rounded-xl px-4 py-2 text-sm font-bold', type === value ? 'bg-sage-600 text-white' : 'bg-sage-100 text-sage-600')}>{label}</button>)}</div>
-          <div className="space-y-4"><input className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /><textarea className="input-field min-h-[520px] font-mono text-sm leading-6" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></div>
-          <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</button><button type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</button>{draft ? <button type="button" className="rounded-xl bg-sage-900 px-5 py-3 font-bold text-white" onClick={() => void safely(async () => { const approved = await confirm({ title: `发布协议版本 ${draft.version}`, message: '发布后将立即成为当前版本，历史版本不可覆盖，所有用户下次登录时需要重新明确同意。', confirmLabel: '确认发布', tone: 'warning' }); if (!approved) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</button> : null}</div>
+        <div className="surface-panel rounded-panel p-6">
+          <SelectionGroup value={type} label="协议类型" className="mb-6 epass-compact-methods">{[['terms', '使用条款'], ['privacy', '隐私政策']].map(([value, label]) => <button key={value} type="button" aria-pressed={type === value} onClick={() => setType(value)}>{label}</button>)}</SelectionGroup>
+          <SelectionContent value={type} index={type === 'terms' ? 0 : 1} className="space-y-6"><ConfigField label="协议标题"><input className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></ConfigField><ConfigField label="协议正文"><textarea className="input-field min-h-[520px] text-sm leading-7" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></ConfigField></SelectionContent>
+          <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</button><button type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</button>{draft ? <button type="button" className="btn-secondary" onClick={() => void safely(async () => { const approved = await confirm({ title: `发布协议版本 ${draft.version}`, message: '发布后将立即成为当前版本，历史版本不可覆盖，所有用户下次登录时需要重新明确同意。', confirmLabel: '确认发布', tone: 'warning' }); if (!approved) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</button> : null}</div>
         </div>
-        <aside className="glass-card h-fit rounded-2xl p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{selected.map((item) => <button key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-xl border border-sage-100 p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-green-600' : 'text-amber-600')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-sage-400">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></button>)}</div></aside>
+        <aside className="surface-panel h-fit rounded-panel p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{!selected.length && <p className="text-sm text-muted">暂无版本记录。保存草稿后会显示在这里。</p>}{selected.map((item) => <button key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-control border border-line p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-success' : 'text-warning')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-muted">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></button>)}</div></aside>
       </div>
     </div>
   );
@@ -897,11 +778,11 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         )}
       />
 
-      <div className="glass-card rounded-2xl p-4">
+      <div className="surface-panel rounded-panel p-4">
         <div className="flex flex-col gap-4 md:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400" size={18} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索昵称或邮箱..." className="input-field pl-10" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+            <input onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败'); } }} aria-label="搜索用户" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索昵称或邮箱..." className="input-field pl-10" />
           </div>
           <button type="button" className="btn-secondary" onClick={() => void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败')}>
             查询
@@ -909,45 +790,45 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         </div>
       </div>
 
-      <div className="glass-card overflow-hidden rounded-2xl">
-        <div className="overflow-x-auto">
+      <div className="surface-panel overflow-hidden rounded-panel">
+        <div className="overflow-x-auto" role="region" aria-label="数据表格，可横向滚动" tabIndex={0}>
           <table className="min-w-[760px] w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-sage-100 bg-sage-50/50">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">用户</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">状态</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">角色</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">用户 ID</th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-sage-500">操作</th>
+              <tr className="border-b border-line bg-canvas">
+                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">用户</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">状态</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">角色</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">用户 ID</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-sage-50">
+            <tbody className="divide-y divide-line">
               {users.map((user, index) => (
-                <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-sage-50/60" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
+                <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-canvas" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
                   <td className="px-6 py-4">
-                    <p className="text-sm font-semibold text-sage-900">{cleanDisplayName(user.nickname, user.email || '-')}</p>
-                    <p className="text-xs text-sage-400">{user.email || '-'}</p>
+                    <button type="button" className="epass-table-link" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>{cleanDisplayName(user.nickname, user.email || '-')}<span className="sr-only">，查看用户详情</span></button>
+                    <p className="text-xs text-muted">{user.email || '-'}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', user.account_status === 'banned' ? 'bg-red-100 text-red-700' : user.is_email_verified ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
+                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', user.account_status === 'banned' ? 'bg-danger-subtle text-danger' : user.is_email_verified ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning')}>
                       {user.account_status === 'banned' ? '已封禁' : user.is_email_verified ? '已验证' : '待验证'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
                       {(user.roles || []).map((role) => (
-                        <span key={role} className="rounded-full bg-sage-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sage-700">
+                        <span key={role} className="rounded-full bg-subtle px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ink">
                           {role}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-sage-400">{user.id || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-muted">{user.id || '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-sage-200 bg-white text-sage-600 transition-colors hover:bg-sage-50"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-line bg-surface text-muted transition-colors hover:bg-canvas"
                         aria-label={`编辑 ${cleanDisplayName(user.nickname, user.email || '-')}`}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -955,11 +836,11 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                           setEditingRoles((user.roles || []).join(', '));
                         }}
                       >
-                        <Pencil size={16} />
+                        <Pencil size={20} />
                       </button>
                       <button
                         type="button"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 transition-colors hover:bg-red-50"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-danger bg-surface text-danger transition-colors hover:bg-danger-subtle"
                         aria-label={`删除 ${cleanDisplayName(user.nickname, user.email || '-')}`}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -978,7 +859,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                           }, '删除用户失败');
                         }}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={20} />
                       </button>
                     </div>
                   </td>
@@ -986,13 +867,13 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
               ))}
               {!users.length && (
                 <tr>
-                  <td colSpan="5" className="px-6 py-10 text-center text-sm text-sage-400">暂无用户数据</td>
+                  <td colSpan="5" className="px-6 py-10 text-center text-sm text-muted">暂无用户数据</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col gap-3 border-t border-sage-100 p-4 text-sm text-sage-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 位用户</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => loadUsers({ page: pagination.page - 1, search }), '用户数据加载失败')}>
@@ -1005,8 +886,8 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         </div>
       </div>
 
-      {createModalOpen && (
-        <Modal
+      <AnimatePresence>{createModalOpen && (
+        <Modal key="createModalOpen"
           title="添加新用户"
           onClose={() => setCreateModalOpen(false)}
           actions={(
@@ -1017,6 +898,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
               <button
                 type="button"
                 className="btn-primary"
+                disabled={!evaluatePassword(createForm.password).ok}
                 onClick={() =>
                   void safely(async () => {
                     await createUser(createForm);
@@ -1037,36 +919,29 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           )}
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <input
-              className="input-field"
-              placeholder="邮箱"
+            <ConfigField label="邮箱"><input
+              className="input-field" type="email"
+              placeholder="name@example.com"
               value={createForm.email}
               onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))}
-            />
-            <input
+            /></ConfigField>
+            <ConfigField label="昵称"><input
               className="input-field"
-              placeholder="昵称"
               value={createForm.nickname}
               onChange={(event) => setCreateForm((current) => ({ ...current, nickname: event.target.value }))}
-            />
-            <input
-              className="input-field md:col-span-2"
-              placeholder="初始密码"
-              value={createForm.password}
-              onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))}
-            />
-            <input
-              className="input-field md:col-span-2"
-              placeholder="角色，用逗号分隔"
+            /></ConfigField>
+            <NewPasswordField className="md:col-span-2" label="初始密码" value={createForm.password} personalInfo={[createForm.nickname, createForm.email]} onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))} />
+            <ConfigField label="角色（逗号分隔）"><input
+              className="input-field"
               value={createForm.roles}
               onChange={(event) => setCreateForm((current) => ({ ...current, roles: event.target.value }))}
-            />
+            /></ConfigField>
           </div>
         </Modal>
-      )}
+      )}</AnimatePresence>
 
-      {editingUser && (
-        <Modal
+      <AnimatePresence>{editingUser && (
+        <Modal key="editingUser"
           title={`编辑权限 · ${cleanDisplayName(editingUser.nickname, editingUser.email || '-')}`}
           onClose={() => setEditingUser(null)}
           actions={(
@@ -1093,7 +968,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
               {(editingUser.roles || []).map((role) => (
-                <span key={role} className="rounded-full bg-sage-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sage-700">
+                <span key={role} className="rounded-full bg-subtle px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ink">
                   {role}
                 </span>
               ))}
@@ -1106,10 +981,10 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
             />
           </div>
         </Modal>
-      )}
+      )}</AnimatePresence>
 
-      {viewingUser && (
-        <Modal title={`用户详情 · ${cleanDisplayName(viewingUser.nickname, viewingUser.email || '-')}`} onClose={() => setViewingUser(null)} actions={<button type="button" className="btn-secondary" onClick={() => setViewingUser(null)}>关闭</button>}>
+      <AnimatePresence>{viewingUser && (
+        <Modal key="viewingUser" title={`用户详情 · ${cleanDisplayName(viewingUser.nickname, viewingUser.email || '-')}`} onClose={() => setViewingUser(null)} actions={<button type="button" className="btn-secondary" onClick={() => setViewingUser(null)}>关闭</button>}>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             {[
               ['用户 ID', viewingUser.id], ['注册时间', viewingUser.created_at ? new Date(viewingUser.created_at).toLocaleString('zh-CN') : '-'],
@@ -1117,15 +992,15 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
               ['手机号', viewingUser.phone_number || '-'], ['手机验证', viewingUser.is_phone_verified ? '已验证' : '未验证'],
               ['通行密钥', `${viewingUser.passkey_count || 0} 个`], ['近期 OIDC 授权', `${viewingUser.oidc_authorization_count || 0} 次`],
               ['最近登录', viewingUser.last_login_at ? new Date(viewingUser.last_login_at).toLocaleString('zh-CN') : '-'], ['账户状态', viewingUser.account_status === 'banned' ? '已封禁' : '正常'],
-            ].map(([label, value]) => <div key={label} className="rounded-xl bg-sage-50 p-3"><p className="text-xs font-bold text-sage-400">{label}</p><p className="mt-1 break-all font-semibold text-sage-800">{value}</p></div>)}
+            ].map(([label, value]) => <div key={label} className="rounded-control bg-canvas p-3"><p className="text-xs font-bold text-muted">{label}</p><p className="mt-1 break-all font-semibold text-ink">{value}</p></div>)}
           </div>
           {viewingUser.account_status === 'banned' ? (
-            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4"><p className="text-sm text-red-700">封禁原因：{viewingUser.banned_reason || '-'}</p><button type="button" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 font-bold text-white" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</button></div>
+            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><button type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</button></div>
           ) : (
-            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50/60 p-4"><label className="text-sm font-bold text-red-700">封禁原因</label><textarea value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><button type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 font-bold text-white disabled:opacity-40" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</button></div>
+            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><label htmlFor="epass-adminpages-field-1" className="text-sm font-bold text-danger">封禁原因</label><textarea id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><button type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-control bg-danger px-4 py-2 font-bold text-on-danger disabled:opacity-40" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</button></div>
           )}
         </Modal>
-      )}
+      )}</AnimatePresence>
     </div>
   );
 }
@@ -1259,72 +1134,38 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
   }
 
   return (
-    <SettingsShell
-      icon={Key}
-      title="OIDC 接入"
-      description="集中查看协议运行参数，并通过弹窗新增或编辑客户端配置。"
-      onSubmit={(event) => event.preventDefault()}
-      actions={
-        <>
-          <Link to="/admin/oidc/docs" className="btn-secondary flex items-center gap-2">
-            <BookOpen size={18} />
-            接入文档
-          </Link>
-          <button className="btn-primary" type="button" onClick={openCreateModal}>添加应用</button>
-        </>
-      }
-    >
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <InfoRow label="Issuer" value={oidcSettings?.issuer || discovery?.issuer} />
-            <InfoRow label="授权端点" value={oidcSettings?.authorization_endpoint || discovery?.authorization_endpoint} />
-            <InfoRow label="Token 端点" value={oidcSettings?.token_endpoint || discovery?.token_endpoint} />
-            <InfoRow label="UserInfo 端点" value={oidcSettings?.userinfo_endpoint || discovery?.userinfo_endpoint} />
-            <InfoRow label="JWKS" value={oidcSettings?.jwks_uri || discovery?.jwks_uri} />
-            <InfoRow label="PKCE" value={oidcSettings?.pkce_required ? '强制 S256' : '可选'} />
-          </div>
-          <div className="rounded-3xl border border-sage-100 bg-white p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-sage-900">协议发现</h3>
-                <p className="mt-1 text-sm text-sage-500">用于确认当前对外发布的协议地址和基础能力。</p>
-              </div>
-              <button type="button" className="rounded-xl bg-sage-100 p-2.5 text-sage-600 hover:bg-sage-200" onClick={() => void safely(loadDiscovery, '协议配置加载失败')}>
-                <Globe size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-sage-400">已接入应用</p>
-          <div className="max-h-[560px] space-y-2 overflow-auto pr-1">
+    <div className="max-w-6xl space-y-8">
+      <SectionHeader title="OIDC 接入" description="管理接入 Rosemary Epass 的应用及其授权权限。" actions={<><Link to="/docs/oidc" className="btn-secondary"><BookOpen size={20} />接入文档</Link><button className="btn-primary" type="button" onClick={openCreateModal}>添加应用</button></>} />
+      <section className="surface-panel rounded-panel overflow-hidden">
+        <div className="border-b border-line px-6 py-5"><h2 className="epass-section-title">已接入应用 <span className="text-base font-sans text-muted">{oidcClients.length}</span></h2></div>
+        {!oidcClients.length && <div className="px-6 py-12"><h3 className="text-lg font-medium">尚未接入应用</h3><p className="mt-2 text-sm leading-6 text-muted">添加应用，配置回调地址与权限后即可使用 Rosemary Epass 认证。</p></div>}
+        <div className="divide-y divide-line">
             {oidcClients.map((client) => (
               <div
                 key={client.client_id}
-                className="rounded-2xl border border-sage-200 bg-white px-4 py-3 transition-all hover:bg-sage-50"
+                className="epass-client-row"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-sage-900">{client.display_name || client.client_id}</p>
-                    {client.display_name ? <p className="mt-0.5 text-[11px] text-sage-400">{client.client_id}</p> : null}
-                    <p className="mt-1 text-[11px] text-sage-400">{client.is_official ? '官方应用' : '第三方应用'}</p>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1 basis-40">
+                    <p className="text-sm font-semibold text-ink">{client.display_name || client.client_id}</p>
+                    {client.display_name ? <p className="mt-0.5 text-xs text-muted">{client.client_id}</p> : null}
+                    <p className="mt-1 text-xs text-muted">{client.is_official ? '官方应用' : '第三方应用'}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', client.is_active === false ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700')}>
+                    <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', client.is_active === false ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success')}>
                       {client.is_active === false ? '停用' : '启用'}
                     </span>
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sage-200 bg-white text-sage-600 hover:bg-sage-50"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface text-muted hover:bg-canvas"
                       aria-label={`编辑 ${client.client_id}`}
                       onClick={() => openEditModal(client)}
                     >
-                      <Pencil size={14} />
+                      <Pencil size={20} />
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-danger bg-surface text-danger hover:bg-danger-subtle"
                       aria-label={`删除 ${client.client_id}`}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -1345,19 +1186,33 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                         }, '删除 OIDC 应用失败');
                       }}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={20} />
                     </button>
                   </div>
                 </div>
-                <p className="mt-2 line-clamp-2 text-xs text-sage-400">{(client.redirect_uris || []).join(', ') || '未配置 redirect URI'}</p>
+                <p className="mt-3 break-all text-sm leading-6 text-muted">{(client.redirect_uris || []).join(', ') || '未配置 redirect URI'}</p>
               </div>
             ))}
-          </div>
         </div>
-      </div>
+      </section>
+      <details className="epass-disclosure">
+        <summary>协议与端点</summary>
+        <div className="space-y-6 py-6">
+          <p className="text-sm text-muted">当前对外发布的协议地址与认证能力。</p>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InfoRow label="Issuer" value={oidcSettings?.issuer || discovery?.issuer} />
+            <InfoRow label="授权端点" value={oidcSettings?.authorization_endpoint || discovery?.authorization_endpoint} />
+            <InfoRow label="Token 端点" value={oidcSettings?.token_endpoint || discovery?.token_endpoint} />
+            <InfoRow label="UserInfo 端点" value={oidcSettings?.userinfo_endpoint || discovery?.userinfo_endpoint} />
+            <InfoRow label="JWKS" value={oidcSettings?.jwks_uri || discovery?.jwks_uri} />
+            <InfoRow label="PKCE" value={oidcSettings?.pkce_required == null ? '未提供' : oidcSettings.pkce_required ? '强制 S256' : '可选'} />
+          </div>
+          <button type="button" className="btn-secondary" onClick={() => void safely(loadDiscovery, '协议配置加载失败')}><RefreshCw size={20} />刷新协议发现</button>
+        </div>
+      </details>
 
-      {editorOpen && (
-        <Modal
+      <AnimatePresence>{editorOpen && (
+        <Modal key="editorOpen" className="epass-dialog-wide"
           title={editingClientId ? `编辑应用 · ${editingClientId}` : '添加应用'}
           onClose={() => setEditorOpen(false)}
           actions={(
@@ -1397,62 +1252,62 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
-              <div className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
+            <div className="rounded-panel border border-line bg-canvas p-4">
+              <div className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
                 <span>启用 Web</span>
                 <RosemaryCheckbox checked={Boolean(oidcForm.enable_web)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_web: checked }))} ariaLabel="启用 Web" />
               </div>
-              <p className="mt-2 text-xs leading-5 text-sage-500">Web 使用 HTTPS 或 loopback 回调。仅 Web 启用时可选择机密客户端。</p>
-              <textarea rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
+              <p className="mt-2 text-xs leading-5 text-muted">Web 使用 HTTPS 或 loopback 回调。仅 Web 启用时可选择机密客户端。</p>
+              <textarea aria-label="Web 回调地址（每行一条）" rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
             </div>
 
-            <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
-              <div className="flex items-center justify-between gap-3 text-sm font-bold text-sage-800">
+            <div className="rounded-panel border border-line bg-canvas p-4">
+              <div className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
                 <span>启用 App</span>
                 <RosemaryCheckbox checked={Boolean(oidcForm.enable_app)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_app: checked }))} ariaLabel="启用 App" />
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs leading-5 text-sage-500">Public 直连使用自定义 scheme；服务端交接使用上方 HTTPS 回调并可保持机密客户端。</p>
+                <p className="text-xs leading-5 text-muted">Public 直连使用自定义 scheme；服务端交接使用上方 HTTPS 回调并可保持机密客户端。</p>
                 <button type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
                   <Smartphone size={14} />
                   生成
                 </button>
               </div>
-              <input className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} />
+              <input aria-label="App 回调地址" className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="space-y-6">
             <ConfigField label="Scopes">
-              <div className="grid max-h-44 grid-cols-1 gap-2 overflow-y-auto rounded-2xl border border-sage-100 bg-sage-50/70 p-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 rounded-panel border border-line bg-canvas p-3 sm:grid-cols-2">
                 {OIDC_SCOPE_OPTIONS.map((scope) => (
                   <RosemaryCheckbox
                       key={scope.value}
                       checked={scopeSet.has(scope.value)}
                       onCheckedChange={(checked) => toggleScope(scope.value, checked)}
-                      className="rounded-xl bg-white px-3 py-2"
+                      className="rounded-control bg-surface px-3 py-2"
                     >
                     <span>
-                      <span className="block text-sm font-semibold text-sage-800">{scope.label}</span>
-                      <span className="block text-xs leading-4 text-sage-500">{scope.description}</span>
+                      <span className="block text-sm font-semibold text-ink">{scope.label}</span>
+                      <span className="block text-xs leading-4 text-muted">{scope.description}</span>
                     </span>
                   </RosemaryCheckbox>
                 ))}
               </div>
             </ConfigField>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <ConfigField label="Grant Types">
                 <textarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
               </ConfigField>
-              <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-4">
-                <p className="text-sm font-bold text-sage-800">Client Secret</p>
-                <p className="mt-2 text-xs leading-5 text-sage-500">
+              <div className="rounded-panel border border-line bg-canvas p-4">
+                <p className="text-sm font-bold text-ink">Client Secret</p>
+                <p className="mt-2 text-xs leading-5 text-muted">
                   {editingClientId
                     ? '现有密钥不会显示。需要更换时勾选轮换，保存后仅展示一次新密钥。'
                     : '机密客户端由服务端自动生成 256 位随机密钥，保存后仅展示一次。'}
                 </p>
                 {editingClientId && oidcForm.is_confidential ? (
-                  <RosemaryCheckbox className="mt-3 text-sage-700" checked={Boolean(oidcForm.generate_client_secret)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, generate_client_secret: checked }))}>
+                  <RosemaryCheckbox className="mt-3 text-ink" checked={Boolean(oidcForm.generate_client_secret)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, generate_client_secret: checked }))}>
                     保存时安全轮换密钥
                   </RosemaryCheckbox>
                 ) : null}
@@ -1460,7 +1315,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-5 rounded-2xl border border-sage-100 bg-sage-50/80 p-4">
+          <div className="flex flex-wrap gap-5 rounded-panel border border-line bg-canvas p-4">
             <RosemaryCheckbox checked={oidcForm.is_official} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, is_official: checked }))}>
               官方应用
             </RosemaryCheckbox>
@@ -1479,15 +1334,15 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             <RosemaryCheckbox checked={oidcForm.is_active} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, is_active: checked }))}>
               启用应用
             </RosemaryCheckbox>
-            <p className="basis-full text-xs leading-5 text-sage-500">
+            <p className="basis-full text-xs leading-5 text-muted">
               同一个包名可以同时启用 Web/App。服务端交接模式可使用机密客户端和 HTTPS 回调；Public 直连模式必须关闭机密客户端并使用自定义 scheme。
             </p>
           </div>
         </Modal>
-      )}
+      )}</AnimatePresence>
 
-      {oneTimeSecret && (
-        <Modal
+      <AnimatePresence>{oneTimeSecret && (
+        <Modal key="oneTimeSecret"
           title="复制 Client Secret"
           onClose={discardOneTimeSecret}
           actions={(
@@ -1498,21 +1353,21 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
           )}
         >
           <div className="space-y-4">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+            <div className="rounded-panel border border-warning bg-warning-subtle px-4 py-3 text-sm leading-6 text-warning">
               这是应用 <strong>{oneTimeSecret.clientId}</strong> 的新密钥。服务端只保存哈希，关闭后无法再次查看；请立即复制到接入方服务器的密钥管理系统。
             </div>
-            <code className="block break-all rounded-2xl border border-sage-200 bg-sage-950 p-4 font-mono text-sm leading-6 text-white" data-sensitive="true">
+            <code className="block break-all rounded-panel border border-line bg-subtle p-4 font-mono text-sm leading-6 text-ink" data-sensitive="true">
               {oneTimeSecret.value}
             </code>
-            <p className="text-xs leading-5 text-sage-500">生产环境请仅通过 HTTPS 管理页面操作。复制成功后，此页面中的明文会立即销毁。</p>
+            <p className="text-xs leading-5 text-muted">生产环境请仅通过 HTTPS 管理页面操作。复制成功后，此页面中的明文会立即销毁。</p>
           </div>
         </Modal>
-      )}
-    </SettingsShell>
+      )}</AnimatePresence>
+    </div>
   );
 }
 
-export function AdminOidcDocsPage({ discovery, oidcSettings }) {
+function OidcDocsContent({ discovery, oidcSettings }) {
   const issuer = oidcSettings?.issuer || discovery?.issuer || '';
   const authorizationEndpoint = oidcSettings?.authorization_endpoint || discovery?.authorization_endpoint || '';
   const tokenEndpoint = oidcSettings?.token_endpoint || discovery?.token_endpoint || '';
@@ -1527,11 +1382,11 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
   const docsMarkdown = [
     '# OIDC 接入文档',
     '',
-    '面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。',
+    '通过 OIDC 接入 Rosemary Epass，完成登录、授权与会话管理。',
     '',
     '## 当前生效参数',
     '',
-    '以下内容来自当前后台已鉴权读取到的运行配置，可直接提供给接入方使用。',
+    '以下为当前服务提供的运行参数，接入时请核对地址与认证要求。',
     '',
     `- Issuer：${issuer}`,
     `- 授权端点：${authorizationEndpoint}`,
@@ -1540,7 +1395,7 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     `- JWKS：${jwksUri}`,
     `- Introspect：${introspectionEndpoint}`,
     `- Revoke：${revocationEndpoint}`,
-    `- PKCE 要求：${oidcSettings?.pkce_required ? '必须使用 S256' : '当前未强制'}`,
+    `- PKCE 要求：${oidcSettings?.pkce_required == null ? '未提供' : oidcSettings.pkce_required ? '必须使用 S256' : '当前未强制'}`,
     `- Access Token TTL：${accessTokenTtl ? `${accessTokenTtl} 秒` : ''}`,
     `- Refresh Token TTL：${refreshTokenTtl ? `${refreshTokenTtl} 秒` : ''}`,
     `- JWT Issuer：${oidcSettings?.jwt_issuer || ''}`,
@@ -1574,7 +1429,7 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     '',
     `SDK 地址：${FLUTTER_SDK_GITHUB_URL}`,
     '',
-    '移动端 Flutter 应用建议使用 ROSM Passport Flutter SDK，以原生 Rosemary 风格页面完成登录和授权确认，不需要跳转到 Web 登录页。生产业务应用推荐使用服务端交接模式：SDK 只取得授权码并交给接入方服务器，接入方服务器作为机密客户端换 token 并创建业务会话。',
+    '移动端 Flutter 应用建议使用 Rosemary Epass Flutter SDK，以原生 Rosemary 风格页面完成登录和授权确认，不需要跳转到 Web 登录页。生产业务应用推荐使用服务端交接模式：SDK 只取得授权码并交给接入方服务器，接入方服务器作为机密客户端换 token 并创建业务会话。',
     '',
     '管理端配置建议：',
     '',
@@ -1591,7 +1446,10 @@ export function AdminOidcDocsPage({ discovery, oidcSettings }) {
     '```yaml',
     'dependencies:',
     '  rosm_passport_flutter:',
-    `    git: ${FLUTTER_SDK_GITHUB_URL}`,
+    '    git:',
+    '      url: https://github.com/Foodie05/rosemary_passport.git',
+    '      ref: v0.9.0',
+    '      path: packages/rosm_passport_flutter',
     '```',
     '',
     'Flutter 侧示例：',
@@ -1626,8 +1484,8 @@ final appSession = result?.serverPayload;`,
     '- `serverHandoffEndpoint` 不是传统浏览器 OIDC callback。传统 callback 接收 query 里的 `code/state`；SDK complete endpoint 接收 App 发来的 JSON POST。',
     '- 建议提供 `POST /auth/rosm/sdk/start` 创建登录 challenge，返回 `state`、`nonce`、`client_id`、`redirect_uri`、`scope` 和 complete endpoint。',
     '- `POST /auth/rosm/sdk/complete` 必须校验 challenge 未过期、未消费、与当前设备/会话绑定，并校验 `issuer`、`client_id`、`redirect_uri`、`scope`、`state`、`nonce` 都匹配。',
-    '- 服务器用 `code`、`code_verifier`、`client_secret` 调用 ROSM token 端点；随后用 JWKS 校验 ID Token 签名和 `iss`、`aud`、`exp`、`iat`、`nonce`。',
-    '- 授权码和 challenge 都按一次性使用处理。完成后由接入方服务器签发自己的 App session；不要把 `client_secret` 返回给 App，通常也不要把 ROSM refresh token 下发到 App。',
+    '- 服务器用 `code`、`code_verifier`、`client_secret` 调用 Rosemary Epass token 端点；随后用 JWKS 校验 ID Token 签名和 `iss`、`aud`、`exp`、`iat`、`nonce`。',
+    '- 授权码和 challenge 都按一次性使用处理。完成后由接入方服务器签发自己的 App session；不要把 `client_secret` 返回给 App，通常也不要把 Rosemary Epass refresh token 下发到 App。',
     '',
     '```json',
     `{
@@ -1716,27 +1574,27 @@ Authorization: Bearer ACCESS_TOKEN`,
   }
 
   return (
-    <div className="min-h-dvh bg-sage-50 p-4 sm:p-6 lg:p-10">
+    <div className="epass-doc-body">
       <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="OIDC 接入文档"
-        description="面向接入方的完整中文说明，包含协议概念、当前实现、典型配置与最佳实践。管理员登录后即可直接查看生效参数，无需再翻服务器文件。"
+        description="通过 OIDC 接入 Rosemary Epass，完成登录、授权与会话管理。"
         actions={(
           <>
             <button type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
               {copying ? '复制中...' : '复制为 MD'}
             </button>
-            <Link to="/admin/oidc/docs/flutter-sdk" className="btn-primary">
+            <Link to="/docs/flutter-sdk" className="btn-primary">
               Flutter SDK 接入
             </Link>
           </>
         )}
       />
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">当前生效参数</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">以下内容来自当前后台已鉴权读取到的运行配置，可直接提供给接入方使用。</p>
+          <h2 id="oidc-parameters" tabIndex={-1} className="text-lg font-bold text-ink">当前生效参数</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">以下为当前服务提供的运行参数，接入时请核对地址与认证要求。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="Issuer" value={issuer} />
@@ -1746,7 +1604,7 @@ Authorization: Bearer ACCESS_TOKEN`,
           <InfoRow label="JWKS" value={jwksUri} />
           <InfoRow label="Introspect" value={introspectionEndpoint} />
           <InfoRow label="Revoke" value={revocationEndpoint} />
-          <InfoRow label="PKCE 要求" value={oidcSettings?.pkce_required ? '必须使用 S256' : '当前未强制'} />
+          <InfoRow label="PKCE 要求" value={oidcSettings?.pkce_required == null ? '未提供' : oidcSettings.pkce_required ? '必须使用 S256' : '当前未强制'} />
           <InfoRow label="Access Token TTL" value={accessTokenTtl ? `${accessTokenTtl} 秒` : ''} />
           <InfoRow label="Refresh Token TTL" value={refreshTokenTtl ? `${refreshTokenTtl} 秒` : ''} />
           <InfoRow label="JWT Issuer" value={oidcSettings?.jwt_issuer || ''} />
@@ -1754,15 +1612,15 @@ Authorization: Bearer ACCESS_TOKEN`,
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">1. 什么是 OIDC</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">OIDC 是建立在 OAuth 2.0 之上的身份层协议。OAuth 2.0 解决“授权访问资源”，OIDC 进一步解决“确认用户是谁”。典型流程是应用把用户带到身份提供方登录，身份提供方确认身份后返回授权码，应用再用授权码换取令牌并读取用户资料。</p>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">在接入实践里，最常见的是授权码模式配合 PKCE。这样前端负责引导用户跳转和回调，后端负责用授权码换令牌、验证令牌并建立本地会话。</p>
+          <h2 id="oidc-overview" tabIndex={-1} className="text-lg font-bold text-ink">1. 什么是 OIDC</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">OIDC 是建立在 OAuth 2.0 之上的身份层协议。OAuth 2.0 解决“授权访问资源”，OIDC 进一步解决“确认用户是谁”。典型流程是应用把用户带到身份提供方登录，身份提供方确认身份后返回授权码，应用再用授权码换取令牌并读取用户资料。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">在接入实践里，最常见的是授权码模式配合 PKCE。这样前端负责引导用户跳转和回调，后端负责用授权码换令牌、验证令牌并建立本地会话。</p>
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">2. 当前服务支持范围</h3>
+          <h2 id="oidc-capabilities" tabIndex={-1} className="text-lg font-bold text-ink">2. 当前服务支持范围</h2>
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <InfoRow label="已支持" value="Discovery、authorization_code、refresh_token、userinfo、jwks、introspect、revoke、PKCE S256、RS256" />
             <InfoRow label="id_token" value="当 scope 包含 openid 时，token 端点会返回 id_token。" />
@@ -1771,9 +1629,9 @@ Authorization: Bearer ACCESS_TOKEN`,
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">3. 典型客户端配置</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">推荐优先使用机密客户端，后端持有 <InlineCode>client_secret</InlineCode>，前端不要直接暴露。默认 scope 建议使用 <InlineCode>openid profile email phone</InlineCode>，grant type 建议启用 <InlineCode>authorization_code</InlineCode> 和 <InlineCode>refresh_token</InlineCode>。</p>
-          <div className="mt-3 space-y-3 text-sm leading-7 text-sage-600">
+          <h2 id="oidc-client-configuration" tabIndex={-1} className="text-lg font-bold text-ink">3. 典型客户端配置</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">推荐优先使用机密客户端，后端持有 <InlineCode>client_secret</InlineCode>，前端不要直接暴露。默认 scope 建议使用 <InlineCode>openid profile email phone</InlineCode>，grant type 建议启用 <InlineCode>authorization_code</InlineCode> 和 <InlineCode>refresh_token</InlineCode>。</p>
+          <div className="mt-3 space-y-3 text-sm leading-7 text-muted">
             <p><InlineCode>Client ID</InlineCode>：应用唯一标识，例如 <InlineCode>my-web-app</InlineCode></p>
             <p><InlineCode>Redirect URI</InlineCode>：必须精确登记回调地址，不能只配域名</p>
             <p><InlineCode>Scopes</InlineCode>：建议至少包含 <InlineCode>openid</InlineCode>，如需邮箱、手机号和昵称则补 <InlineCode>email</InlineCode>、<InlineCode>phone</InlineCode>、<InlineCode>profile</InlineCode></p>
@@ -1785,31 +1643,31 @@ Authorization: Bearer ACCESS_TOKEN`,
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">4. Flutter SDK 原生接入</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">Flutter 应用建议使用 ROSM Passport Flutter SDK，以原生页面完成登录、授权确认、token 交换、刷新和登出，不需要跳转到 Web 登录页。</p>
+          <h2 id="oidc-flutter" tabIndex={-1} className="text-lg font-bold text-ink">4. Flutter SDK 原生接入</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">Flutter 应用建议使用 Rosemary Epass Flutter SDK，以原生页面完成登录、授权确认、token 交换、刷新和登出，不需要跳转到 Web 登录页。</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <a className="btn-secondary" href={FLUTTER_SDK_GITHUB_URL} target="_blank" rel="noreferrer">
               查看 SDK
             </a>
-            <Link to="/admin/oidc/docs/flutter-sdk" className="btn-primary">
+            <Link to="/docs/flutter-sdk" className="btn-primary">
               打开 Flutter SDK 接入页面
             </Link>
           </div>
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">5. Web / 服务端接入步骤</h3>
-          <div className="mt-3 space-y-5 text-sm leading-7 text-sage-600">
+          <h2 id="oidc-web-integration" tabIndex={-1} className="text-lg font-bold text-ink">5. Web / 服务端接入步骤</h2>
+          <div className="mt-3 space-y-5 text-sm leading-7 text-muted">
             <div>
-              <p className="font-bold text-sage-800">步骤一：读取 Discovery</p>
+              <p className="font-bold text-ink">步骤一：读取 Discovery</p>
               <CodeBlock>{`GET ${issuer}/.well-known/openid-configuration`}</CodeBlock>
             </div>
             <div>
-              <p className="font-bold text-sage-800">步骤二：浏览器跳转到授权端点</p>
+              <p className="font-bold text-ink">步骤二：浏览器跳转到授权端点</p>
               <CodeBlock>{`${authorizationEndpoint}?response_type=code&client_id=my-web-app&redirect_uri=${encodeURIComponent('https://app.example.com/callback')}&scope=openid%20profile%20email%20phone&state=random_state&nonce=random_nonce&code_challenge=BASE64URL_SHA256&code_challenge_method=S256`}</CodeBlock>
             </div>
             <div>
-              <p className="font-bold text-sage-800">步骤三：后端交换令牌</p>
+              <p className="font-bold text-ink">步骤三：后端交换令牌</p>
               <CodeBlock>{`POST ${tokenEndpoint}
 Content-Type: application/json
 
@@ -1823,7 +1681,7 @@ Content-Type: application/json
 }`}</CodeBlock>
             </div>
             <div>
-              <p className="font-bold text-sage-800">步骤四：读取用户信息</p>
+              <p className="font-bold text-ink">步骤四：读取用户信息</p>
               <CodeBlock>{`GET ${userinfoEndpoint}
 Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
             </div>
@@ -1831,8 +1689,8 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">6. 最佳实践</h3>
-          <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
+          <h2 id="oidc-best-practices" tabIndex={-1} className="text-lg font-bold text-ink">6. 最佳实践</h2>
+          <div className="mt-3 space-y-2 text-sm leading-7 text-muted">
             <p>始终启用 PKCE，且使用 <InlineCode>S256</InlineCode>。</p>
             <p>当 <InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时务必携带 <InlineCode>nonce</InlineCode>，否则授权端点会拒绝请求。</p>
             <p>如果应用需要识别账号角色（例如 <InlineCode>admin</InlineCode>/<InlineCode>user</InlineCode>），请申请 <InlineCode>accountRule</InlineCode> scope。</p>
@@ -1846,8 +1704,8 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
         </div>
 
         <div>
-          <h3 className="text-lg font-bold text-sage-900">7. 管理员检查清单</h3>
-          <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
+          <h2 id="oidc-checklist" tabIndex={-1} className="text-lg font-bold text-ink">7. 管理员检查清单</h2>
+          <div className="mt-3 space-y-2 text-sm leading-7 text-muted">
             <p>确认上方展示的 <InlineCode>Issuer</InlineCode> 与实际公网域名一致。</p>
             <p>确认 <InlineCode>JWT Issuer</InlineCode> 与 <InlineCode>Issuer</InlineCode> 保持一致，避免第三方校验失败。</p>
             <p>确认客户端登记的 <InlineCode>Redirect URI</InlineCode> 没有拼写错误。</p>
@@ -1861,9 +1719,8 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
   );
 }
 
-export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
+function FlutterDocsContent({ discovery, oidcSettings }) {
   const issuer = oidcSettings?.issuer || discovery?.issuer || 'https://auth.example.com';
-  const webAuthnOrigin = typeof window === 'undefined' ? 'https://auth.example.com' : window.location.origin;
   const tokenEndpoint = oidcSettings?.token_endpoint || discovery?.token_endpoint || `${issuer}/oidc/token`;
   const userinfoEndpoint = oidcSettings?.userinfo_endpoint || discovery?.userinfo_endpoint || `${issuer}/oidc/userinfo`;
   const revocationEndpoint = oidcSettings?.revocation_endpoint || discovery?.revocation_endpoint || `${issuer}/oidc/revoke`;
@@ -1871,14 +1728,14 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
   const nativeApproveEndpoint = `${issuer}/api/v1/oidc/native/approve`;
 
   return (
-    <div className="min-h-dvh bg-sage-50 p-4 sm:p-6 lg:p-10">
+    <div className="epass-doc-body">
       <div className="mx-auto max-w-5xl space-y-8">
       <SectionHeader
         title="Flutter SDK 接入"
         description="面向移动端应用的原生接入说明。SDK 内置 Rosemary 风格登录 UI，应用侧使用 Dart 类和方法完成登录授权，JSON 请求由 SDK 内部处理。"
         actions={(
           <>
-            <Link to="/admin/oidc/docs" className="btn-secondary">
+            <Link to="/docs/oidc" className="btn-secondary">
               返回 OIDC 文档
             </Link>
             <a className="btn-primary" href={FLUTTER_SDK_GITHUB_URL} target="_blank" rel="noreferrer">
@@ -1888,10 +1745,10 @@ export function AdminFlutterSdkDocsPage({ discovery, oidcSettings }) {
         )}
       />
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">1. 选择客户端模式</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">推荐生产应用使用“服务端交接”模式：Flutter SDK 在 App 内完成 Rosemary 风格登录 UI 和授权确认，但 <InlineCode>client_secret</InlineCode> 仍只放在接入方自己的服务器。SDK 获取一次性授权码后，把授权码和 PKCE verifier 交给接入方服务器，由服务器作为机密客户端换取 token 并创建业务会话。</p>
+          <h2 id="flutter-client-mode" tabIndex={-1} className="text-lg font-bold text-ink">1. 选择客户端模式</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">推荐生产应用使用“服务端交接”模式：Flutter SDK 在 App 内完成 Rosemary 风格登录 UI 和授权确认，但 <InlineCode>client_secret</InlineCode> 仍只放在接入方自己的服务器。SDK 获取一次性授权码后，把授权码和 PKCE verifier 交给接入方服务器，由服务器作为机密客户端换取 token 并创建业务会话。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="Client ID" value="com.cruos.zion" />
@@ -1925,29 +1782,29 @@ Scopes:
   accountRule`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">2. 添加 SDK 依赖</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 放在当前 GitHub 仓库中，应用可以直接通过 git 依赖接入。</p>
+          <h2 id="flutter-dependencies" tabIndex={-1} className="text-lg font-bold text-ink">2. 添加 SDK 依赖</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">v0.9.0 使用官方 Rosemary Design Flutter SDK 0.3.0-prototype.2，并锁定其提交。需要 Flutter 3.44+ 和 Dart 3.12+；应用可通过 Git 标签接入。</p>
         </div>
         <CodeBlock>{`dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
+      ref: v0.9.0
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">3. 使用 SDK 内置 UI</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、手机、密码、密码二次验证、注册、忘记密码、通行密钥登录、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
+          <h2 id="flutter-sign-in-ui" tabIndex={-1} className="text-lg font-bold text-ink">3. 使用 SDK 内置 UI</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、手机、密码、密码二次验证、注册、忘记密码、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
         </div>
         <CodeBlock>{`final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer}'),
   clientId: 'com.cruos.zion',
   redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
-  webAuthnOrigin: Uri.parse('${webAuthnOrigin}'),
 );
 
 final result = await showRosmPassportSignIn(
@@ -1959,16 +1816,12 @@ final result = await showRosmPassportSignIn(
     ),
     requestCaptchaToken: () => yourCaptchaProvider(),
     enableRegistration: true,
-    authenticatePasskey: (options) async {
-      final response = await passkeyPlugin.authenticate(options.options);
-      return RosmWebAuthnCredential(response);
-    },
   ),
 );
 
 final appSession = result?.serverPayload;`}</CodeBlock>
-        <p className="text-sm leading-relaxed text-sage-600">
-          注册功能默认开启，用户可在内置 UI 中使用邮箱验证码创建 ROSM 账号，然后进入同一套授权确认和服务端交接流程。注册发码需要
+        <p className="text-sm leading-relaxed text-muted">
+          注册功能默认开启，用户可在内置 UI 中使用邮箱验证码创建 Rosemary Epass 账户，然后进入同一套授权确认和服务端交接流程。注册发码需要
           <InlineCode>requestCaptchaToken</InlineCode>
           返回有效人机验证 token；不希望开放注册的应用可以设置
           <InlineCode>enableRegistration: false</InlineCode>
@@ -1976,10 +1829,10 @@ final appSession = result?.serverPayload;`}</CodeBlock>
         </p>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">4. 接入方服务器完成换票</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">服务端交接接口由接入方实现。SDK 会把授权码、PKCE verifier、state、nonce 和 redirect URI 发给该接口；接入方服务器再带自己的 <InlineCode>client_secret</InlineCode> 调用 ROSM token 端点，校验 ID Token 后创建自己的 App 会话。</p>
+          <h2 id="flutter-server-handoff" tabIndex={-1} className="text-lg font-bold text-ink">4. 接入方服务器完成换票</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">服务端交接接口由接入方实现。SDK 会把授权码、PKCE verifier、state、nonce 和 redirect URI 发给该接口；接入方服务器再带自己的 <InlineCode>client_secret</InlineCode> 调用 Rosemary Epass token 端点，校验 ID Token 后创建自己的 App 会话。</p>
         </div>
         <CodeBlock>{`POST https://api.example.com/auth/rosm/sdk/complete
 Content-Type: application/json
@@ -2007,18 +1860,18 @@ POST ${tokenEndpoint}
 }`}</CodeBlock>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="SDK 返回" value="RosmPassportUiResult.serverPayload，内容由接入方服务器决定" />
-          <InfoRow label="ROSM Token" value="只在接入方服务器换取和校验" />
+          <InfoRow label="Rosemary Epass Token" value="只在接入方服务器换取和校验" />
           <InfoRow label="安全校验" value="校验 state、nonce、issuer、aud、过期时间与回调 URI" />
           <InfoRow label="业务会话" value="由接入方服务器签发自己的 App session" />
         </div>
-        <div className="rounded-2xl border border-sage-100 bg-sage-50/70 p-5">
-          <p className="text-sm font-bold text-sage-900">接入方服务器必须实现的契约</p>
-          <div className="mt-3 space-y-2 text-sm leading-7 text-sage-600">
+        <div className="rounded-panel border border-line bg-canvas p-5">
+          <p className="text-sm font-bold text-ink">接入方服务器必须实现的契约</p>
+          <div className="mt-3 space-y-2 text-sm leading-7 text-muted">
             <p><InlineCode>serverHandoffEndpoint</InlineCode> 不是传统浏览器 OIDC callback。传统 callback 接收 query 里的 <InlineCode>code/state</InlineCode>；SDK complete endpoint 接收 App 发来的 JSON POST。</p>
             <p>建议提供 <InlineCode>POST /auth/rosm/sdk/start</InlineCode> 创建登录 challenge，返回 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>client_id</InlineCode>、<InlineCode>redirect_uri</InlineCode>、<InlineCode>scope</InlineCode> 和 complete endpoint。</p>
             <p><InlineCode>POST /auth/rosm/sdk/complete</InlineCode> 必须校验 challenge 未过期、未消费、与当前设备/会话绑定，并校验 <InlineCode>issuer</InlineCode>、<InlineCode>client_id</InlineCode>、<InlineCode>redirect_uri</InlineCode>、<InlineCode>scope</InlineCode>、<InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode> 都匹配。</p>
-            <p>服务器用 <InlineCode>code</InlineCode>、<InlineCode>code_verifier</InlineCode>、<InlineCode>client_secret</InlineCode> 调用 ROSM token 端点；随后用 JWKS 校验 ID Token 签名和 <InlineCode>iss</InlineCode>、<InlineCode>aud</InlineCode>、<InlineCode>exp</InlineCode>、<InlineCode>iat</InlineCode>、<InlineCode>nonce</InlineCode>。</p>
-            <p>授权码和 challenge 都按一次性使用处理。完成后由接入方服务器签发自己的 App session；不要把 <InlineCode>client_secret</InlineCode> 返回给 App，通常也不要把 ROSM refresh token 下发到 App。</p>
+            <p>服务器用 <InlineCode>code</InlineCode>、<InlineCode>code_verifier</InlineCode>、<InlineCode>client_secret</InlineCode> 调用 Rosemary Epass token 端点；随后用 JWKS 校验 ID Token 签名和 <InlineCode>iss</InlineCode>、<InlineCode>aud</InlineCode>、<InlineCode>exp</InlineCode>、<InlineCode>iat</InlineCode>、<InlineCode>nonce</InlineCode>。</p>
+            <p>授权码和 challenge 都按一次性使用处理。完成后由接入方服务器签发自己的 App session；不要把 <InlineCode>client_secret</InlineCode> 返回给 App，通常也不要把 Rosemary Epass refresh token 下发到 App。</p>
           </div>
         </div>
         <CodeBlock>{`// 建议的 start 响应，由接入方服务器生成并保存 challenge
@@ -2041,10 +1894,10 @@ POST ${tokenEndpoint}
 }`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">5. 忘记密码</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">应用侧先完成人机验证，再调用 SDK 发送找回验证码。邮箱找回和手机找回都使用同一组 Dart 方法，通过 RosmPasswordRecoveryMethod 区分。</p>
+          <h2 id="flutter-password-recovery" tabIndex={-1} className="text-lg font-bold text-ink">5. 忘记密码</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">应用侧先完成人机验证，再调用 SDK 发送找回验证码。邮箱找回和手机找回都使用同一组 Dart 方法，通过 RosmPasswordRecoveryMethod 区分。</p>
         </div>
         <CodeBlock>{`await passport.sendPasswordRecoveryCode(
   account: 'user@example.com',
@@ -2064,70 +1917,38 @@ await passport.resetPasswordByCode(
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">6. 通行密钥登录与添加</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">SDK 默认内置原生通行密钥适配，会获取 WebAuthn options、调起系统通行密钥弹窗，并把 credential response 交回 ROSM 验证。接入方通常不需要手写 WebAuthn JSON 或额外接 passkey 插件。</p>
+          <h2 id="flutter-passkeys" tabIndex={-1} className="text-lg font-bold text-ink">6. 新密码与即时反馈</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">注册、找回和账户重置密码时，内置 UI 会随输入即时检查；新密码须为 8–128 个字符，并在字母、数字、符号中至少包含两类。大小写都算字母，内部空格不算符号，首尾不能有空格。常规提示只显示“不少于 8 个字符”。</p>
         </div>
-        <CodeBlock>{`final loginOptions = await passport.beginWebAuthnLogin(
-  email: 'user@example.com',
+        <CodeBlock>{`final passwordController = TextEditingController();
+// 宿主持有控制器，离开界面时 dispose。
+RosmNewPasswordField(controller: passwordController);
+final validation = const RosmPasswordPolicy().evaluate(
+  passwordController.text,
 );
+// validation.ok 控制提交；不要记录密码。`}</CodeBlock>
+        <p className="text-sm leading-relaxed text-muted">自定义界面可使用同一校验器。新密码 API 在发送 HTTP 前检查；已有密码登录保持兼容。客户端提示不评估跨网站密码复用。</p>
+      </div>
 
-final loginCredential = await authenticateRosmPasskey(loginOptions);
-
-final session = await passport.completeWebAuthnLogin(
-  email: 'user@example.com',
-  credential: loginCredential,
-);
-
-final registerOptions = await passport.beginPasskeyRegistration(
-  currentPassword: currentPassword,
-);
-
-final registerCredential = await registerRosmPasskey(registerOptions);
-
-await passport.completePasskeyRegistration(
-  credential: registerCredential,
-);`}</CodeBlock>
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
+        <div>
+          <h2 id="flutter-platform-configuration" tabIndex={-1} className="text-lg font-bold text-ink">7. 原生平台与设计适配</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">官方设计 SDK 提供平台适配的主按钮、主题和加载组件。通行证界面遵循同源语义令牌，跟随系统明暗主题、字号及减少动态效果；宿主继续管理 Navigator、输入控制器和业务会话。</p>
+        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="登录" value="beginWebAuthnLogin + completeWebAuthnLogin" />
-          <InfoRow label="添加" value="beginPasskeyRegistration + completePasskeyRegistration" />
-          <InfoRow label="注册后引导" value="postRegisterPasskeyBootstrap 为 true 时可免当前密码添加" />
-          <InfoRow label="管理" value="listPasskeys 与 deletePasskey" />
+          <InfoRow label="运行环境" value="Flutter 3.44+ / Dart 3.12+" />
+          <InfoRow label="设计 SDK" value="rosemary_reference 0.3.0-prototype.2，固定提交" />
+          <InfoRow label="版本状态" value="官方设计库仍为 Prototype；人工辅助技术验收尚未完成" />
+          <InfoRow label="通行密钥" value="当前 Flutter SDK 不包含原生 Passkey API；网站的 WebAuthn 能力独立提供" />
         </div>
       </div>
 
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
+      <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h3 className="text-lg font-bold text-sage-900">7. 通行密钥平台配置</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">Passkey 必须绑定 HTTPS relying party 域名。移动端需要完成系统级域名关联，并让 SDK 请求 options 时携带同一个 Origin。iOS 报 “Application with identifier ... is not associated with domain ...” 时，优先检查 App ID、entitlement 与 AASA 是否完全一致并已部署生效。</p>
-        </div>
-        <CodeBlock>{`const passkeyConfig = RosmPasskeyPlatformConfig(
-  rpDomain: 'auth.cruty.cn',
-  appleTeamId: 'Y6AYA4F7T3',
-  appleBundleId: 'com.cruos.zion',
-  androidPackageName: 'com.cruos.zion',
-  androidSha256CertFingerprints: ['AA:BB:CC:...'],
-);
-
-final iosEntitlement = passkeyConfig.appleAssociatedDomain;
-final aasa = passkeyConfig.appleAppSiteAssociation(
-  includeUniversalLinks: true,
-);
-final assetLinks = passkeyConfig.androidAssetLinks();
-final assetStatement = passkeyConfig.androidAssetStatementsInclude();`}</CodeBlock>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="iOS/macOS" value="配置 Associated Domains，例如 webcredentials:auth.cruty.cn；AASA 的 webcredentials.apps 必须包含 TeamID.BundleID" />
-          <InfoRow label="Android" value="assetlinks.json 必须 200、无跳转、application/json，并声明包名与所有 SHA-256 签名证书指纹" />
-          <InfoRow label="SDK Origin" value={`webAuthnOrigin 使用服务端 WebAuthn RP 对应的 HTTPS origin，例如 ${webAuthnOrigin}`} />
-          <InfoRow label="服务端域名" value="issuer、RP ID、平台关联文件必须指向同一登录域名边界" />
-        </div>
-      </div>
-
-      <div className="glass-card space-y-6 rounded-3xl p-5 sm:p-8">
-        <div>
-          <h3 className="text-lg font-bold text-sage-900">8. Public 直连模式与端点</h3>
-          <p className="mt-2 text-sm leading-relaxed text-sage-600">如果应用明确不经过自己的服务器，可以把 OIDC client 配成 Public，并使用自定义 scheme redirect URI。此时 SDK 会在设备上换取和保存 ROSM token；生产业务 App 更推荐上面的服务端交接模式。</p>
+          <h2 id="flutter-public-endpoints" tabIndex={-1} className="text-lg font-bold text-ink">8. Public 直连模式与端点</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">如果应用明确不经过自己的服务器，可以把 OIDC client 配成 Public，并使用自定义 scheme redirect URI。此时 SDK 会在设备上换取和保存 Rosemary Epass token；生产业务 App 更推荐上面的服务端交接模式。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="Native Start" value={nativeStartEndpoint} />
@@ -2151,15 +1972,15 @@ final userInfo = await passport.userInfo();
 await passport.signOut();`}</CodeBlock>
       </div>
 
-      <div className="glass-card space-y-4 rounded-3xl p-5 sm:p-8">
-        <h3 className="text-lg font-bold text-sage-900">9. 检查清单</h3>
-        <div className="space-y-2 text-sm leading-7 text-sage-600">
+      <div className="surface-panel space-y-4 rounded-panel p-5 sm:p-8">
+        <h2 id="flutter-checklist" tabIndex={-1} className="text-lg font-bold text-ink">9. 检查清单</h2>
+        <div className="space-y-2 text-sm leading-7 text-muted">
           <p>生产推荐使用服务端交接：Flutter SDK 设置 <InlineCode>serverHandoff</InlineCode>，接入方服务器保存 <InlineCode>client_secret</InlineCode> 并完成 token exchange。</p>
           <p>机密客户端的 <InlineCode>Redirect URI</InlineCode> 必须是接入方服务器 HTTPS 回调，不能是移动端自定义 scheme。</p>
           <p>只有 Public 直连模式才使用自定义 scheme，例如 <InlineCode>com.cruos.zion:/oidc/callback</InlineCode>。</p>
           <p>接入方服务器必须校验 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>issuer</InlineCode>、<InlineCode>aud</InlineCode>、过期时间和 redirect URI。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
-          <p>使用通行密钥时，iOS Associated Domains、Android Digital Asset Links 与 <InlineCode>webAuthnOrigin</InlineCode> 必须指向同一个 HTTPS 登录域名边界。</p>
+          <p>升级至 v0.9.0 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
           <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
           <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>
@@ -2169,3 +1990,26 @@ await passport.signOut();`}</CodeBlock>
     </div>
   );
 }
+
+const DOC_SECTIONS = {"oidc": [["parameters", "当前生效参数"], ["overview", "1. 什么是 OIDC"], ["capabilities", "2. 当前服务支持范围"], ["client-configuration", "3. 典型客户端配置"], ["flutter", "4. Flutter SDK 原生接入"], ["web-integration", "5. Web / 服务端接入步骤"], ["best-practices", "6. 最佳实践"], ["checklist", "7. 管理员检查清单"]], "flutter": [["client-mode", "1. 选择客户端模式"], ["dependencies", "2. 添加 SDK 依赖"], ["sign-in-ui", "3. 使用 SDK 内置 UI"], ["server-handoff", "4. 接入方服务器完成换票"], ["password-recovery", "5. 忘记密码"], ["passkeys", "6. 新密码与即时反馈"], ["platform-configuration", "7. 原生平台与设计适配"], ["public-endpoints", "8. Public 直连模式与端点"], ["checklist", "9. 检查清单"]]};
+
+function DocsLayout({ children, current }) {
+  const contents = DOC_SECTIONS[current];
+  const [contentsOpen, setContentsOpen] = useState(() => window.matchMedia('(min-width: 901px)').matches);
+  return <div className="min-h-dvh">
+    <a href="#docs-main" className="epass-skip">跳到文档正文</a>
+    <header className="epass-topbar"><Brand /><ThemeToggle /></header>
+    <div className="epass-docs-shell">
+      <nav className="epass-docs-nav" aria-label="接入文档">
+        <p className="epass-eyebrow">DEVELOPER GUIDES</p>
+        <Link className="epass-nav-item" aria-current={current === 'oidc' ? 'page' : undefined} to="/docs/oidc">OIDC 接入</Link>
+        <Link className="epass-nav-item" aria-current={current === 'flutter' ? 'page' : undefined} to="/docs/flutter-sdk">Flutter SDK</Link>
+        <details className="epass-docs-contents" open={contentsOpen} onToggle={(event) => setContentsOpen(event.currentTarget.open)}><summary>本页目录</summary><div>{contents.map(([id, label]) => <a key={id} href={`#${current}-${id}`}>{label}</a>)}</div></details>
+        <Link className="epass-nav-item" to="/account">返回账户中心</Link>
+      </nav>
+      <main id="docs-main" tabIndex={-1} className="epass-docs-content">{children}</main>
+    </div><SiteFooter />
+  </div>;
+}
+export function AdminOidcDocsPage(props) { return <DocsLayout current="oidc"><OidcDocsContent {...props} /></DocsLayout>; }
+export function AdminFlutterSdkDocsPage(props) { return <DocsLayout current="flutter"><FlutterDocsContent {...props} /></DocsLayout>; }

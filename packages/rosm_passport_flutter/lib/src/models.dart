@@ -2,7 +2,7 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'models.g.dart';
 
-/// Controls the appearance of ROSM Passport's built-in Flutter screens.
+/// Controls the appearance of Rosemary Epass's built-in Flutter screens.
 enum RosmPassportThemeMode { system, light, dark }
 
 class RosmLegalDocument {

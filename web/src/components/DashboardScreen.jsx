@@ -167,7 +167,7 @@ export function DashboardScreen({
     <section className="dashboard-shell">
       <aside className="dashboard-sidebar">
         <div className="brand-card product-brand">
-          <p className="eyebrow">ROSM Passport</p>
+          <p className="eyebrow">Rosemary Epass</p>
           <h2>Admin Console</h2>
           <p>Identity administration</p>
         </div>

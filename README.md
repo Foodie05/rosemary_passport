@@ -1,10 +1,10 @@
-# Rosemary Passport
+# Rosemary Epass
 
-Rosemary Passport 是面向多应用接入的身份与单点登录服务。服务端基于 Dart Frog 和 PostgreSQL，包含标准 OIDC、WebAuthn/Passkey、用户中心、管理后台及 Flutter 接入包。
+Rosemary Epass 是面向多应用接入的身份与单点登录服务。服务端基于 Dart Frog 和 PostgreSQL，包含标准 OIDC、WebAuthn/Passkey、用户中心、管理后台及 Flutter 接入包。
 
 ## 安全与兼容能力
 
-- 密码使用 Argon2id，新增或修改密码执行 12-128 字符及泄露密码策略；历史密码仍可登录。
+- 密码使用 Argon2id，新增或修改密码执行 8–128 字符、字母/数字/符号至少两类及常见弱密码策略；历史密码仍可登录。
 - Access Token 固定为 15 分钟；Refresh Token 使用 family、单次轮换、重放检测和整族撤销。
 - 第一方刷新使用 `HttpOnly`、`Secure`、`SameSite` Cookie，并校验可信 Origin。
 - JWT 使用带 `kid` 的多密钥环；JWKS 可同时发布当前与上一把公钥。

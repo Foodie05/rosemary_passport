@@ -1,3 +1,5 @@
+import '../../lib/src/utils/epass_design.dart';
+
 import 'dart:convert';
 import 'dart:math';
 
@@ -19,7 +21,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Use GET.',
       statusCode: 405,
       title: '您要登录的应用没有正确响应',
-      description: '这个应用发起了不受支持的授权请求方式，ROSM 无法继续处理。',
+      description: '这个应用发起了不受支持的授权请求方式，Rosemary Epass 无法继续处理。',
     );
   }
 
@@ -85,7 +87,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'client_id, redirect_uri and response_type are required.',
       statusCode: 400,
       title: '您要登录的应用没有正确响应',
-      description: '当前登录请求缺少必要参数，ROSM 无法继续完成授权。',
+      description: '当前登录请求缺少必要参数，Rosemary Epass 无法继续完成授权。',
     );
   }
 
@@ -98,7 +100,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Authorization request rejected.',
       statusCode: 400,
       title: '您要登录的应用没有正确响应',
-      description: '这个应用尚未在 ROSM 中正确配置，登录流程无法继续。',
+      description: '这个应用尚未在 Rosemary Epass 中正确配置，登录流程无法继续。',
     );
   }
 
@@ -129,7 +131,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Authorization request rejected.',
       statusCode: 400,
       title: '您要登录的应用没有正确响应',
-      description: '这个应用发起的登录请求不完整或配置不正确，ROSM 无法安全地继续登录流程。',
+      description: '这个应用发起的登录请求不完整或配置不正确，Rosemary Epass 无法安全地继续登录流程。',
     );
   }
 
@@ -212,7 +214,7 @@ Future<Response> onRequest(RequestContext context) async {
       message: 'Authorization request rejected.',
       statusCode: 400,
       title: '您要登录的应用没有正确响应',
-      description: '这个应用发起的登录请求不完整或配置不正确，ROSM 无法安全地继续登录流程。',
+      description: '这个应用发起的登录请求不完整或配置不正确，Rosemary Epass 无法安全地继续登录流程。',
     );
   }
 
@@ -295,7 +297,10 @@ Response authorizationConsentPage(
   final accountCenterUrl = Uri.parse(
     context.read<AppConfig>().webBaseUrl,
   ).resolve('/account').toString();
-  final escapedTitle = _escapeHtml('是否授权登录 $clientDisplayName?');
+  final brandLogoUrl = Uri.parse(
+    context.read<AppConfig>().webBaseUrl,
+  ).resolve('/brand/rosemary.png').toString();
+  final escapedTitle = _escapeHtml('是否授权登录 $clientDisplayName？');
   final badgeLabel = isOfficial ? '官方应用' : '第三方应用';
   final escapedBadgeLabel = _escapeHtml(badgeLabel);
   final scopeListHtml = scopeLines
@@ -306,7 +311,7 @@ Response authorizationConsentPage(
     headers: {
       'content-type': 'text/html; charset=utf-8',
       'content-security-policy':
-          "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src https: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+          "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       ...headers,
     },
     body:
@@ -316,10 +321,11 @@ Response authorizationConsentPage(
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ROSM Pass</title>
+    <title>Rosemary Epass</title>
     <script>
       (function() {
         try {
+          document.documentElement.dataset.reduceMotion = String(window.localStorage.getItem('rosemary_motion') === 'reduce');
           var stored = window.localStorage.getItem('rosm_theme_preference');
           var preference = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
           var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -329,304 +335,18 @@ Response authorizationConsentPage(
         } catch (_) {}
       })();
     </script>
-    <style>
-      :root {
-        --sage-50: #f4f7f4;
-        --sage-100: #e2e9e2;
-        --sage-200: #c5d3c5;
-        --sage-400: #8ba88b;
-        --sage-500: #6e926e;
-        --sage-600: #577557;
-        --sage-700: #415841;
-        --sage-900: #161d16;
-        --page-bg:
-          radial-gradient(circle at top right, rgba(87, 117, 87, 0.16), transparent 26rem),
-          radial-gradient(circle at bottom left, rgba(139, 168, 139, 0.18), transparent 24rem),
-          var(--sage-50);
-        --card-bg: rgba(255,255,255,0.84);
-        --card-border: rgba(197,211,197,0.8);
-        --text-main: var(--sage-900);
-        --text-subtle: rgba(22,29,22,0.68);
-        --muted: var(--sage-500);
-      }
-      html[data-theme='dark'] {
-        --page-bg:
-          radial-gradient(circle at top right, rgba(110, 146, 110, 0.15), transparent 24rem),
-          radial-gradient(circle at bottom left, rgba(65, 88, 65, 0.26), transparent 24rem),
-          #0f140f;
-        --card-bg: rgba(22,29,22,0.84);
-        --card-border: rgba(65,88,65,0.8);
-        --text-main: #f4f7f4;
-        --text-subtle: rgba(226,233,226,0.72);
-        --muted: #8ba88b;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "SF Pro Display","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-        background: var(--page-bg);
-        color: var(--text-main);
-      }
-      .shell {
-        min-height: 100vh;
-        display: grid;
-        grid-template-columns: minmax(22rem, 34rem) minmax(24rem, 1fr);
-      }
-      .brand-side {
-        position: relative;
-        overflow: hidden;
-        padding: 3rem;
-        background: linear-gradient(180deg, #1a241a 0%, #101710 100%);
-        color: white;
-      }
-      html[data-theme='dark'] .brand-side {
-        background: linear-gradient(180deg, #182218 0%, #0d130d 100%);
-      }
-      .brand-side::before,
-      .brand-side::after {
-        content: "";
-        position: absolute;
-        border-radius: 999px;
-        filter: blur(90px);
-      }
-      .brand-side::before {
-        width: 20rem;
-        height: 20rem;
-        right: -7rem;
-        top: -7rem;
-        background: rgba(110, 146, 110, 0.22);
-      }
-      .brand-side::after {
-        width: 16rem;
-        height: 16rem;
-        left: -5rem;
-        bottom: -5rem;
-        background: rgba(87, 117, 87, 0.2);
-      }
-      .brand-wrap {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        min-height: calc(100vh - 6rem);
-        flex-direction: column;
-        justify-content: space-between;
-      }
-      .brand-copy h1 {
-        margin: 0 0 1rem;
-        font-size: clamp(2.2rem, 4vw, 4rem);
-        line-height: 1.06;
-        letter-spacing: -0.04em;
-      }
-      .brand-copy p {
-        margin: 0;
-        max-width: 26rem;
-        color: rgba(255,255,255,0.74);
-        line-height: 1.9;
-        font-size: 1.04rem;
-      }
-      .brand-foot {
-        font-size: 0.78rem;
-        letter-spacing: 0.24em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.36);
-      }
-      .main {
-        display: grid;
-        place-items: center;
-        padding: 2rem;
-      }
-      .panel-stack {
-        width: min(100%, 40rem);
-      }
-      .panel {
-        width: 100%;
-        border: 1px solid var(--card-border);
-        border-radius: 2rem;
-        background: var(--card-bg);
-        backdrop-filter: blur(16px);
-        box-shadow: 0 24px 60px rgba(22,29,22,0.12);
-        padding: 2rem;
-      }
-      .panel-top {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-      }
-      .switch-account {
-        flex: 0 0 auto;
-        border: 1px solid var(--card-border);
-        border-radius: 0.8rem;
-        padding: 0.55rem 0.75rem;
-        color: var(--text-subtle);
-        font-size: 0.84rem;
-        font-weight: 700;
-        text-decoration: none;
-        transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
-      }
-      .switch-account:hover {
-        border-color: var(--sage-400);
-        background: rgba(139,168,139,0.12);
-        color: var(--text-main);
-      }
-      .account-center {
-        display: flex;
-        width: fit-content;
-        align-items: center;
-        gap: 0.4rem;
-        margin: 0.8rem auto 0;
-        padding: 0.55rem 0.8rem;
-        border-radius: 0.8rem;
-        color: var(--muted);
-        font-size: 0.9rem;
-        font-weight: 700;
-        text-decoration: none;
-        transition: background 160ms ease, color 160ms ease;
-      }
-      .account-center:hover {
-        background: rgba(139,168,139,0.14);
-        color: var(--text-main);
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.9rem;
-        margin-bottom: 1.5rem;
-      }
-      .logo {
-        display: grid;
-        place-items: center;
-        width: 3rem;
-        height: 3rem;
-        border-radius: 1rem;
-        background: white;
-        box-shadow: 0 16px 32px rgba(22,29,22,0.12);
-      }
-      .logo img { width: 1.9rem; height: 1.9rem; object-fit: contain; }
-      .eyebrow {
-        margin: 0 0 0.4rem;
-        font-size: 0.78rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--muted);
-        font-weight: 700;
-      }
-      .trust-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.55rem;
-        margin-bottom: 1rem;
-        border-radius: 999px;
-        padding: 0.5rem 0.85rem;
-        font-size: 0.82rem;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        background: rgba(139,168,139,0.12);
-        color: var(--text-main);
-      }
-      .trust-icon {
-        display: inline-flex;
-        width: 1rem;
-        height: 1rem;
-      }
-      .trust-icon svg {
-        width: 1rem;
-        height: 1rem;
-        display: block;
-      }
-      .trust-icon.hidden {
-        display: none;
-      }
-      h1 {
-        margin: 0;
-        font-size: clamp(2rem, 4vw, 2.8rem);
-        line-height: 1.16;
-        letter-spacing: -0.03em;
-      }
-      .subtitle {
-        margin: 1rem 0 0;
-        color: var(--text-subtle);
-        font-size: 1.02rem;
-        line-height: 1.8;
-      }
-      .permission-head {
-        margin: 1rem 0 0.3rem;
-        color: var(--text-subtle);
-        font-size: 1.02rem;
-        line-height: 1.8;
-      }
-      .permission-list {
-        margin: 0;
-        padding-left: 1.2rem;
-        color: var(--text-main);
-        font-size: 1rem;
-        line-height: 1.85;
-      }
-      .actions {
-        display: flex;
-        gap: 0.9rem;
-        margin-top: 1.8rem;
-      }
-      .button {
-        flex: 1;
-        min-height: 3.2rem;
-        border-radius: 1rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
-        font-weight: 700;
-        transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
-      }
-      .button:hover { transform: translateY(-1px); }
-      .button[aria-disabled='true'] {
-        cursor: wait;
-        pointer-events: none;
-        opacity: 0.72;
-        transform: none;
-      }
-      .primary {
-        background: var(--sage-600);
-        color: white;
-        box-shadow: 0 16px 30px rgba(87,117,87,0.22);
-      }
-      .primary:hover { background: var(--sage-700); }
-      .secondary {
-        border: 1px solid var(--card-border);
-        background: transparent;
-        color: var(--text-main);
-      }
-      @media (max-width: 720px) {
-        .shell {
-          grid-template-columns: 1fr;
-        }
-        .brand-side {
-          padding: 2rem 1.5rem;
-        }
-        .brand-wrap {
-          min-height: auto;
-          gap: 3rem;
-        }
-        .main {
-          padding: 1rem;
-          margin-top: -1rem;
-        }
-        .panel { padding: 1.4rem; }
-        .actions { flex-direction: column; }
-      }
-    </style>
+    <style>$epassDocumentStyles</style>
   </head>
   <body>
     <div class="shell">
       <section class="brand-side">
         <div class="brand-wrap">
           <div class="brand-copy">
-            <p class="eyebrow">ROSM 授权确认</p>
-            <h1>确认应用访问范围后，再继续登录</h1>
-            <p>ROSM 会在这里明确展示应用身份与它将获得的信息，帮助你在继续前做出清楚判断。</p>
+            <p class="eyebrow">Rosemary Epass 授权确认</p>
+            <h2>你的账户，<br />由你决定如何连接。</h2>
+            <p>查看应用申请的信息，确认后继续登录。</p>
           </div>
-          <div class="brand-foot">ROSEMARY STUDIO</div>
+          <div class="brand-foot">ROSEMARY EPASS</div>
         </div>
       </section>
       <main class="main">
@@ -635,11 +355,11 @@ Response authorizationConsentPage(
             <div class="panel-top">
               <div class="brand">
                 <div class="logo">
-                  <img src="https://tianyue.s3.bitiful.net/logo/rosemary_pure.png" alt="ROSM" />
+                  <img src="${_escapeHtml(brandLogoUrl)}" alt="Rosemary Epass" />
                 </div>
                 <div>
-                  <p class="eyebrow">ROSM 授权确认</p>
-                  <strong>ROSM Pass</strong>
+                  <p class="eyebrow">Rosemary Epass 授权确认</p>
+                  <strong>Rosemary Epass</strong>
                 </div>
               </div>
               <a class="switch-account" href="${_escapeHtml(switchAccountUrl)}">切换账号</a>
@@ -653,13 +373,13 @@ Response authorizationConsentPage(
             $escapedBadgeLabel
           </div>
           <h1>$escapedTitle</h1>
-          ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 ROSM 验证你的登录状态。</p>' : '<p class="permission-head">您将授权此应用获取你的：</p><ul class="permission-list">$scopeListHtml</ul>'}
+          ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 Rosemary Epass 验证你的登录状态。</p>' : '<p class="permission-head">此应用将获得以下信息：</p><ul class="permission-list">$scopeListHtml</ul>'}
           <div class="actions">
             <a class="button secondary" href="${_escapeHtml(cancelUrl)}">取消</a>
             <a id="approve-button" class="button primary" href="${_escapeHtml(approveUrl)}">确认</a>
           </div>
           </section>
-          <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">ROSM 账号中心 <span aria-hidden="true">→</span></a>
+          <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">Rosemary Epass 账号中心 <span aria-hidden="true">→</span></a>
         </div>
       </main>
     </div>

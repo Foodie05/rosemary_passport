@@ -1,239 +1,67 @@
-import { useMemo, useState } from 'react';
-import {
-  Bell,
-  Activity,
-  Fingerprint,
-  Key,
-  LayoutDashboard,
-  LogOut,
-  Mail,
-  Menu,
-  ShieldCheck,
-  ScrollText,
-  FileText,
-  Shield,
-  Users,
-  X,
-} from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { Link, useNavigate } from '../design/NavigationMotion';
+import { AnimatePresence } from 'motion/react';
+import { useState } from 'react';
+import { Activity, BookOpen, FileText, Key, LayoutDashboard, LogOut, Menu, ShieldCheck, ScrollText, Users, Mail } from 'lucide-react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { cleanDisplayName, getInitial } from '../utils';
 import { ThemeToggle } from '../theme';
+import { Brand, SiteFooter } from './Brand';
+import { Dialog } from './Dialog';
 
-function SidebarItem({ icon: Icon, label, to, active }) {
-  return (
-    <Link to={to}>
-      <motion.div
-        whileHover={{ x: 4 }}
-        className={cn(
-          'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-300 group',
-          active ? 'bg-sage-600 text-white shadow-md shadow-sage-600/20' : 'text-sage-600 hover:bg-sage-100',
-        )}
-      >
-        <Icon size={20} className={cn(active ? 'text-white' : 'text-sage-400 group-hover:text-sage-600')} />
-        <span className="font-medium">{label}</span>
-        {active && <motion.div layoutId="sidebar-active" className="ml-auto h-1.5 w-1.5 rounded-full bg-white" />}
-      </motion.div>
-    </Link>
-  );
+const menuItems = [
+  { icon: LayoutDashboard, label: '运营看板', to: '/admin/dashboard', group: '管理' },
+  { icon: Users, label: '用户管理', to: '/admin/users' },
+  { icon: Key, label: '应用接入', to: '/admin/oidc' },
+  { icon: Activity, label: '状态管理', to: '/admin/status' },
+  { icon: Mail, label: '服务配置', to: '/admin/service', group: '设置' },
+  { icon: ScrollText, label: '安全策略', to: '/admin/security' },
+  { icon: FileText, label: '协议管理', to: '/admin/legal' },
+  { icon: ShieldCheck, label: '账户安全', to: '/admin/account' },
+];
+
+function Navigation({ close }) {
+  const { pathname } = useLocation();
+  return <nav aria-label="管理控制台">{menuItems.map(({ icon: Icon, label, to, group }) => <div key={to}>
+    {group && <p className="epass-nav-group">{group}</p>}
+    <Link to={to} className="epass-nav-item" aria-current={pathname === to || pathname.startsWith(`${to}/`) ? 'page' : undefined} onClick={close}><Icon size={20} aria-hidden="true" /><span>{label}</span></Link>
+  </div>)}</nav>;
 }
 
 export function AdminLayout({ session, logout, mustBindEmail }) {
-  const location = useLocation();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const menuItems = useMemo(
-    () =>
-      [
-        { icon: LayoutDashboard, label: '运营看板', to: '/admin/dashboard' },
-        { icon: ShieldCheck, label: '账户安全', to: '/admin/account' },
-        { icon: Mail, label: '服务配置', to: '/admin/service' },
-        { icon: Users, label: '用户管理', to: '/admin/users' },
-        { icon: Activity, label: '状态管理', to: '/admin/status' },
-        { icon: Key, label: 'OCID', to: '/admin/oidc' },
-        { icon: ScrollText, label: '安全策略', to: '/admin/security' },
-        { icon: FileText, label: '协议管理', to: '/admin/legal' },
-      ],
-    [],
-  );
-
-  const displayName = cleanDisplayName(session.user?.nickname, session.user?.email || 'Admin');
-
-  const sidebar = (
-    <>
-      <div className="mb-10 flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-600 text-white shadow-lg shadow-sage-600/20">
-          <Shield size={24} />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight text-sage-900">ROSM Admin</h1>
-          <p className="text-xs font-medium text-sage-500">身份与接入控制台</p>
-        </div>
-      </div>
-
-      <nav className="flex-1 space-y-1">
-        {menuItems.map((item) => (
-          <SidebarItem key={item.to} {...item} active={location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)} />
-        ))}
-      </nav>
-
-      <div className="mt-auto border-t border-sage-100 pt-6">
-        <button
-          onClick={() => {
-            logout();
-            navigate('/login');
-          }}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sage-500 transition-all duration-300 hover:bg-red-50 hover:text-red-500"
-          type="button"
-        >
-          <LogOut size={20} />
-          <span className="font-medium">退出登录</span>
-        </button>
-      </div>
-    </>
-  );
-
-  return (
-    <div className="flex min-h-dvh bg-sage-50">
-      <aside className="sticky top-0 hidden h-dvh w-64 flex-col overflow-y-auto border-r border-sage-200 bg-white/50 p-6 backdrop-blur-xl lg:flex">
-        {sidebar}
-      </aside>
-
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-sage-200 bg-white/50 px-4 py-2 backdrop-blur-md sm:px-6">
-          <div className="flex items-center gap-4 lg:hidden">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-sage-600" type="button">
-              <Menu size={24} />
-            </button>
-            <span className="font-bold text-sage-900">ROSM</span>
-          </div>
-
-          <div className="hidden items-center rounded-full border border-sage-200 bg-sage-100/50 px-4 py-1.5 md:flex">
-            <span className="text-sm text-sage-500">
-              {mustBindEmail ? '当前账号需先完成邮箱绑定后再继续高级管理。' : '身份、接入、安全与审计统一管理。'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <ThemeToggle className="hidden md:inline-flex" />
-            <button className="relative rounded-full p-2 text-sage-500 transition-colors hover:bg-sage-100" type="button">
-              <Bell size={20} />
-              {mustBindEmail && <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-amber-500" />}
-            </button>
-            <div className="mx-1 h-8 w-px bg-sage-200" />
-            <Link to="/admin/account" className="group flex items-center gap-3 pl-2">
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold leading-none text-sage-900">{displayName}</p>
-                <p className="mt-1 text-xs text-sage-500">{(session.user?.roles || []).join(', ') || '成员'}</p>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-sage-200 text-sm font-bold text-sage-700 shadow-sm transition-all group-hover:border-sage-300">
-                {getInitial(session.user?.email)}
-              </div>
-            </Link>
-          </div>
-        </header>
-
-        <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-10">
-          <Outlet />
-        </div>
+  const [menuOpen, setMenuOpen] = useState(false);
+  const displayName = cleanDisplayName(session.user?.nickname, session.user?.email || '管理员');
+  const pageName = menuItems.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))?.label || '管理控制台';
+  const exit = () => { logout(); navigate('/login'); };
+  return <div className="epass-shell">
+    <a href="#main-content" className="epass-skip">跳到主要内容</a>
+    <aside className="epass-sidebar">
+      <Brand compact subtitle="管理控制台" to="/admin/dashboard" />
+      <Navigation />
+      <div className="border-t border-line pt-4"><Link className="epass-nav-item" to="/docs"><BookOpen size={20} />接入文档</Link><button className="epass-nav-item w-full" type="button" onClick={exit}><LogOut size={20} />退出登录</button></div>
+    </aside>
+    <div className="flex min-w-0 flex-col">
+      <header className="epass-topbar">
+        <div className="flex min-w-0 items-center gap-3"><button type="button" className="inline-flex h-11 w-11 items-center justify-center lg:hidden" aria-label="打开导航" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={20} /></button><p className="text-sm text-muted"><span className="hidden sm:inline">管理控制台 <span className="mx-3">/</span></span><span className="text-ink">{pageName}</span></p></div>
+        <div className="flex items-center gap-4"><ThemeToggle /><Link to="/admin/account" className="flex items-center gap-3" aria-label={`账户安全：${displayName}`}><span className="hidden text-sm sm:block">{displayName}</span><span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-subtle text-sm text-accent">{getInitial(session.user?.email)}</span></Link></div>
+      </header>
+      <main id="main-content" tabIndex={-1} className="epass-workspace flex-1">
+        {mustBindEmail && <div className="mb-6 rounded-control border border-warning bg-warning-subtle p-4 text-sm text-warning">请先<Link to="/admin/account" className="underline underline-offset-4">绑定邮箱</Link>，再使用高级管理功能。</div>}
+        <Outlet />
       </main>
-
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 z-40 bg-sage-900/20 backdrop-blur-sm lg:hidden"
-            />
-            <motion.aside
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,calc(100vw-2rem))] flex-col overflow-y-auto bg-white p-5 shadow-2xl lg:hidden"
-            >
-              <div className="mb-8 flex shrink-0 items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-600 text-white">
-                    <Shield size={24} />
-                  </div>
-                  <span className="text-lg font-bold text-sage-900">ROSM Admin</span>
-                </div>
-                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-sage-400" type="button">
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4">
-                  <ThemeToggle className="w-full justify-center" />
-                </div>
-                <div className="flex-1 space-y-1" onClick={() => setIsMobileMenuOpen(false)}>
-                  {menuItems.map((item) => (
-                    <SidebarItem key={item.to} {...item} active={location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)} />
-                  ))}
-                </div>
-                <button
-                  onClick={() => {
-                    logout();
-                    navigate('/login');
-                  }}
-                  className="mt-6 flex items-center gap-3 rounded-xl px-4 py-3 text-sage-500 hover:bg-red-50 hover:text-red-500"
-                  type="button"
-                >
-                  <LogOut size={20} />
-                  <span className="font-medium">退出登录</span>
-                </button>
-              </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      <SiteFooter />
     </div>
-  );
+    <AnimatePresence>{menuOpen && <Dialog key="navigation" className="epass-dialog-navigation" title="管理控制台" onClose={() => setMenuOpen(false)}><Brand compact /><Navigation close={() => setMenuOpen(false)} /><Link to="/docs" className="epass-nav-item" onClick={() => setMenuOpen(false)}><BookOpen size={20} />接入文档</Link><button type="button" className="epass-nav-item" onClick={exit}><LogOut size={20} />退出登录</button></Dialog>}</AnimatePresence>
+  </div>;
 }
 
 export function UserLayout({ session, logout }) {
   const navigate = useNavigate();
-  const displayName = cleanDisplayName(session.user?.nickname, session.user?.email || 'User');
-
-  return (
-    <div className="flex min-h-dvh flex-col bg-sage-50">
-      <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-sage-200 bg-white/70 px-4 py-2 backdrop-blur-md sm:px-6">
-        <div className="flex cursor-pointer items-center gap-2" onClick={() => navigate('/account')}>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sage-600 text-white">
-            <Fingerprint size={18} />
-          </div>
-          <span className="font-bold tracking-tight text-sage-900">ROSM Pass</span>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <ThemeToggle className="hidden md:inline-flex" />
-          <span className="hidden text-sm font-medium text-sage-600 sm:block">{displayName}</span>
-          <button
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-            className="rounded-xl px-3 py-2 text-sm font-medium text-sage-600 transition-colors hover:bg-sage-100 hover:text-sage-900"
-            type="button"
-          >
-            退出
-          </button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white bg-sage-200 text-xs font-bold text-sage-700 shadow-sm">
-            {getInitial(session.user?.email)}
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4 sm:p-6 lg:p-10">
-        <Outlet />
-      </main>
-      <footer className="border-t border-sage-200 bg-white/30 px-4 py-6 text-center text-sm text-sage-400 sm:py-8">
-        <p>© 2026 ROSM 通行证 · 单点登录系统</p>
-      </footer>
-    </div>
-  );
+  return <div className="flex min-h-dvh flex-col">
+    <a href="#main-content" className="epass-skip">跳到主要内容</a>
+    <header className="epass-topbar"><Brand to="/account" /><div className="flex items-center gap-3"><ThemeToggle /><button type="button" className="hidden min-h-11 px-3 text-sm text-muted sm:block" onClick={() => { logout(); navigate('/login'); }}>退出登录</button></div></header>
+    <main id="main-content" tabIndex={-1} className="epass-user-main"><Outlet /><button type="button" className="btn-secondary mt-8 sm:hidden" onClick={() => { logout(); navigate('/login'); }}>退出登录</button></main>
+    <SiteFooter />
+  </div>;
 }

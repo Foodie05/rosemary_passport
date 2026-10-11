@@ -1,13 +1,13 @@
-# rosm_passport_flutter
+# Rosemary Epass Flutter SDK
 
-Flutter SDK for ROSM Passport native sign-in. The SDK includes a Rosemary-style sign-in UI and also exposes typed Dart APIs for apps that need custom screens.
+Flutter SDK for Rosemary Epass native sign-in. The SDK includes a Rosemary-style sign-in UI and also exposes typed Dart APIs for apps that need custom screens.
 
 The recommended production mode is server handoff:
 
 - The Flutter app never ships `client_secret`.
 - The app server owns the confidential OIDC client.
 - The SDK signs the user in inside the app, obtains an authorization code with PKCE, and posts the code plus `code_verifier` to the app server.
-- The app server exchanges the code at ROSM Passport with its `client_secret`, validates the OIDC result, creates its own app session, and returns that session payload to Flutter.
+- The app server exchanges the code at Rosemary Epass with its `client_secret`, validates the OIDC result, creates its own app session, and returns that session payload to Flutter.
 
 ## Add the dependency
 
@@ -16,13 +16,13 @@ dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: v0.8.1
+      ref: v0.9.0
       path: packages/rosm_passport_flutter
 ```
 
 ## Recommended: built-in UI with server handoff
 
-Register a confidential OIDC client in ROSM Passport. Use a package-style `client_id`, for example `com.cruos.zion`, but register the redirect URI as your app server HTTPS callback, for example `https://api.example.com/auth/rosm/callback`. Keep `client_secret` only on that server.
+Register a confidential OIDC client in Rosemary Epass. Use a package-style `client_id`, for example `com.cruos.zion`, but register the redirect URI as your app server HTTPS callback, for example `https://api.example.com/auth/rosm/callback`. Keep `client_secret` only on that server.
 
 ```dart
 final passport = RosmPassportClient(
@@ -59,7 +59,7 @@ const accountConfig = RosmPassportAccountConfig(
 );
 ```
 
-Available values are `system`, `light`, and `dark`. Input text and controls always use contrast-safe colors from the selected ROSM Passport color scheme rather than inheriting potentially incompatible colors from the host application.
+Available values are `system`, `light`, and `dark`. Input text and controls always use contrast-safe colors from the selected Rosemary Epass color scheme rather than inheriting potentially incompatible colors from the host application.
 
 The SDK uses ROSM's public configuration to run the built-in Aliyun Captcha 2.0 challenge before sending a login, registration, recovery, or MFA code. It sends the returned `captchaVerifyParam` as `captcha_token`; apps do not provide or store Aliyun credentials. To use an existing in-app captcha implementation instead, supply `requestCaptchaToken`; its non-empty return value takes precedence.
 
@@ -129,7 +129,7 @@ Your server should verify its own login challenge or session binding, exchange t
 
 ### App server contract
 
-Server handoff is not the same endpoint as a browser OIDC callback. A normal callback such as `/auth/rosm/callback` receives `code` and `state` from a redirect. The SDK handoff endpoint receives a JSON POST from the app after the in-app UI has already finished ROSM Passport login and consent.
+Server handoff is not the same endpoint as a browser OIDC callback. A normal callback such as `/auth/rosm/callback` receives `code` and `state` from a redirect. The SDK handoff endpoint receives a JSON POST from the app after the in-app UI has already finished Rosemary Epass login and consent.
 
 Recommended endpoints on the app server:
 
@@ -294,3 +294,22 @@ For phone recovery, pass the phone number as `account` and use `RosmPasswordReco
 - If using direct public mode, register the custom-scheme redirect URI and keep the client public.
 - Enable Authorization Code and Refresh Token grants, and require PKCE S256.
 - Keep `openid` requests paired with a nonce. `RosmPassportClient.createAuthorizationRequest()` does this automatically.
+
+## Design system and runtime
+
+Flutter **3.44+** and Dart **3.12+** are required from v0.9.0. The SDK depends on the official `rosemary_reference` **0.3.0-prototype.2**, pinned to commit `a36510e38277a2f84ab4150e074bbfbee55ddefd` in [Rosemary Design System](https://github.com/Foodie05/Rosemary-Design-System). It uses the official theme, platform-adaptive primary actions and loading feedback. Product fields extend that theme for password autofill, visibility and live security feedback. Semantic tokens are generated from the same source as the website; system reduced motion, appearance and text scaling remain active. The upstream library is still Prototype; this release does not claim upstream Beta or completed manual VoiceOver/TalkBack acceptance.
+
+Existing `Rosm*` API names, OIDC endpoints and stored sessions remain compatible. Integration now requires the runtime upgrade above. New-password client methods reject invalid input before sending HTTP; existing-password login remains unrestricted.
+
+## Custom password fields
+
+New passwords contain 8–128 printable ASCII characters and at least two of **letters, digits, symbols**. Uppercase/lowercase count as one letter category; interior spaces are allowed but do not count as symbols. Edge spaces, known common passwords and repeated patterns are rejected. Normal guidance shows “不少于 8 个字符”; the upper limit is shown only on overflow. Personal-information feedback is advice, not a strength score or cross-site reuse check.
+
+```dart
+final passwordController = TextEditingController(); // host owns/disposes it
+RosmNewPasswordField(controller: passwordController);
+final result = const RosmPasswordPolicy().evaluate(passwordController.text);
+// Use result.ok to enable submission; do not log or store the password.
+```
+
+Use the field for registration or password changes, never for existing-password sign-in. `registerWithEmail`, `registerWithPhone`, `resetPasswordByCode`, `resetOwnPassword` and `updateAccount(newPassword: ...)` perform the same local validation.

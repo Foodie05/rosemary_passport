@@ -45,20 +45,18 @@ void main() {
       expect(await hasher.verify(hashes.first, 'wrong'), isFalse);
     },
   );
-  test(
-    'legacy weak hashes remain verifiable but cannot be newly selected',
-    () async {
-      final hasher = PasswordHasher(
-        AppConfig.forTesting({
-          'ARGON2_MEMORY_KB': '8192',
-          'ARGON2_ITERATIONS': '1',
-          'ARGON2_PARALLELISM': '1',
-        }),
-      );
-      const legacyPassword = 'old';
+  test('legacy weak and non-ASCII hashes remain verifiable', () async {
+    final hasher = PasswordHasher(
+      AppConfig.forTesting({
+        'ARGON2_MEMORY_KB': '8192',
+        'ARGON2_ITERATIONS': '1',
+        'ARGON2_PARALLELISM': '1',
+      }),
+    );
+    for (final legacyPassword in ['old', '旧密码仍可登录迷迭香通行证', ' old phrase ']) {
       final hash = await hasher.hash(legacyPassword);
       expect(await hasher.verify(hash, legacyPassword), isTrue);
       expect(PasswordPolicy().validate(legacyPassword).ok, isFalse);
-    },
-  );
+    }
+  });
 }
