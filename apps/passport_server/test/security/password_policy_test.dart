@@ -18,9 +18,9 @@ void main() {
     for (final item in cases) {
       final value = item as Map<String, dynamic>;
       expect(
-        policy.validate(value['password'] as String).ok,
+        policy.validate(value['input'] as String).ok,
         value['accepted'],
-        reason: 'Policy mismatch: ${value['password']}',
+        reason: 'Policy mismatch: ${value['input']}',
       );
     }
   });

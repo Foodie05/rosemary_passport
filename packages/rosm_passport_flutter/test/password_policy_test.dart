@@ -17,7 +17,7 @@ void main() {
             as List;
     for (final item in cases) {
       expect(
-        policy.evaluate(item['password'] as String).ok,
+        policy.evaluate(item['input'] as String).ok,
         item['accepted'],
         reason: item['name'] as String?,
       );
@@ -113,8 +113,8 @@ void main() {
         password: 'orchid willow!',
       );
       await client.loginWithPassword(email: 'old@example.com', password: '旧密码');
-      expect(bodies[0]['password'], 'orchid willow!');
-      expect(bodies[1]['password'], '旧密码');
+      expect(bodies[0]['input'], 'orchid willow!');
+      expect(bodies[1]['input'], '旧密码');
     },
   );
 }

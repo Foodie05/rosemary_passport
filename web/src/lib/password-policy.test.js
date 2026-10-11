@@ -4,7 +4,7 @@ import test from 'node:test';
 import { evaluatePassword, passwordContainsPersonalInfo } from './password-policy.js';
 const cases = JSON.parse(readFileSync(new URL('../../../testdata/password-policy-cases.json', import.meta.url), 'utf8'));
 test('new-password feedback and server use the same acceptance cases', () => {
-  for (const {password, accepted} of cases) assert.equal(evaluatePassword(password).ok, accepted, `Mismatch for ${JSON.stringify(password)}`);
+  for (const {input: password, accepted} of cases) assert.equal(evaluatePassword(password).ok, accepted, `Mismatch for ${JSON.stringify(password)}`);
 });
 test('feedback updates before submission and explains the failing condition', () => {
   assert.match(evaluatePassword('orchid').message, /还需 2 个/);

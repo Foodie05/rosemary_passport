@@ -6,7 +6,6 @@
     "version": "v2.0.0-beta.2-banner.2",
     "commit": "a36510e38277a2f84ab4150e074bbfbee55ddefd",
     "tokensSource": "src/generated/tokens.css",
-    "tokensSha256": "294120f5c74c8ade573afb819c704883447feb215b9db3115dfbcdb8f18e20e2",
     "guides": [
       "public/guide/motion.md",
       "src/components/common/SelectionMotion.tsx",
@@ -14,7 +13,8 @@
       "src/pageMotion.ts",
       "src/index.css",
       "public/guide/content.md"
-    ]
+    ],
+    "sourceSha256": "294120f5c74c8ade573afb819c704883447feb215b9db3115dfbcdb8f18e20e2"
   },
   "brand": {
     "name": "Rosemary Epass",
