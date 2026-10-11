@@ -80,7 +80,7 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
-const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/master/packages/rosm_passport_flutter';
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.9.0/packages/rosm_passport_flutter';
 const DASHBOARD_PERIODS = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
@@ -1446,7 +1446,10 @@ function OidcDocsContent({ discovery, oidcSettings }) {
     '```yaml',
     'dependencies:',
     '  rosm_passport_flutter:',
-    `    git: ${FLUTTER_SDK_GITHUB_URL}`,
+    '    git:',
+    '      url: https://github.com/Foodie05/rosemary_passport.git',
+    '      ref: v0.9.0',
+    '      path: packages/rosm_passport_flutter',
     '```',
     '',
     'Flutter 侧示例：',
@@ -1718,7 +1721,6 @@ Authorization: Bearer ACCESS_TOKEN`}</CodeBlock>
 
 function FlutterDocsContent({ discovery, oidcSettings }) {
   const issuer = oidcSettings?.issuer || discovery?.issuer || 'https://auth.example.com';
-  const webAuthnOrigin = typeof window === 'undefined' ? 'https://auth.example.com' : window.location.origin;
   const tokenEndpoint = oidcSettings?.token_endpoint || discovery?.token_endpoint || `${issuer}/oidc/token`;
   const userinfoEndpoint = oidcSettings?.userinfo_endpoint || discovery?.userinfo_endpoint || `${issuer}/oidc/userinfo`;
   const revocationEndpoint = oidcSettings?.revocation_endpoint || discovery?.revocation_endpoint || `${issuer}/oidc/revoke`;
@@ -1783,26 +1785,26 @@ Scopes:
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-dependencies" tabIndex={-1} className="text-lg font-bold text-ink">2. 添加 SDK 依赖</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">SDK 放在当前 GitHub 仓库中，应用可以直接通过 git 依赖接入。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">v0.9.0 使用官方 Rosemary Design Flutter SDK 0.3.0-prototype.2，并锁定其提交。需要 Flutter 3.44+ 和 Dart 3.12+；应用可通过 Git 标签接入。</p>
         </div>
         <CodeBlock>{`dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
+      ref: v0.9.0
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-sign-in-ui" tabIndex={-1} className="text-lg font-bold text-ink">3. 使用 SDK 内置 UI</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、手机、密码、密码二次验证、注册、忘记密码、通行密钥登录、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">SDK 内置 Rosemary 风格登录页。应用侧只配置 Dart 类和回调；验证码、手机、密码、密码二次验证、注册、忘记密码、授权确认、native approve 和服务端交接都由 SDK 串起来。</p>
         </div>
         <CodeBlock>{`final passport = RosmPassportClient(
   issuer: Uri.parse('${issuer}'),
   clientId: 'com.cruos.zion',
   redirectUri: Uri.parse('https://api.example.com/auth/rosm/callback'),
   scopes: const {'openid', 'profile', 'email', 'phone', 'accountRule'},
-  webAuthnOrigin: Uri.parse('${webAuthnOrigin}'),
 );
 
 final result = await showRosmPassportSignIn(
@@ -1814,10 +1816,6 @@ final result = await showRosmPassportSignIn(
     ),
     requestCaptchaToken: () => yourCaptchaProvider(),
     enableRegistration: true,
-    authenticatePasskey: (options) async {
-      final response = await passkeyPlugin.authenticate(options.options);
-      return RosmWebAuthnCredential(response);
-    },
   ),
 );
 
@@ -1921,61 +1919,29 @@ await passport.resetPasswordByCode(
 
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h2 id="flutter-passkeys" tabIndex={-1} className="text-lg font-bold text-ink">6. 通行密钥登录与添加</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">SDK 默认内置原生通行密钥适配，会获取 WebAuthn options、调起系统通行密钥弹窗，并把 credential response 交回 Rosemary Epass 验证。接入方通常不需要手写 WebAuthn JSON 或额外接 passkey 插件。</p>
+          <h2 id="flutter-passkeys" tabIndex={-1} className="text-lg font-bold text-ink">6. 新密码与即时反馈</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">注册、找回和账户重置密码时，内置 UI 会随输入即时检查；新密码须为 8–128 个字符，并在字母、数字、符号中至少包含两类。大小写都算字母，内部空格不算符号，首尾不能有空格。常规提示只显示“不少于 8 个字符”。</p>
         </div>
-        <CodeBlock>{`final loginOptions = await passport.beginWebAuthnLogin(
-  email: 'user@example.com',
+        <CodeBlock>{`final passwordController = TextEditingController();
+// 宿主持有控制器，离开界面时 dispose。
+RosmNewPasswordField(controller: passwordController);
+final validation = const RosmPasswordPolicy().evaluate(
+  passwordController.text,
 );
-
-final loginCredential = await authenticateRosmPasskey(loginOptions);
-
-final session = await passport.completeWebAuthnLogin(
-  email: 'user@example.com',
-  credential: loginCredential,
-);
-
-final registerOptions = await passport.beginPasskeyRegistration(
-  currentPassword: currentPassword,
-);
-
-final registerCredential = await registerRosmPasskey(registerOptions);
-
-await passport.completePasskeyRegistration(
-  credential: registerCredential,
-);`}</CodeBlock>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="登录" value="beginWebAuthnLogin + completeWebAuthnLogin" />
-          <InfoRow label="添加" value="beginPasskeyRegistration + completePasskeyRegistration" />
-          <InfoRow label="注册后引导" value="postRegisterPasskeyBootstrap 为 true 时可免当前密码添加" />
-          <InfoRow label="管理" value="listPasskeys 与 deletePasskey" />
-        </div>
+// validation.ok 控制提交；不要记录密码。`}</CodeBlock>
+        <p className="text-sm leading-relaxed text-muted">自定义界面可使用同一校验器。新密码 API 在发送 HTTP 前检查；已有密码登录保持兼容。客户端提示不评估跨网站密码复用。</p>
       </div>
 
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
-          <h2 id="flutter-platform-configuration" tabIndex={-1} className="text-lg font-bold text-ink">7. 通行密钥平台配置</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">Passkey 必须绑定 HTTPS relying party 域名。移动端需要完成系统级域名关联，并让 SDK 请求 options 时携带同一个 Origin。iOS 报 “Application with identifier ... is not associated with domain ...” 时，优先检查 App ID、entitlement 与 AASA 是否完全一致并已部署生效。</p>
+          <h2 id="flutter-platform-configuration" tabIndex={-1} className="text-lg font-bold text-ink">7. 原生平台与设计适配</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">官方设计 SDK 提供平台适配的主按钮、主题和加载组件。通行证界面遵循同源语义令牌，跟随系统明暗主题、字号及减少动态效果；宿主继续管理 Navigator、输入控制器和业务会话。</p>
         </div>
-        <CodeBlock>{`const passkeyConfig = RosmPasskeyPlatformConfig(
-  rpDomain: 'auth.cruty.cn',
-  appleTeamId: 'Y6AYA4F7T3',
-  appleBundleId: 'com.cruos.zion',
-  androidPackageName: 'com.cruos.zion',
-  androidSha256CertFingerprints: ['AA:BB:CC:...'],
-);
-
-final iosEntitlement = passkeyConfig.appleAssociatedDomain;
-final aasa = passkeyConfig.appleAppSiteAssociation(
-  includeUniversalLinks: true,
-);
-final assetLinks = passkeyConfig.androidAssetLinks();
-final assetStatement = passkeyConfig.androidAssetStatementsInclude();`}</CodeBlock>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="iOS/macOS" value="配置 Associated Domains，例如 webcredentials:auth.cruty.cn；AASA 的 webcredentials.apps 必须包含 TeamID.BundleID" />
-          <InfoRow label="Android" value="assetlinks.json 必须 200、无跳转、application/json，并声明包名与所有 SHA-256 签名证书指纹" />
-          <InfoRow label="SDK Origin" value={`webAuthnOrigin 使用服务端 WebAuthn RP 对应的 HTTPS origin，例如 ${webAuthnOrigin}`} />
-          <InfoRow label="服务端域名" value="issuer、RP ID、平台关联文件必须指向同一登录域名边界" />
+          <InfoRow label="运行环境" value="Flutter 3.44+ / Dart 3.12+" />
+          <InfoRow label="设计 SDK" value="rosemary_reference 0.3.0-prototype.2，固定提交" />
+          <InfoRow label="版本状态" value="官方设计库仍为 Prototype；人工辅助技术验收尚未完成" />
+          <InfoRow label="通行密钥" value="当前 Flutter SDK 不包含原生 Passkey API；网站的 WebAuthn 能力独立提供" />
         </div>
       </div>
 
@@ -2014,7 +1980,7 @@ await passport.signOut();`}</CodeBlock>
           <p>只有 Public 直连模式才使用自定义 scheme，例如 <InlineCode>com.cruos.zion:/oidc/callback</InlineCode>。</p>
           <p>接入方服务器必须校验 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>issuer</InlineCode>、<InlineCode>aud</InlineCode>、过期时间和 redirect URI。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
-          <p>使用通行密钥时，iOS Associated Domains、Android Digital Asset Links 与 <InlineCode>webAuthnOrigin</InlineCode> 必须指向同一个 HTTPS 登录域名边界。</p>
+          <p>升级至 v0.9.0 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
           <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
           <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>
@@ -2025,7 +1991,7 @@ await passport.signOut();`}</CodeBlock>
   );
 }
 
-const DOC_SECTIONS = {"oidc": [["parameters", "当前生效参数"], ["overview", "1. 什么是 OIDC"], ["capabilities", "2. 当前服务支持范围"], ["client-configuration", "3. 典型客户端配置"], ["flutter", "4. Flutter SDK 原生接入"], ["web-integration", "5. Web / 服务端接入步骤"], ["best-practices", "6. 最佳实践"], ["checklist", "7. 管理员检查清单"]], "flutter": [["client-mode", "1. 选择客户端模式"], ["dependencies", "2. 添加 SDK 依赖"], ["sign-in-ui", "3. 使用 SDK 内置 UI"], ["server-handoff", "4. 接入方服务器完成换票"], ["password-recovery", "5. 忘记密码"], ["passkeys", "6. 通行密钥登录与添加"], ["platform-configuration", "7. 通行密钥平台配置"], ["public-endpoints", "8. Public 直连模式与端点"], ["checklist", "9. 检查清单"]]};
+const DOC_SECTIONS = {"oidc": [["parameters", "当前生效参数"], ["overview", "1. 什么是 OIDC"], ["capabilities", "2. 当前服务支持范围"], ["client-configuration", "3. 典型客户端配置"], ["flutter", "4. Flutter SDK 原生接入"], ["web-integration", "5. Web / 服务端接入步骤"], ["best-practices", "6. 最佳实践"], ["checklist", "7. 管理员检查清单"]], "flutter": [["client-mode", "1. 选择客户端模式"], ["dependencies", "2. 添加 SDK 依赖"], ["sign-in-ui", "3. 使用 SDK 内置 UI"], ["server-handoff", "4. 接入方服务器完成换票"], ["password-recovery", "5. 忘记密码"], ["passkeys", "6. 新密码与即时反馈"], ["platform-configuration", "7. 原生平台与设计适配"], ["public-endpoints", "8. Public 直连模式与端点"], ["checklist", "9. 检查清单"]]};
 
 function DocsLayout({ children, current }) {
   const contents = DOC_SECTIONS[current];

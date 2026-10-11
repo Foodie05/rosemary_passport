@@ -1,8 +1,10 @@
-# ROSM Passport Flutter SDK 设计
+# Rosemary Epass Flutter SDK 设计
+
+> 当前发布版本 v0.9.0 使用官方 Rosemary Design Flutter SDK，要求 Flutter 3.44+ / Dart 3.12+；新密码 8–128 个字符、三类要素至少两类，并提供输入时反馈。实际公开 API 以 [SDK README](../packages/rosm_passport_flutter/README.md) 为准。本文保留早期架构方案；其中原生 Passkey 适配和回调尚未包含在当前 SDK 中。
 
 ## 目标
 
-`rosm_passport_flutter` 用于让 Flutter 应用以原生界面接入 ROSM Passport，不需要跳转到 Web 登录页，也不包含管理端功能。
+`rosm_passport_flutter` 用于让 Flutter 应用以原生界面接入 Rosemary Epass，不需要跳转到 Web 登录页，也不包含管理端功能。
 
 SDK 覆盖：
 
@@ -323,7 +325,7 @@ final assetLinks = passkeyConfig.androidAssetLinks();
 
 - iOS/macOS：为每个使用通行密钥的 target 增加 Associated Domains entitlement，配置 `webcredentials:<rp-domain>`，并在该域名提供 `https://<rp-domain>/.well-known/apple-app-site-association`。文件不能跳转，App ID 必须是 `<Apple Team ID>.<Bundle ID>`。例如 Zion 使用 `auth.cruty.cn` 时，AASA 的 `webcredentials.apps` 必须包含 `Y6AYA4F7T3.com.cruos.zion`；如果系统报 `Application with identifier Y6AYA4F7T3.com.cruos.zion is not associated with domain auth.cruty.cn`，就是域名关联还没有生效。
 - Android：在 WebAuthn RP 域名提供 `https://<rp-domain>/.well-known/assetlinks.json`，HTTP 200、无 301/302、`Content-Type: application/json`，并包含 `delegate_permission/common.get_login_creds`、App package name，以及 debug/release/Play signing 证书的 SHA-256 fingerprint。使用 Credential Manager 共享凭据校验时，在 manifest 加 `asset_statements` 指向这个文件。
-- Web：必须使用 HTTPS origin，且 hostname/RP ID 与 ROSM Passport 签发的 WebAuthn options 保持一致。
+- Web：必须使用 HTTPS origin，且 hostname/RP ID 与 Rosemary Epass 签发的 WebAuthn options 保持一致。
 - Windows：不需要移动端 entitlement，但仍需保证 RP ID 与 origin 由服务端按同一域名生成。
 
 核心类：
