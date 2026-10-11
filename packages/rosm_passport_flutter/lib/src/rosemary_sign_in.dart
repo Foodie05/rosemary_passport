@@ -666,9 +666,9 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                   Divider(height: 1, color: colors.outlineVariant),
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: FilledButton(
+                    child: RosemaryButton(
                       onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('阅读完成'),
+                      label: '阅读完成',
                     ),
                   ),
                 ],
@@ -1014,8 +1014,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                   TextButton(
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: const Size(48, 48),
+                      tapTargetSize: MaterialTapTargetSize.padded,
                     ),
                     onPressed: () => _showLegalDocument(documents.terms),
                     child: const Text('《使用条款》'),
@@ -1024,8 +1024,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                   TextButton(
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 2),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: const Size(48, 48),
+                      tapTargetSize: MaterialTapTargetSize.padded,
                     ),
                     onPressed: () => _showLegalDocument(documents.privacy),
                     child: const Text('《隐私政策》'),
@@ -1622,11 +1622,9 @@ class _Header extends StatelessWidget {
             Expanded(
               child: Text(
                 'Rosemary Epass',
-                style: TextStyle(
-                  color: colors.onSurface,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineLarge?.copyWith(fontSize: 20),
               ),
             ),
           ],

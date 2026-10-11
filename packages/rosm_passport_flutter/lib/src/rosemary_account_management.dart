@@ -1343,7 +1343,7 @@ class _AccountError extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton(onPressed: onRetry, child: Text(actionLabel)),
+            RosemaryButton(onPressed: onRetry, label: actionLabel),
           ],
         ),
       ),

@@ -55,8 +55,19 @@ ThemeData buildRosmPassportTheme(
         onSecondary: dark
             ? RosmEpassDarkTokens.onAccent
             : RosmEpassLightTokens.onAccent,
-        secondaryContainer: subtle,
-        onSecondaryContainer: ink,
+        secondaryContainer: dark
+            ? RosmEpassDarkTokens.accentSubtle
+            : RosmEpassLightTokens.accentSubtle,
+        onSecondaryContainer: primary,
+        tertiary: dark
+            ? RosmEpassDarkTokens.warning
+            : RosmEpassLightTokens.warning,
+        tertiaryContainer: dark
+            ? RosmEpassDarkTokens.warningSubtle
+            : RosmEpassLightTokens.warningSubtle,
+        onTertiaryContainer: dark
+            ? RosmEpassDarkTokens.warning
+            : RosmEpassLightTokens.warning,
         surface: canvas,
         surfaceContainerLowest: surface,
         surfaceContainerLow: surface,
