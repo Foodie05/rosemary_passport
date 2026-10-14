@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rosemary_reference/rosemary.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 
 import 'epass_tokens.dart';
 import 'models.dart';
@@ -99,14 +99,19 @@ ThemeData buildRosmPassportTheme(
     bodyColor: ink,
     displayColor: ink,
   );
-  return rosemaryThemeData(brightness).copyWith(
+  return ThemeData(brightness: brightness).copyWith(
+    extensions: [
+      RosemaryThemeData(
+        colors: dark ? RosmEpassDarkTokens.colors : RosmEpassLightTokens.colors,
+      ),
+    ],
     platform: inherited.platform,
     brightness: brightness,
     colorScheme: scheme,
     textTheme: textTheme.copyWith(
       headlineLarge: textTheme.headlineLarge?.copyWith(
-        fontFamily: 'Georgia',
-        fontFamilyFallback: const ['Noto Serif SC', 'Songti SC', 'serif'],
+        fontFamily: null,
+        fontFamilyFallback: const [],
         fontWeight: FontWeight.w400,
       ),
     ),
@@ -154,6 +159,35 @@ ThemeData buildRosmPassportTheme(
         ),
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
       ).copyWith(animationDuration: duration),
+    ),
+  );
+}
+
+/// Applies the Epass palette through the official Forma provider.
+class RosmEpassTheme extends StatelessWidget {
+  const RosmEpassTheme({super.key, required this.data, required this.child});
+  final ThemeData data;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Theme(
+    data: data,
+    child: RosemaryTheme(
+      mode: data.brightness == Brightness.dark
+          ? RosemaryThemeMode.dark
+          : RosemaryThemeMode.light,
+      colors: data.brightness == Brightness.dark
+          ? RosmEpassDarkTokens.colors
+          : RosmEpassLightTokens.colors,
+      highContrastColors:
+          (data.brightness == Brightness.dark
+                  ? RosmEpassDarkTokens.colors
+                  : RosmEpassLightTokens.colors)
+              .copyWith(
+                control: data.colorScheme.onSurface,
+                border: data.colorScheme.onSurfaceVariant,
+              ),
+      strings: rosemaryChinese,
+      child: child,
     ),
   );
 }

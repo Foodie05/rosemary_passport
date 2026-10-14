@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:rosm_passport_flutter/rosm_passport_flutter.dart';
-import 'package:rosemary_reference/rosemary.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 
 void main() {
   testWidgets(
@@ -26,6 +26,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _tapVisible(tester, find.text('立即注册'));
+      await _tapVisible(tester, find.text('接受并继续'));
       expect(find.text('不少于 8 个字符'), findsOneWidget);
       final action = find.byWidgetPredicate(
         (w) => w is RosemaryButton && w.label == '注册并继续  →',
@@ -44,6 +45,94 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  for (final mode in ['phone', 'email', 'password', 'register', 'recovery']) {
+    testWidgets(
+      '$mode blocks before captcha/HTTP, dismisses on decline and resumes once on acceptance',
+      (tester) async {
+        final requests = <http.Request>[];
+        var captchas = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: RosmPassportSignInPage(
+              client: _client(requests, Completer<http.Response>()),
+              config: RosmPassportSignInConfig(
+                enablePhoneCode: mode == 'phone',
+                enableEmailCode: mode == 'email',
+                enablePassword: mode != 'phone' && mode != 'email',
+                requestCaptchaToken: () async {
+                  captchas++;
+                  return 'test-captcha';
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (mode == 'register') {
+          await _tapVisible(tester, find.text('立即注册'));
+          await _tapVisible(tester, find.text('暂不接受'));
+          expect(find.text('创建新账户'), findsNothing);
+          expect(captchas, 0);
+          await _tapVisible(tester, find.text('立即注册'));
+          await _tapVisible(tester, find.text('接受并继续'));
+          await _tapVisible(tester, find.byType(RosemaryCheckbox));
+          await tester.enterText(_field('邮箱'), 'user@example.com');
+        } else if (mode == 'recovery') {
+          await _tapVisible(tester, find.text('忘记密码'));
+          await _tapVisible(tester, find.text('暂不接受'));
+          expect(find.text('邮箱或手机号'), findsNothing);
+          expect(captchas, 0);
+          await _tapVisible(tester, find.text('忘记密码'));
+          await _tapVisible(tester, find.text('接受并继续'));
+          await _tapVisible(tester, find.byType(RosemaryCheckbox));
+          await tester.enterText(_field('邮箱或手机号'), 'user@example.com');
+        } else if (mode == 'phone') {
+          await tester.enterText(_field('手机号'), '13800138000');
+        } else {
+          await tester.enterText(_field('邮箱'), 'user@example.com');
+          if (mode == 'password')
+            await tester.enterText(_field('密码'), 'legacy input');
+        }
+        final actionLabel = switch (mode) {
+          'password' => '继续登录  →',
+          'register' || 'recovery' => '发送',
+          'email' => '发送邮箱验证码  →',
+          _ => '发送登录验证码  →',
+        };
+        final before = requests.length;
+        await _tapVisible(tester, find.text(actionLabel));
+        expect(find.text('是否接受使用条款与隐私政策？'), findsOneWidget);
+        expect(captchas, 0);
+        expect(requests.length, before);
+        await _tapVisible(tester, find.text('暂不接受'));
+        expect(find.text('是否接受使用条款与隐私政策？'), findsNothing);
+        expect(find.text(actionLabel), findsOneWidget);
+        if (find.byType(RosemaryCheckbox).evaluate().isNotEmpty) {
+          expect(
+            tester
+                .widget<RosemaryCheckbox>(find.byType(RosemaryCheckbox))
+                .value,
+            false,
+          );
+        }
+        expect(requests.length, before);
+        await _tapVisible(tester, find.text(actionLabel));
+        // System back also dismisses without continuing.
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(requests.length, before);
+        await _tapVisible(tester, find.text(actionLabel));
+        await _tapVisible(tester, find.text('接受并继续'));
+        expect(captchas, 1);
+        expect(requests.length, before + 1);
+        expect(find.text('是否接受使用条款与隐私政策？'), findsNothing);
+        if (mode == 'password') expect(find.text('选择验证方式'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   for (final directStepUp in [false, true]) {
     testWidgets(
@@ -71,7 +160,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await _tapVisible(tester, find.byType(Checkbox));
+        await _tapVisible(tester, find.byType(RosemaryCheckbox));
         if (directStepUp) {
           await tester.enterText(_field('手机号'), '13800138000');
           await _tapVisible(tester, find.text('发送登录验证码  →'));
@@ -108,9 +197,9 @@ void main() {
         sent.complete(_json({'sent': true, 'retry_after': 45}));
         await tester.pumpAndSettle();
         expect(input.hitTestable(), findsOneWidget);
-        expect(tester.widget<TextField>(input).focusNode!.hasFocus, isTrue);
+        expect(tester.widget<EditableText>(input).focusNode.hasFocus, isTrue);
         await tester.enterText(input, '123456');
-        expect(tester.widget<TextField>(input).controller!.text, '123456');
+        expect(tester.widget<EditableText>(input).controller.text, '123456');
         expect(find.text('45秒'), findsOneWidget);
         expect(find.text('完成登录  →'), findsOneWidget);
         await _tapVisible(tester, find.text('完成登录  →'));
@@ -140,8 +229,15 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-Finder _field(String label) => find.byWidgetPredicate(
-  (widget) => widget is TextField && widget.decoration?.labelText == label,
+Finder _field(String label) => find.descendant(
+  of: find.byWidgetPredicate(
+    (widget) =>
+        (widget is RosemaryInput && widget.label == label) ||
+        (widget is TextField &&
+            (widget.decoration?.labelText == label ||
+                widget.decoration?.hintText == label)),
+  ),
+  matching: find.byType(EditableText),
 );
 
 http.Response _json(Map<String, Object?> body) => http.Response(
@@ -190,6 +286,9 @@ RosmPassportClient _client(
       case '/api/v1/auth/send-login-code':
       case '/api/v1/auth/login-step-up-code':
         return sent.future;
+      case '/api/v1/auth/send-email-login-code':
+      case '/api/v1/auth/send-code':
+      case '/api/v1/auth/send-recovery-code':
       case '/api/v1/auth/send-phone-login-code':
         return _json({'sent': true, 'retry_after': 0});
       case '/api/v1/auth/phone-login':

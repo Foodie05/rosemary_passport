@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rosemary_reference/rosemary.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 import 'package:rosm_passport_flutter/rosm_passport_flutter.dart';
 import 'package:rosm_passport_flutter/src/epass_motion.dart';
 import 'package:rosm_passport_flutter/src/rosm_passport_theme.dart';
@@ -27,7 +27,7 @@ void main() {
         tester.widget<TextField>(find.byType(TextField)).obscureText,
         isTrue,
       );
-      await tester.tap(find.byTooltip('显示密码'));
+      await tester.tap(find.bySemanticsLabel('显示密码'));
       await tester.pump();
       expect(
         tester.widget<TextField>(find.byType(TextField)).obscureText,
@@ -76,7 +76,7 @@ void main() {
             ),
           ),
         );
-        expect(theme.extension<RosemaryTheme>(), isNotNull);
+        expect(theme.extension<RosemaryThemeData>(), isNotNull);
         expect(
           theme.scaffoldBackgroundColor,
           Color(dark ? 0xff141c18 : 0xfff6f5ef),

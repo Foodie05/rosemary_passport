@@ -1,3 +1,4 @@
+import { FormaButton, FormaInput } from './Forma';
 import { Field, InfoPill } from './ui';
 
 export function AuthScreen({
@@ -48,7 +49,7 @@ export function AuthScreen({
             {loginStep === 'credentials' ? (
               <>
                 <Field label="邮箱">
-                  <input
+                  <FormaInput
                     type="email"
                     value={loginForm.email}
                     onChange={(event) =>
@@ -58,7 +59,7 @@ export function AuthScreen({
                   />
                 </Field>
                 <Field label="密码">
-                  <input
+                  <FormaInput
                     type="password"
                     value={loginForm.password}
                     onChange={(event) =>
@@ -67,14 +68,14 @@ export function AuthScreen({
                     required
                   />
                 </Field>
-                <button disabled={loading} type="submit">
+                <FormaButton disabled={loading} type="submit">
                   {loading ? '校验中...' : '下一步'}
-                </button>
+                </FormaButton>
               </>
             ) : (
               <>
                 <Field label="邮箱验证码">
-                  <input
+                  <FormaInput
                     value={loginForm.email_code}
                     onChange={(event) =>
                       setLoginForm((current) => ({ ...current, email_code: event.target.value }))
@@ -84,20 +85,20 @@ export function AuthScreen({
                   />
                 </Field>
                 <div className="button-row">
-                  <button className="ghost" type="button" onClick={() => setLoginStep('credentials')}>
+                  <FormaButton className="ghost" type="button" onClick={() => setLoginStep('credentials')}>
                     返回上一步
-                  </button>
-                  <button disabled={loading} type="submit">
+                  </FormaButton>
+                  <FormaButton disabled={loading} type="submit">
                     {loading ? '登录中...' : '完成登录'}
-                  </button>
+                  </FormaButton>
                 </div>
               </>
             )}
             <p className="switch-copy">
               没有账号？
-              <button className="text-link" type="button" onClick={() => setAuthMode('register')}>
+              <FormaButton className="text-link" type="button" onClick={() => setAuthMode('register')}>
                 立即注册
-              </button>
+              </FormaButton>
             </p>
           </form>
         ) : (
@@ -107,7 +108,7 @@ export function AuthScreen({
               <p>注册流程、验证码与风控逻辑全部沿用当前接口。</p>
             </div>
             <Field label="邮箱">
-              <input
+              <FormaInput
                 type="email"
                 value={registerForm.email}
                 onChange={(event) =>
@@ -119,11 +120,11 @@ export function AuthScreen({
             <div className="captcha">
               <div ref={captchaRef} />
             </div>
-            <button className="ghost" type="button" onClick={submitRegisterCode}>
+            <FormaButton className="ghost" type="button" onClick={submitRegisterCode}>
               发送验证码
-            </button>
+            </FormaButton>
             <Field label="邮箱验证码">
-              <input
+              <FormaInput
                 value={registerForm.email_code}
                 onChange={(event) =>
                   setRegisterForm((current) => ({ ...current, email_code: event.target.value }))
@@ -132,7 +133,7 @@ export function AuthScreen({
               />
             </Field>
             <Field label="昵称">
-              <input
+              <FormaInput
                 value={registerForm.nickname}
                 onChange={(event) =>
                   setRegisterForm((current) => ({ ...current, nickname: event.target.value }))
@@ -141,7 +142,7 @@ export function AuthScreen({
               />
             </Field>
             <Field label="密码">
-              <input
+              <FormaInput
                 type="password"
                 value={registerForm.password}
                 onChange={(event) =>
@@ -150,14 +151,14 @@ export function AuthScreen({
                 required
               />
             </Field>
-            <button disabled={loading} type="submit">
+            <FormaButton disabled={loading} type="submit">
               {loading ? '注册中...' : '注册并登录'}
-            </button>
+            </FormaButton>
             <p className="switch-copy">
               已有账号？
-              <button className="text-link" type="button" onClick={() => setAuthMode('login')}>
+              <FormaButton className="text-link" type="button" onClick={() => setAuthMode('login')}>
                 去登录
-              </button>
+              </FormaButton>
             </p>
           </form>
         )}

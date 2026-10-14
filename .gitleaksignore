@@ -10,3 +10,6 @@ bab7c3e1d232acea0262dd3d60d95f07c637bcab:docs/oidc-integration-zh.md:curl-auth-h
 35be0048e44ea996de290ab02b42e2a4d2d1f062:packages/rosm_passport_flutter/test/fixtures/password-policy-cases.json:generic-api-key:39
 35be0048e44ea996de290ab02b42e2a4d2d1f062:packages/rosm_passport_flutter/test/fixtures/password-policy-cases.json:generic-api-key:43
 35be0048e44ea996de290ab02b42e2a4d2d1f062:packages/rosm_passport_flutter/test/fixtures/password-policy-cases.json:generic-api-key:55
+
+# Public SHA-256 of upstream Forma design/tokens.json (verified by web tests).
+92a0dc3806fe0fc7b637e7fbd0cdcbaa6a6ef344:web/src/design/manifest.json:generic-api-key:10

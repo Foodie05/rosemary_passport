@@ -1,5 +1,7 @@
+import { FormaButton, FormaInput } from './components/Forma';
 import { AnimatePresence } from 'motion/react';
 import { Notice } from './components/Notice';
+import { useLegalConsent } from './components/LegalConsent';
 import { useNavigate } from './design/NavigationMotion';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
@@ -71,6 +73,7 @@ function AppRoutes({
   completeWebAuthnLogin,
   legalAccepted,
   setLegalAccepted,
+  requestLegalAcceptance,
   legalDocuments,
   legalLoading,
   bannedAccount,
@@ -203,6 +206,7 @@ function AppRoutes({
                 completeWebAuthnLogin={completeWebAuthnLogin}
                 legalAccepted={legalAccepted}
                 setLegalAccepted={setLegalAccepted}
+                requestLegalAcceptance={requestLegalAcceptance}
                 legalDocuments={legalDocuments}
                 authNext={loginNext}
               />
@@ -231,13 +235,14 @@ function AppRoutes({
                 mountCaptcha={mountPublicCaptcha}
                 legalAccepted={legalAccepted}
                 setLegalAccepted={setLegalAccepted}
+                requestLegalAcceptance={requestLegalAcceptance}
                 legalDocuments={legalDocuments}
                 authNext={registerNext}
               />
             )
           }
         />
-        <Route path="/forgot-password" element={isLoggedIn ? <PostLoginRedirect target={forgotNext} fallback={defaultAuthedPath} /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} beginWebAuthnLogin={beginWebAuthnLogin} authNext={forgotNext} />} />
+        <Route path="/forgot-password" element={isLoggedIn ? <PostLoginRedirect target={forgotNext} fallback={defaultAuthedPath} /> : <ForgotPasswordPage loading={loading} sendRecoveryCode={sendRecoveryCode} resetPasswordByCode={resetPasswordByCode} beginWebAuthnLogin={beginWebAuthnLogin} requestLegalAcceptance={requestLegalAcceptance} authNext={forgotNext} />} />
 
         <Route path="/docs" element={<Navigate to="/docs/oidc" replace />} />
         <Route path="/docs/oidc" element={<AdminOidcDocsPage discovery={discovery} />} />
@@ -388,12 +393,12 @@ function OidcContinueRedirect() {
     <main className="flex min-h-dvh items-center justify-center bg-canvas px-5 text-center" aria-busy="true">
       <form ref={formRef} method="get" action={authorizationEndpoint} className="space-y-4">
         {authorizationParameters.map(([name, value], index) => (
-          <input key={`${name}-${index}`} type="hidden" name={name} value={value} />
+          <FormaInput key={`${name}-${index}`} type="hidden" name={name} value={value} />
         ))}
         <p className="text-sm font-semibold text-ink">正在继续授权流程…</p>
-        <button type="submit" className="btn-primary px-5 py-3 text-sm font-bold">
+        <FormaButton type="submit" className="btn-primary px-5 py-3 text-sm font-bold">
           继续授权
-        </button>
+        </FormaButton>
       </form>
     </main>
   );
@@ -434,7 +439,7 @@ function App() {
   const [publicConfig, setPublicConfig] = useState(null);
   const [legalDocuments, setLegalDocuments] = useState(null);
   const [legalLoading, setLegalLoading] = useState(true);
-  const [legalAccepted, setLegalAccepted] = useState(false);
+  const { legalAccepted, setLegalAccepted, requestLegalAcceptance, isLegalAccepted, currentLegalDocuments, legalPrompt } = useLegalConsent(legalDocuments, legalLoading, location.key);
   const [bannedAccount, setBannedAccount] = useState('');
   const [session, setSession] = useState({ user: null, security: null });
   const [systemSettings, setSystemSettings] = useState(null);
@@ -799,7 +804,8 @@ function App() {
   }
 
   function legalSubmission() {
-    if (!legalAccepted || !legalDocuments?.terms || !legalDocuments?.privacy) {
+    const legalDocuments = currentLegalDocuments();
+    if (!isLegalAccepted() || !legalDocuments?.terms || !legalDocuments?.privacy) {
       throw new Error('请先阅读并同意使用条款与隐私政策。');
     }
     return {
@@ -1143,6 +1149,7 @@ function App() {
   }
 
   async function submitRegisterCode() {
+    if (!await requestLegalAcceptance()) return null;
     setRegisterCodeSending(true);
     try {
       const captchaToken = getPublicCaptchaToken();
@@ -1166,6 +1173,7 @@ function App() {
   }
 
   async function requestPasswordLoginCode() {
+    if (!await requestLegalAcceptance()) return null;
     setLoginCodeSending(true);
     try {
       const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
@@ -1190,6 +1198,7 @@ function App() {
   }
 
   async function requestPasswordPhoneCode() {
+    if (!await requestLegalAcceptance()) return null;
     setLoginCodeSending(true);
     try {
       const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
@@ -1213,6 +1222,7 @@ function App() {
   }
 
   async function selectPasswordFactor(factor) {
+    if (!await requestLegalAcceptance()) return null;
     setSelectedPasswordFactor(factor);
     setLoginForm((current) => ({
       ...current,
@@ -1229,6 +1239,7 @@ function App() {
 
   async function prepareLogin(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       const email = loginForm.email.trim();
@@ -1274,6 +1285,7 @@ function App() {
 
   async function completeLogin(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
@@ -1301,6 +1313,7 @@ function App() {
   }
 
   async function requestEmailCodeLogin() {
+    if (!await requestLegalAcceptance()) return null;
     setLoginCodeSending(true);
     try {
       const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
@@ -1323,6 +1336,7 @@ function App() {
   }
 
   async function requestPhoneCodeLogin() {
+    if (!await requestLegalAcceptance()) return null;
     setLoginCodeSending(true);
     try {
       const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
@@ -1346,6 +1360,7 @@ function App() {
 
   async function preparePhoneCodeLogin(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       await requestPhoneCodeLogin();
@@ -1356,6 +1371,7 @@ function App() {
 
   async function completePhoneCodeLogin(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       const payload = await api('/api/v1/auth/phone-login', {
@@ -1381,6 +1397,7 @@ function App() {
 
   async function prepareEmailCodeLogin(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       await requestEmailCodeLogin();
@@ -1391,6 +1408,7 @@ function App() {
 
   async function completeEmailCodeLogin(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       const payload = await api('/api/v1/auth/email-login', {
@@ -1445,6 +1463,7 @@ function App() {
   }
 
   async function selectDirectLoginStepUpFactor(factor) {
+    if (!await requestLegalAcceptance()) return null;
     setSelectedPasswordFactor(factor);
     if (!['email_code', 'phone_code'].includes(factor)) return;
     setLoginCodeSending(true);
@@ -1465,6 +1484,7 @@ function App() {
 
   async function completeDirectLoginStepUp(event, response) {
     event?.preventDefault?.();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       const factor = selectedPasswordFactor;
@@ -1489,7 +1509,8 @@ function App() {
     }
   }
 
-  function beginDirectLoginStepUpPasskey() {
+  async function beginDirectLoginStepUpPasskey() {
+    if (!await requestLegalAcceptance()) return null;
     return api('/api/v1/auth/login-step-up-passkey-options', {
       method: 'POST',
       body: { step_up_challenge: loginStepUpChallenge },
@@ -1543,6 +1564,7 @@ function App() {
 
   async function submitRegister(event) {
     event.preventDefault();
+    if (!await requestLegalAcceptance()) return null;
     setLoading(true);
     try {
       const payload = registerMethod === 'phone'
@@ -1829,6 +1851,7 @@ function App() {
   }
 
   async function sendRecoveryCode(payload) {
+    if (!await requestLegalAcceptance()) return null;
     try {
       const captchaToken = hasConfiguredCaptcha() ? await executeBackgroundCaptcha() : undefined;
       const result = await api('/api/v1/auth/send-recovery-code', {
@@ -1847,6 +1870,7 @@ function App() {
   }
 
   async function resetPasswordByCode(payload) {
+    if (!await requestLegalAcceptance()) return null;
     const result = await api('/api/v1/auth/reset-password-by-code', {
       method: 'POST',
       body: payload,
@@ -1856,6 +1880,7 @@ function App() {
   }
 
   async function beginWebAuthnLogin(email = '') {
+    if (!await requestLegalAcceptance()) return null;
     return api('/api/v1/auth/webauthn/options', {
       method: 'POST',
       body: email ? { email } : {},
@@ -1863,6 +1888,7 @@ function App() {
   }
 
   async function completeWebAuthnLogin(email, response, remember = rememberMe) {
+    if (!await requestLegalAcceptance()) return null;
     try {
       const payload = await api('/api/v1/auth/webauthn/verify', {
         method: 'POST',
@@ -2261,7 +2287,7 @@ function App() {
         id="aliyun-background-captcha"
         aria-hidden="true"
       />
-      <button
+      <FormaButton
         ref={backgroundCaptchaButtonRef}
         id="aliyun-background-captcha-trigger"
         type="button"
@@ -2269,6 +2295,7 @@ function App() {
         aria-hidden="true"
         style={{ position: 'fixed', left: '-9999px', top: 0, width: 1, height: 1, opacity: 0 }}
       />
+      {legalPrompt}
       <AnimatePresence>{toast && (
         <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`fixed right-4 top-4 z-50 max-w-[calc(100vw-2rem)] rounded-control border border-line px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
           {toast.message}
@@ -2381,6 +2408,7 @@ function App() {
         completeWebAuthnLogin={completeWebAuthnLogin}
         legalAccepted={legalAccepted}
         setLegalAccepted={setLegalAccepted}
+        requestLegalAcceptance={requestLegalAcceptance}
         legalDocuments={legalDocuments}
         legalLoading={legalLoading}
         bannedAccount={bannedAccount}

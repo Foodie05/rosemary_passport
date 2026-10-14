@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'epass_motion.dart';
+import 'epass_tokens.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'models.dart';
@@ -117,7 +119,7 @@ class _RosmAliyunCaptchaPageState extends State<_RosmAliyunCaptchaPage> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_loading) const Center(child: CircularProgressIndicator()),
+          if (_loading) const Center(child: RosmEpassProgress()),
         ],
       ),
     );
@@ -132,7 +134,7 @@ String _pageHtml(RosmAliyunCaptchaConfig config) {
   final sceneId = jsonEncode(config.sceneId);
   return '''<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1">
-<style>body{margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f6f8f3;color:#17352b}#rosm-captcha-trigger{width:100%;min-height:48px;border:0;border-radius:12px;background:#2f6b53;color:#fff;font-size:16px;font-weight:600}</style>
+<style>body{margin:0;padding:24px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#${RosmEpassLightTokens.canvas.toARGB32().toRadixString(16).substring(2)};color:#${RosmEpassLightTokens.ink.toARGB32().toRadixString(16).substring(2)}}#rosm-captcha-trigger{width:100%;min-height:48px;border:0;border-radius:8px;background:#${RosmEpassLightTokens.primary.toARGB32().toRadixString(16).substring(2)};color:#fff;font-size:16px;font-weight:500}</style>
 </head><body><p>请完成人机验证后继续。</p><button id="rosm-captcha-trigger">开始安全验证</button>
 <script>window.AliyunCaptchaConfig=$globalConfig;</script>
 <script src="https://o.alicdn.com/captcha-frontend/aliyunCaptcha/AliyunCaptcha.js"></script>

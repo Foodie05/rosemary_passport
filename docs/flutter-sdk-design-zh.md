@@ -1,6 +1,6 @@
 # Rosemary Epass Flutter SDK 设计
 
-> 当前发布版本 v0.9.0 使用官方 Rosemary Design Flutter SDK，要求 Flutter 3.44+ / Dart 3.12+；新密码 8–128 个字符、三类要素至少两类，并提供输入时反馈。实际公开 API 以 [SDK README](../packages/rosm_passport_flutter/README.md) 为准。本文保留早期架构方案；其中原生 Passkey 适配和回调尚未包含在当前 SDK 中。
+> 当前发布版本 v0.10.0 使用官方 rosemary_ui 0.4.0（Forma 1.2.0），要求 Flutter 3.44.8+ / Dart 3.12.2+；新密码 8–128 个字符、三类要素至少两类，并提供输入时反馈。实际公开 API 以 [SDK README](../packages/rosm_passport_flutter/README.md) 为准。本文保留早期架构方案；其中原生 Passkey 适配和回调尚未包含在当前 SDK 中。
 
 ## 目标
 

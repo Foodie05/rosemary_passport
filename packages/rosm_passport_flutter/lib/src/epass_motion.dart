@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rosemary_reference/rosemary.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 import 'epass_tokens.dart';
 
 /// Presents exactly one live form. Selection changes semantics and focus immediately.
@@ -21,7 +21,7 @@ class _SelectionContentState extends State<RosmEpassSelectionContent>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
-    duration: RosmEpassMotion.settle,
+    duration: RosmEpassMotion.tabs,
     value: 1,
   );
   double _startOpacity = 1;
@@ -48,9 +48,7 @@ class _SelectionContentState extends State<RosmEpassSelectionContent>
     final opacity = _opacity;
     final offset = _offset;
     _startOpacity = animating ? opacity : 0;
-    _startOffset = animating
-        ? offset
-        : (widget.order < oldWidget.order ? -12 : 12);
+    _startOffset = animating ? offset : 0;
     _controller.forward(from: 0);
   }
 
@@ -65,7 +63,7 @@ class _SelectionContentState extends State<RosmEpassSelectionContent>
     animation: _controller,
     child: widget.child,
     builder: (context, child) => Transform.translate(
-      offset: Offset(_offset, 0),
+      offset: Offset(0, _offset),
       child: Opacity(
         opacity: _opacity,
         alwaysIncludeSemantics: true,
@@ -82,6 +80,6 @@ class RosmEpassProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DefaultTextStyle.merge(
     style: TextStyle(color: color ?? Theme.of(context).colorScheme.primary),
-    child: const RosemarySpinner(label: '处理中', size: 20),
+    child: RosemaryLoading(label: '处理中', size: 20, color: color),
   );
 }

@@ -1,8 +1,10 @@
+import { FormaImport } from '../components/Forma';
+import { FormaButton, FormaInput, FormaTextarea } from '../components/Forma';
 import { Link } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
 import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react';
 
-import { Activity, Ban, BookOpen, Check, Clock3, Copy, FileText, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from 'lucide-react';
+import { Activity, Ban, BookOpen, Check, Clock3, Copy, FileText, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from '../design/Icons';
 import { NewPasswordField } from '../components/NewPasswordField';
 import { evaluatePassword } from '../lib/password-policy';
 import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
@@ -80,7 +82,7 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
-const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.9.0/packages/rosm_passport_flutter';
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.10.0/packages/rosm_passport_flutter';
 const DASHBOARD_PERIODS = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
@@ -169,31 +171,31 @@ function ProviderListSection({
       </div>
       <p className="text-sm leading-6 text-muted">可导入 txt 文件，每行一个邮箱域名；例如 gmail.com 或 @gmail.com。</p>
       <div className="flex flex-col gap-3 md:flex-row">
-        <input
+        <FormaInput
           aria-label="邮箱提供商域名"
           className="input-field"
           value={inputValue}
           onChange={(event) => onInputChange(event.target.value)}
           placeholder="@gmail.com"
         />
-        <button className="btn-secondary whitespace-nowrap" type="button" onClick={onAdd}>
+        <FormaButton className="btn-secondary whitespace-nowrap" type="button" onClick={onAdd}>
           添加提供商
-        </button>
+        </FormaButton>
       </div>
-      <label className="block space-y-2 text-sm font-medium text-ink"><span>批量导入提供商</span><input type="file" accept=".txt,text/plain" className="epass-file-input" onChange={(event) => { onImport(event.target.files?.[0] || null); event.target.value = ''; }} /></label>
+      <FormaImport onImport={onImport} />
       <div className="flex flex-wrap gap-2">
         {providers.length ? (
           providers.map((provider) => (
             <span key={provider} className="inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink">
               <span className="min-w-0 break-all">{provider}</span>
-              <button
+              <FormaButton
                 type="button"
                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-muted transition-colors hover:text-danger"
                 onClick={() => onRemove(provider)}
                 aria-label={`移除 ${provider}`}
               >
                 <Trash2 size={20} />
-              </button>
+              </FormaButton>
             </span>
           ))
         ) : (
@@ -249,7 +251,7 @@ export function AdminServiceConfig({
       onSubmit={saveServiceConfig}
       actions={(
         <div className="flex flex-wrap gap-3">
-          <button className="btn-primary" type="submit">保存服务配置</button>
+          <FormaButton className="btn-primary" type="submit">保存服务配置</FormaButton>
         </div>
       )}
     >
@@ -261,28 +263,28 @@ export function AdminServiceConfig({
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <ConfigField label="SMTP Host">
-              <input className="input-field" value={systemForm.smtp_host || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_host: event.target.value }))} />
+              <FormaInput className="input-field" value={systemForm.smtp_host || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_host: event.target.value }))} />
             </ConfigField>
             <ConfigField label="SMTP Port">
-              <input type="number" className="input-field" value={systemForm.smtp_port || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_port: event.target.value }))} />
+              <FormaInput type="number" className="input-field" value={systemForm.smtp_port || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_port: event.target.value }))} />
             </ConfigField>
             <ConfigField label="SMTP Username">
-              <input className="input-field" value={systemForm.smtp_username || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_username: event.target.value }))} />
+              <FormaInput className="input-field" value={systemForm.smtp_username || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_username: event.target.value }))} />
             </ConfigField>
             <ConfigField label="SMTP Password">
-              <input type="password" className="input-field" value={systemForm.smtp_password || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_password: event.target.value }))} />
+              <FormaInput type="password" className="input-field" value={systemForm.smtp_password || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_password: event.target.value }))} />
             </ConfigField>
             <ConfigField label="SMTP From">
-              <input className="input-field" value={systemForm.smtp_from || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_from: event.target.value }))} />
+              <FormaInput className="input-field" value={systemForm.smtp_from || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_from: event.target.value }))} />
             </ConfigField>
             <ConfigField label="确认 SMTP Password">
-              <input type="password" className="input-field" value={systemForm.smtp_password_confirm || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_password_confirm: event.target.value }))} />
+              <FormaInput type="password" className="input-field" value={systemForm.smtp_password_confirm || ''} onChange={(event) => setSystemForm((current) => ({ ...current, smtp_password_confirm: event.target.value }))} />
             </ConfigField>
           </div>
           <RosemaryCheckbox checked={Boolean(systemForm.smtp_secure)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, smtp_secure: checked }))}>
             启用安全连接
           </RosemaryCheckbox>
-          <button className="btn-secondary" type="button" onClick={testSmtpConnection}>验证 SMTP 连接</button>
+          <FormaButton className="btn-secondary" type="button" onClick={testSmtpConnection}>验证 SMTP 连接</FormaButton>
         </section>
 
         <section className="epass-settings-section">
@@ -293,23 +295,23 @@ export function AdminServiceConfig({
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ConfigField label="Prefix">
-                <input className="input-field" value={systemForm.aliyun_captcha_prefix || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_prefix: event.target.value }))} />
+                <FormaInput className="input-field" value={systemForm.aliyun_captcha_prefix || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_prefix: event.target.value }))} />
               </ConfigField>
               <ConfigField label="场景 ID" hint="只填写场景管理中显示的 ID，不要包含场景名称或空格。">
-                <input className="input-field" autoComplete="off" value={systemForm.aliyun_captcha_scene_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_scene_id: event.target.value }))} />
+                <FormaInput className="input-field" autoComplete="off" value={systemForm.aliyun_captcha_scene_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_scene_id: event.target.value }))} />
               </ConfigField>
               <ConfigField label="AccessKey ID" hint="填写 RAM 用户的 AccessKey ID。">
-                <input className="input-field" autoComplete="off" placeholder={systemForm.aliyun_captcha_access_key_id_configured ? '已配置，留空则保持不变' : 'RAM AccessKey ID'} value={systemForm.aliyun_captcha_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_id: event.target.value }))} />
+                <FormaInput className="input-field" autoComplete="off" placeholder={systemForm.aliyun_captcha_access_key_id_configured ? '已配置，留空则保持不变' : 'RAM AccessKey ID'} value={systemForm.aliyun_captcha_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_id: event.target.value }))} />
               </ConfigField>
               <ConfigField label="AccessKey Secret" hint="AccessKey 创建时仅展示一次；只保存在服务端，不会下发到客户端。">
-                <input type="password" className="input-field" autoComplete="new-password" placeholder={systemForm.aliyun_captcha_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.aliyun_captcha_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_secret: event.target.value }))} />
+                <FormaInput type="password" className="input-field" autoComplete="new-password" placeholder={systemForm.aliyun_captcha_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.aliyun_captcha_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_secret: event.target.value }))} />
               </ConfigField>
             </div>
             <RosemaryCheckbox checked={Boolean(systemForm.registration_email_verify)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, registration_email_verify: checked }))}>
               注册必须验证邮箱
             </RosemaryCheckbox>
           </div>
-          <button className="btn-secondary" type="button" onClick={testAliyunCaptchaConnection}>验证阿里云验证码</button>
+          <FormaButton className="btn-secondary" type="button" onClick={testAliyunCaptchaConnection}>验证阿里云验证码</FormaButton>
         </section>
 
         <section className="epass-settings-section">
@@ -320,26 +322,26 @@ export function AdminServiceConfig({
             </div>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <ConfigField label="AccessKey ID">
-                <input className="input-field" placeholder={systemForm.phone_sms_access_key_id_configured ? '已配置，留空则保持不变' : 'RAM AccessKey ID'} value={systemForm.phone_sms_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_id: event.target.value }))} />
+                <FormaInput className="input-field" placeholder={systemForm.phone_sms_access_key_id_configured ? '已配置，留空则保持不变' : 'RAM AccessKey ID'} value={systemForm.phone_sms_access_key_id || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_id: event.target.value }))} />
               </ConfigField>
               <ConfigField label="AccessKey Secret">
-                <input type="password" className="input-field" placeholder={systemForm.phone_sms_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.phone_sms_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_secret: event.target.value }))} />
+                <FormaInput type="password" className="input-field" placeholder={systemForm.phone_sms_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.phone_sms_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_access_key_secret: event.target.value }))} />
               </ConfigField>
               <ConfigField label="短信签名 SignName">
-                <input className="input-field" value={systemForm.phone_sms_sign_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_sign_name: event.target.value }))} />
+                <FormaInput className="input-field" value={systemForm.phone_sms_sign_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_sign_name: event.target.value }))} />
               </ConfigField>
               <ConfigField label="短信模板 TemplateCode">
-                <input className="input-field" value={systemForm.phone_sms_template_code || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_template_code: event.target.value }))} />
+                <FormaInput className="input-field" value={systemForm.phone_sms_template_code || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_template_code: event.target.value }))} />
               </ConfigField>
               <ConfigField label="方案名 SchemeName（可选）">
-                <input className="input-field" value={systemForm.phone_sms_scheme_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_scheme_name: event.target.value }))} />
+                <FormaInput className="input-field" value={systemForm.phone_sms_scheme_name || ''} onChange={(event) => setSystemForm((current) => ({ ...current, phone_sms_scheme_name: event.target.value }))} />
               </ConfigField>
             </div>
             <RosemaryCheckbox checked={Boolean(systemForm.phone_verification_enabled ?? true)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, phone_verification_enabled: checked }))}>
               启用手机号验证码能力（登录 / MFA / 绑定）
             </RosemaryCheckbox>
           </div>
-          <button className="btn-secondary" type="button" onClick={testPhoneSmsConnection}>验证短信配置</button>
+          <FormaButton className="btn-secondary" type="button" onClick={testPhoneSmsConnection}>验证短信配置</FormaButton>
         </section>
       </div>
     </SettingsShell>
@@ -375,7 +377,7 @@ export function AdminSecurityPolicy({
       title="安全策略"
       description="控制限流策略、验证码尝试次数以及注册邮箱提供商管理。"
       onSubmit={saveSecurityPolicy}
-      actions={<button className="btn-primary" type="submit">保存安全策略</button>}
+      actions={<FormaButton className="btn-primary" type="submit">保存安全策略</FormaButton>}
     >
       <div className="space-y-8">
         <div className="space-y-6 rounded-panel border border-line bg-surface p-6">
@@ -415,7 +417,7 @@ export function AdminSecurityPolicy({
                   hint={SECURITY_FIELD_HINTS[key]}
                   defaultValue={SECURITY_FIELD_DEFAULTS[key]}
                 >
-                  <input
+                  <FormaInput
                     type="number"
                     className="input-field"
                     value={systemForm[key] ?? ''}
@@ -437,7 +439,7 @@ export function AdminSecurityPolicy({
               </p>
             </div>
             <SelectionGroup value={providerMode} label="邮箱提供商管理模式" className="epass-compact-methods">
-              {[['blacklist', '黑名单模式'], ['whitelist', '白名单模式']].map(([mode, label]) => <button key={mode} type="button" aria-pressed={providerMode === mode} onClick={() => setSystemForm((current) => ({ ...current, registration_email_provider_mode: mode }))}>{label}</button>)}
+              {[['blacklist', '黑名单模式'], ['whitelist', '白名单模式']].map(([mode, label]) => <FormaButton key={mode} type="button" aria-pressed={providerMode === mode} onClick={() => setSystemForm((current) => ({ ...current, registration_email_provider_mode: mode }))}>{label}</FormaButton>)}
             </SelectionGroup>
           </div>
 
@@ -564,7 +566,7 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
           <div className="flex flex-col items-start gap-2 md:items-end">
             <span className="text-xs font-bold text-muted">选择统计时间范围</span>
             <SelectionGroup value={days} label="统计时间范围" className="epass-compact-methods">
-              {DASHBOARD_PERIODS.map((period) => <button key={period.days} type="button" aria-pressed={days === period.days} onClick={() => setDays(period.days)}>{period.label}</button>)}
+              {DASHBOARD_PERIODS.map((period) => <FormaButton key={period.days} type="button" aria-pressed={days === period.days} onClick={() => setDays(period.days)}>{period.label}</FormaButton>)}
             </SelectionGroup>
           </div>
         )}
@@ -659,7 +661,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
       <SectionHeader
         title="状态管理"
         description="查看验证码发放与校验产生的冷却、尝试窗口和来源 IP；包括尚未注册的邮箱与手机号。"
-        actions={<button type="button" className="btn-secondary flex items-center gap-2" onClick={() => void safely(() => refresh(pagination.page || 1), '冷却状态刷新失败')}><RefreshCw size={17} />刷新</button>}
+        actions={<FormaButton type="button" className="btn-secondary flex items-center gap-2" onClick={() => void safely(() => refresh(pagination.page || 1), '冷却状态刷新失败')}><RefreshCw size={17} />刷新</FormaButton>}
       />
 
       <h2 className="epass-section-title">冷却管理</h2>
@@ -668,15 +670,15 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-            <input aria-label="搜索冷却记录" className="input-field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、手机号、IP 或冷却类型" onKeyDown={(event) => { if (event.key === 'Enter') void safely(() => refresh(1), '冷却状态加载失败'); }} />
+            <FormaInput aria-label="搜索冷却记录" className="input-field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、手机号、IP 或冷却类型" onKeyDown={(event) => { if (event.key === 'Enter') void safely(() => refresh(1), '冷却状态加载失败'); }} />
           </div>
           <SelectionGroup value={subjectType} label="主体类型" className="epass-segments epass-compact-methods" indicator={false}>
             {COOLDOWN_SUBJECT_TYPES.map((item) => (
-              <button key={item.value} type="button" aria-pressed={subjectType === item.value} className={cn('rounded-control px-3 py-2 text-sm font-bold transition-colors', subjectType === item.value ? 'text-ink' : 'text-muted hover:text-ink')} onClick={() => setSubjectType(item.value)}>{item.label}</button>
+              <FormaButton key={item.value} type="button" aria-pressed={subjectType === item.value} className={cn('rounded-control px-3 py-2 text-sm font-bold transition-colors', subjectType === item.value ? 'text-ink' : 'text-muted hover:text-ink')} onClick={() => setSubjectType(item.value)}>{item.label}</FormaButton>
             ))}
           </SelectionGroup>
           <RosemaryCheckbox checked={activeOnly} onCheckedChange={setActiveOnly} ariaLabel="仅显示冷却中">仅显示冷却中</RosemaryCheckbox>
-          <button type="button" className="btn-primary" onClick={() => void safely(() => refresh(1), '冷却状态加载失败')}>应用筛选</button>
+          <FormaButton type="button" className="btn-primary" onClick={() => void safely(() => refresh(1), '冷却状态加载失败')}>应用筛选</FormaButton>
         </div>
         <p className="flex items-center gap-2 text-xs leading-5 text-muted"><Wifi size={15} />主体与来源 IP 仅在管理员页面显示；重置行为会进入脱敏审计链。</p>
       </div>
@@ -700,7 +702,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
                     <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.updated_at)}</td>
                     <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.blocked_until)}</td>
                     <td className="px-5 py-4"><span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', active ? 'bg-warning-subtle text-warning' : 'bg-subtle text-muted')}><Clock3 size={13} />{formatRemaining(record, now)}</span></td>
-                    <td className="px-5 py-4"><button type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</button></td>
+                    <td className="px-5 py-4"><FormaButton type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</FormaButton></td>
                   </tr>
                 );
               })}
@@ -711,8 +713,8 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
         <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</p>
           <div className="flex gap-2">
-            <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</button>
-            <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => refresh(pagination.page + 1), '冷却状态加载失败')}>下一页</button>
+            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</FormaButton>
+            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => refresh(pagination.page + 1), '冷却状态加载失败')}>下一页</FormaButton>
           </div>
         </div>
       </div>
@@ -736,11 +738,11 @@ export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publi
       <SectionHeader title="使用条款与隐私政策" description="保存形成下一版本草稿；发布后立即成为当前版本，并要求用户在后续登录时重新明确同意。" />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="surface-panel rounded-panel p-6">
-          <SelectionGroup value={type} label="协议类型" className="mb-6 epass-compact-methods">{[['terms', '使用条款'], ['privacy', '隐私政策']].map(([value, label]) => <button key={value} type="button" aria-pressed={type === value} onClick={() => setType(value)}>{label}</button>)}</SelectionGroup>
-          <SelectionContent value={type} index={type === 'terms' ? 0 : 1} className="space-y-6"><ConfigField label="协议标题"><input className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></ConfigField><ConfigField label="协议正文"><textarea className="input-field min-h-[520px] text-sm leading-7" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></ConfigField></SelectionContent>
-          <div className="mt-5 flex flex-wrap justify-end gap-3"><button type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</button><button type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</button>{draft ? <button type="button" className="btn-secondary" onClick={() => void safely(async () => { const approved = await confirm({ title: `发布协议版本 ${draft.version}`, message: '发布后将立即成为当前版本，历史版本不可覆盖，所有用户下次登录时需要重新明确同意。', confirmLabel: '确认发布', tone: 'warning' }); if (!approved) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</button> : null}</div>
+          <SelectionGroup value={type} label="协议类型" className="mb-6 epass-compact-methods">{[['terms', '使用条款'], ['privacy', '隐私政策']].map(([value, label]) => <FormaButton key={value} type="button" aria-pressed={type === value} onClick={() => setType(value)}>{label}</FormaButton>)}</SelectionGroup>
+          <SelectionContent value={type} index={type === 'terms' ? 0 : 1} className="space-y-6"><ConfigField label="协议标题"><FormaInput className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></ConfigField><ConfigField label="协议正文"><FormaTextarea className="input-field min-h-[520px] text-sm leading-7" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></ConfigField></SelectionContent>
+          <div className="mt-5 flex flex-wrap justify-end gap-3"><FormaButton type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</FormaButton><FormaButton type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</FormaButton>{draft ? <FormaButton type="button" className="btn-secondary" onClick={() => void safely(async () => { const approved = await confirm({ title: `发布协议版本 ${draft.version}`, message: '发布后将立即成为当前版本，历史版本不可覆盖，所有用户下次登录时需要重新明确同意。', confirmLabel: '确认发布', tone: 'warning' }); if (!approved) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</FormaButton> : null}</div>
         </div>
-        <aside className="surface-panel h-fit rounded-panel p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{!selected.length && <p className="text-sm text-muted">暂无版本记录。保存草稿后会显示在这里。</p>}{selected.map((item) => <button key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-control border border-line p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-success' : 'text-warning')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-muted">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></button>)}</div></aside>
+        <aside className="surface-panel h-fit rounded-panel p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{!selected.length && <p className="text-sm text-muted">暂无版本记录。保存草稿后会显示在这里。</p>}{selected.map((item) => <FormaButton key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-control border border-line p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-success' : 'text-warning')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-muted">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></FormaButton>)}</div></aside>
       </div>
     </div>
   );
@@ -771,10 +773,10 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         title="用户管理"
         description="查看当前所有已注册用户，并通过分页方式检索账户。"
         actions={(
-          <button type="button" className="btn-primary flex items-center gap-2" onClick={() => setCreateModalOpen(true)}>
+          <FormaButton type="button" className="btn-primary flex items-center gap-2" onClick={() => setCreateModalOpen(true)}>
             <UserPlus size={18} />
             添加新用户
-          </button>
+          </FormaButton>
         )}
       />
 
@@ -782,11 +784,11 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         <div className="flex flex-col gap-4 md:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-            <input onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败'); } }} aria-label="搜索用户" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索昵称或邮箱..." className="input-field pl-10" />
+            <FormaInput onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败'); } }} aria-label="搜索用户" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索昵称或邮箱..." className="input-field pl-10" />
           </div>
-          <button type="button" className="btn-secondary" onClick={() => void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败')}>
+          <FormaButton type="button" className="btn-secondary" onClick={() => void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败')}>
             查询
-          </button>
+          </FormaButton>
         </div>
       </div>
 
@@ -806,7 +808,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
               {users.map((user, index) => (
                 <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-canvas" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
                   <td className="px-6 py-4">
-                    <button type="button" className="epass-table-link" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>{cleanDisplayName(user.nickname, user.email || '-')}<span className="sr-only">，查看用户详情</span></button>
+                    <FormaButton type="button" className="epass-table-link" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>{cleanDisplayName(user.nickname, user.email || '-')}<span className="sr-only">，查看用户详情</span></FormaButton>
                     <p className="text-xs text-muted">{user.email || '-'}</p>
                   </td>
                   <td className="px-6 py-4">
@@ -826,7 +828,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                   <td className="px-6 py-4 text-sm text-muted">{user.id || '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      <button
+                      <FormaButton
                         type="button"
                         className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-line bg-surface text-muted transition-colors hover:bg-canvas"
                         aria-label={`编辑 ${cleanDisplayName(user.nickname, user.email || '-')}`}
@@ -837,8 +839,8 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                         }}
                       >
                         <Pencil size={20} />
-                      </button>
-                      <button
+                      </FormaButton>
+                      <FormaButton
                         type="button"
                         className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-danger bg-surface text-danger transition-colors hover:bg-danger-subtle"
                         aria-label={`删除 ${cleanDisplayName(user.nickname, user.email || '-')}`}
@@ -860,7 +862,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                         }}
                       >
                         <Trash2 size={20} />
-                      </button>
+                      </FormaButton>
                     </div>
                   </td>
                 </tr>
@@ -876,12 +878,12 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 位用户</p>
           <div className="flex gap-2">
-            <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => loadUsers({ page: pagination.page - 1, search }), '用户数据加载失败')}>
+            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => loadUsers({ page: pagination.page - 1, search }), '用户数据加载失败')}>
               上一页
-            </button>
-            <button type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => loadUsers({ page: pagination.page + 1, search }), '用户数据加载失败')}>
+            </FormaButton>
+            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => loadUsers({ page: pagination.page + 1, search }), '用户数据加载失败')}>
               下一页
-            </button>
+            </FormaButton>
           </div>
         </div>
       </div>
@@ -892,10 +894,10 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           onClose={() => setCreateModalOpen(false)}
           actions={(
             <>
-              <button type="button" className="btn-secondary" onClick={() => setCreateModalOpen(false)}>
+              <FormaButton type="button" className="btn-secondary" onClick={() => setCreateModalOpen(false)}>
                 取消
-              </button>
-              <button
+              </FormaButton>
+              <FormaButton
                 type="button"
                 className="btn-primary"
                 disabled={!evaluatePassword(createForm.password).ok}
@@ -914,24 +916,24 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                 }
               >
                 创建用户
-              </button>
+              </FormaButton>
             </>
           )}
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <ConfigField label="邮箱"><input
+            <ConfigField label="邮箱"><FormaInput
               className="input-field" type="email"
               placeholder="name@example.com"
               value={createForm.email}
               onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))}
             /></ConfigField>
-            <ConfigField label="昵称"><input
+            <ConfigField label="昵称"><FormaInput
               className="input-field"
               value={createForm.nickname}
               onChange={(event) => setCreateForm((current) => ({ ...current, nickname: event.target.value }))}
             /></ConfigField>
             <NewPasswordField className="md:col-span-2" label="初始密码" value={createForm.password} personalInfo={[createForm.nickname, createForm.email]} onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))} />
-            <ConfigField label="角色（逗号分隔）"><input
+            <ConfigField label="角色（逗号分隔）"><FormaInput
               className="input-field"
               value={createForm.roles}
               onChange={(event) => setCreateForm((current) => ({ ...current, roles: event.target.value }))}
@@ -946,10 +948,10 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           onClose={() => setEditingUser(null)}
           actions={(
             <>
-              <button type="button" className="btn-secondary" onClick={() => setEditingUser(null)}>
+              <FormaButton type="button" className="btn-secondary" onClick={() => setEditingUser(null)}>
                 取消
-              </button>
-              <button
+              </FormaButton>
+              <FormaButton
                 type="button"
                 className="btn-primary"
                 onClick={() =>
@@ -961,7 +963,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                 }
               >
                 保存
-              </button>
+              </FormaButton>
             </>
           )}
         >
@@ -973,7 +975,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                 </span>
               ))}
             </div>
-            <input
+            <FormaInput
               className="input-field"
               placeholder="角色，用逗号分隔"
               value={editingRoles}
@@ -984,7 +986,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
       )}</AnimatePresence>
 
       <AnimatePresence>{viewingUser && (
-        <Modal key="viewingUser" title={`用户详情 · ${cleanDisplayName(viewingUser.nickname, viewingUser.email || '-')}`} onClose={() => setViewingUser(null)} actions={<button type="button" className="btn-secondary" onClick={() => setViewingUser(null)}>关闭</button>}>
+        <Modal key="viewingUser" title={`用户详情 · ${cleanDisplayName(viewingUser.nickname, viewingUser.email || '-')}`} onClose={() => setViewingUser(null)} actions={<FormaButton type="button" className="btn-secondary" onClick={() => setViewingUser(null)}>关闭</FormaButton>}>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             {[
               ['用户 ID', viewingUser.id], ['注册时间', viewingUser.created_at ? new Date(viewingUser.created_at).toLocaleString('zh-CN') : '-'],
@@ -995,9 +997,9 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
             ].map(([label, value]) => <div key={label} className="rounded-control bg-canvas p-3"><p className="text-xs font-bold text-muted">{label}</p><p className="mt-1 break-all font-semibold text-ink">{value}</p></div>)}
           </div>
           {viewingUser.account_status === 'banned' ? (
-            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><button type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</button></div>
+            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><FormaButton type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</FormaButton></div>
           ) : (
-            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><label htmlFor="epass-adminpages-field-1" className="text-sm font-bold text-danger">封禁原因</label><textarea id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><button type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-control bg-danger px-4 py-2 font-bold text-on-danger disabled:opacity-40" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</button></div>
+            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><label htmlFor="epass-adminpages-field-1" className="text-sm font-bold text-danger">封禁原因</label><FormaTextarea id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-control bg-danger px-4 py-2 font-bold text-on-danger disabled:opacity-40" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
           )}
         </Modal>
       )}</AnimatePresence>
@@ -1135,7 +1137,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
 
   return (
     <div className="max-w-6xl space-y-8">
-      <SectionHeader title="OIDC 接入" description="管理接入 Rosemary Epass 的应用及其授权权限。" actions={<><Link to="/docs/oidc" className="btn-secondary"><BookOpen size={20} />接入文档</Link><button className="btn-primary" type="button" onClick={openCreateModal}>添加应用</button></>} />
+      <SectionHeader title="OIDC 接入" description="管理接入 Rosemary Epass 的应用及其授权权限。" actions={<><Link to="/docs/oidc" className="btn-secondary"><BookOpen size={20} />接入文档</Link><FormaButton className="btn-primary" type="button" onClick={openCreateModal}>添加应用</FormaButton></>} />
       <section className="surface-panel rounded-panel overflow-hidden">
         <div className="border-b border-line px-6 py-5"><h2 className="epass-section-title">已接入应用 <span className="text-base font-sans text-muted">{oidcClients.length}</span></h2></div>
         {!oidcClients.length && <div className="px-6 py-12"><h3 className="text-lg font-medium">尚未接入应用</h3><p className="mt-2 text-sm leading-6 text-muted">添加应用，配置回调地址与权限后即可使用 Rosemary Epass 认证。</p></div>}
@@ -1155,15 +1157,15 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                     <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', client.is_active === false ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success')}>
                       {client.is_active === false ? '停用' : '启用'}
                     </span>
-                    <button
+                    <FormaButton
                       type="button"
                       className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface text-muted hover:bg-canvas"
                       aria-label={`编辑 ${client.client_id}`}
                       onClick={() => openEditModal(client)}
                     >
                       <Pencil size={20} />
-                    </button>
-                    <button
+                    </FormaButton>
+                    <FormaButton
                       type="button"
                       className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-danger bg-surface text-danger hover:bg-danger-subtle"
                       aria-label={`删除 ${client.client_id}`}
@@ -1187,7 +1189,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                       }}
                     >
                       <Trash2 size={20} />
-                    </button>
+                    </FormaButton>
                   </div>
                 </div>
                 <p className="mt-3 break-all text-sm leading-6 text-muted">{(client.redirect_uris || []).join(', ') || '未配置 redirect URI'}</p>
@@ -1207,7 +1209,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             <InfoRow label="JWKS" value={oidcSettings?.jwks_uri || discovery?.jwks_uri} />
             <InfoRow label="PKCE" value={oidcSettings?.pkce_required == null ? '未提供' : oidcSettings.pkce_required ? '强制 S256' : '可选'} />
           </div>
-          <button type="button" className="btn-secondary" onClick={() => void safely(loadDiscovery, '协议配置加载失败')}><RefreshCw size={20} />刷新协议发现</button>
+          <FormaButton type="button" className="btn-secondary" onClick={() => void safely(loadDiscovery, '协议配置加载失败')}><RefreshCw size={20} />刷新协议发现</FormaButton>
         </div>
       </details>
 
@@ -1217,10 +1219,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
           onClose={() => setEditorOpen(false)}
           actions={(
             <>
-              <button type="button" className="btn-secondary" onClick={() => setEditorOpen(false)}>
+              <FormaButton type="button" className="btn-secondary" onClick={() => setEditorOpen(false)}>
                 取消
-              </button>
-              <button
+              </FormaButton>
+              <FormaButton
                 type="button"
                 className="btn-primary"
                 onClick={() =>
@@ -1238,16 +1240,16 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                 }
               >
                 保存应用
-              </button>
+              </FormaButton>
             </>
           )}
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <ConfigField label="Client ID">
-              <input className="input-field" placeholder="例如 com.rosm.donut" value={oidcForm.client_id} onChange={(event) => setOidcForm((current) => ({ ...current, client_id: event.target.value }))} required />
+              <FormaInput className="input-field" placeholder="例如 com.rosm.donut" value={oidcForm.client_id} onChange={(event) => setOidcForm((current) => ({ ...current, client_id: event.target.value }))} required />
             </ConfigField>
             <ConfigField label="展示名称">
-              <input className="input-field" placeholder="例如 Donut App" value={oidcForm.display_name} onChange={(event) => setOidcForm((current) => ({ ...current, display_name: event.target.value }))} />
+              <FormaInput className="input-field" placeholder="例如 Donut App" value={oidcForm.display_name} onChange={(event) => setOidcForm((current) => ({ ...current, display_name: event.target.value }))} />
             </ConfigField>
           </div>
 
@@ -1258,7 +1260,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                 <RosemaryCheckbox checked={Boolean(oidcForm.enable_web)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_web: checked }))} ariaLabel="启用 Web" />
               </div>
               <p className="mt-2 text-xs leading-5 text-muted">Web 使用 HTTPS 或 loopback 回调。仅 Web 启用时可选择机密客户端。</p>
-              <textarea aria-label="Web 回调地址（每行一条）" rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
+              <FormaTextarea aria-label="Web 回调地址（每行一条）" rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
             </div>
 
             <div className="rounded-panel border border-line bg-canvas p-4">
@@ -1268,12 +1270,12 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs leading-5 text-muted">Public 直连使用自定义 scheme；服务端交接使用上方 HTTPS 回调并可保持机密客户端。</p>
-                <button type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
+                <FormaButton type="button" className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs" onClick={applyMobilePublicTemplate}>
                   <Smartphone size={14} />
                   生成
-                </button>
+                </FormaButton>
               </div>
-              <input aria-label="App 回调地址" className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} />
+              <FormaInput aria-label="App 回调地址" className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} />
             </div>
           </div>
 
@@ -1297,7 +1299,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             </ConfigField>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <ConfigField label="Grant Types">
-                <textarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
+                <FormaTextarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
               </ConfigField>
               <div className="rounded-panel border border-line bg-canvas p-4">
                 <p className="text-sm font-bold text-ink">Client Secret</p>
@@ -1346,10 +1348,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
           title="复制 Client Secret"
           onClose={discardOneTimeSecret}
           actions={(
-            <button type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => void copyOneTimeSecret()} disabled={copyingSecret}>
+            <FormaButton type="button" className="btn-primary inline-flex items-center gap-2" onClick={() => void copyOneTimeSecret()} disabled={copyingSecret}>
               {copyingSecret ? <Check size={18} /> : <Copy size={18} />}
               {copyingSecret ? '正在复制' : '复制一次并关闭'}
-            </button>
+            </FormaButton>
           )}
         >
           <div className="space-y-4">
@@ -1448,7 +1450,7 @@ function OidcDocsContent({ discovery, oidcSettings }) {
     '  rosm_passport_flutter:',
     '    git:',
     '      url: https://github.com/Foodie05/rosemary_passport.git',
-    '      ref: v0.9.0',
+    '      ref: v0.10.0',
     '      path: packages/rosm_passport_flutter',
     '```',
     '',
@@ -1581,9 +1583,9 @@ Authorization: Bearer ACCESS_TOKEN`,
         description="通过 OIDC 接入 Rosemary Epass，完成登录、授权与会话管理。"
         actions={(
           <>
-            <button type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
+            <FormaButton type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
               {copying ? '复制中...' : '复制为 MD'}
-            </button>
+            </FormaButton>
             <Link to="/docs/flutter-sdk" className="btn-primary">
               Flutter SDK 接入
             </Link>
@@ -1785,13 +1787,13 @@ Scopes:
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-dependencies" tabIndex={-1} className="text-lg font-bold text-ink">2. 添加 SDK 依赖</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">v0.9.0 使用官方 Rosemary Design Flutter SDK 0.3.0-prototype.2，并锁定其提交。需要 Flutter 3.44+ 和 Dart 3.12+；应用可通过 Git 标签接入。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">v0.10.0 使用官方 Rosemary Forma 1.2.0 Flutter SDK 0.4.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；应用可通过 Git 标签接入。</p>
         </div>
         <CodeBlock>{`dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: v0.9.0
+      ref: v0.10.0
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
@@ -1938,8 +1940,8 @@ final validation = const RosmPasswordPolicy().evaluate(
           <p className="mt-2 text-sm leading-relaxed text-muted">官方设计 SDK 提供平台适配的主按钮、主题和加载组件。通行证界面遵循同源语义令牌，跟随系统明暗主题、字号及减少动态效果；宿主继续管理 Navigator、输入控制器和业务会话。</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <InfoRow label="运行环境" value="Flutter 3.44+ / Dart 3.12+" />
-          <InfoRow label="设计 SDK" value="rosemary_reference 0.3.0-prototype.2，固定提交" />
+          <InfoRow label="运行环境" value="Flutter 3.44.8+ / Dart 3.12.2+" />
+          <InfoRow label="设计 SDK" value="rosemary_ui 0.4.0，固定提交" />
           <InfoRow label="版本状态" value="官方设计库仍为 Prototype；人工辅助技术验收尚未完成" />
           <InfoRow label="通行密钥" value="当前 Flutter SDK 不包含原生 Passkey API；网站的 WebAuthn 能力独立提供" />
         </div>
@@ -1980,7 +1982,7 @@ await passport.signOut();`}</CodeBlock>
           <p>只有 Public 直连模式才使用自定义 scheme，例如 <InlineCode>com.cruos.zion:/oidc/callback</InlineCode>。</p>
           <p>接入方服务器必须校验 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>issuer</InlineCode>、<InlineCode>aud</InlineCode>、过期时间和 redirect URI。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
-          <p>升级至 v0.9.0 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
+          <p>升级至 v0.10.0 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
           <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
           <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>

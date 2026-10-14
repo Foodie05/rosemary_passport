@@ -1,5 +1,5 @@
 import { Link } from '../design/NavigationMotion';
-import { ArrowLeft, Ban, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Ban, ExternalLink } from '../design/Icons';
 
 import { Brand, SiteFooter } from '../components/Brand';
 import { ThemeToggle } from '../theme';

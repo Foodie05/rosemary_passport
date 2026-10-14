@@ -1,3 +1,4 @@
+import { FormaButton, FormaInput, FormaTextarea } from './Forma';
 import { PAGE_META, SECURITY_FIELDS } from '../constants';
 import { cleanDisplayName, formatAnyDate, getInitial } from '../utils';
 import { EmptyState, Field, InfoPill, InfoTile, KeyValueList, Panel } from './ui';
@@ -200,7 +201,7 @@ export function DashboardScreen({
         <div className="sidebar-section-label">工作区</div>
         <nav className="nav-list">
           {navItems.map((item) => (
-            <button
+            <FormaButton
               key={item.key}
               className={`nav-button ${page === item.key ? 'active' : ''}`}
               onClick={() => navigateTo(item.key)}
@@ -208,17 +209,17 @@ export function DashboardScreen({
             >
               <span>{item.label}</span>
               <small>{item.title}</small>
-            </button>
+            </FormaButton>
           ))}
         </nav>
 
         <div className="sidebar-footer">
-          <button className="ghost" onClick={() => navigateTo('profile')} type="button">
+          <FormaButton className="ghost" onClick={() => navigateTo('profile')} type="button">
             账号与安全
-          </button>
-          <button className="danger" onClick={() => logout()} type="button">
+          </FormaButton>
+          <FormaButton className="danger" onClick={() => logout()} type="button">
             退出登录
-          </button>
+          </FormaButton>
         </div>
       </aside>
 
@@ -305,7 +306,7 @@ export function DashboardScreen({
               <Panel title="已注册客户端" description="优先查看已启用的接入配置。">
                 <div className="client-summary-list">
                   {oidcClients.slice(0, 4).map((client) => (
-                    <button
+                    <FormaButton
                       key={client.client_id}
                       className="entity-card"
                       onClick={() => {
@@ -321,7 +322,7 @@ export function DashboardScreen({
                         </span>
                       </div>
                       <p>{(client.redirect_uris || []).join(', ') || '未配置 redirect URI'}</p>
-                    </button>
+                    </FormaButton>
                   ))}
                   {!oidcClients.length && <EmptyState title="暂无客户端" body="接入方创建后会出现在这里，可直接跳转到 OIDC 页面继续完善。" />}
                 </div>
@@ -332,10 +333,10 @@ export function DashboardScreen({
                   {navItems
                     .filter((item) => item.key !== 'overview')
                     .map((item) => (
-                      <button key={item.key} className="action-card" onClick={() => navigateTo(item.key)} type="button">
+                      <FormaButton key={item.key} className="action-card" onClick={() => navigateTo(item.key)} type="button">
                         <strong>{item.title}</strong>
                         <p>{item.description}</p>
-                      </button>
+                      </FormaButton>
                     ))}
                 </div>
               </Panel>
@@ -349,7 +350,7 @@ export function DashboardScreen({
               <Panel title="账号信息" description="在不打断当前会话的前提下完成资料与凭证更新。">
                 <form className="stack" onSubmit={saveProfile}>
                   <Field label="昵称">
-                    <input
+                    <FormaInput
                       value={profileForm.nickname}
                       onChange={(event) =>
                         setProfileForm((current) => ({ ...current, nickname: event.target.value }))
@@ -357,7 +358,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="新邮箱">
-                    <input
+                    <FormaInput
                       type="email"
                       value={profileForm.email}
                       onChange={(event) =>
@@ -366,7 +367,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="新密码">
-                    <input
+                    <FormaInput
                       type="password"
                       value={profileForm.new_password}
                       onChange={(event) =>
@@ -378,7 +379,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="当前密码">
-                    <input
+                    <FormaInput
                       type="password"
                       value={profileForm.current_password}
                       onChange={(event) =>
@@ -389,7 +390,7 @@ export function DashboardScreen({
                       }
                     />
                   </Field>
-                  <button type="submit">保存账号设置</button>
+                  <FormaButton type="submit">保存账号设置</FormaButton>
                 </form>
               </Panel>
 
@@ -451,7 +452,7 @@ export function DashboardScreen({
                     <div className="form-subsection">
                       <h3>注册与验证码</h3>
                       <Field label="阿里云验证码场景 ID">
-                        <input
+                        <FormaInput
                           value={systemForm.aliyun_captcha_scene_id || ''}
                           onChange={(event) =>
                             setSystemForm((current) => ({
@@ -462,7 +463,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <label className="toggle">
-                        <input
+                        <FormaInput
                           checked={Boolean(systemForm.registration_email_verify)}
                           type="checkbox"
                           onChange={(event) =>
@@ -479,7 +480,7 @@ export function DashboardScreen({
                     <div className="form-subsection">
                       <h3>SMTP</h3>
                       <Field label="SMTP Host">
-                        <input
+                        <FormaInput
                           value={systemForm.smtp_host || ''}
                           onChange={(event) =>
                             setSystemForm((current) => ({ ...current, smtp_host: event.target.value }))
@@ -487,7 +488,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <Field label="SMTP Port">
-                        <input
+                        <FormaInput
                           type="number"
                           value={systemForm.smtp_port || ''}
                           onChange={(event) =>
@@ -496,7 +497,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <Field label="SMTP From">
-                        <input
+                        <FormaInput
                           value={systemForm.smtp_from || ''}
                           onChange={(event) =>
                             setSystemForm((current) => ({ ...current, smtp_from: event.target.value }))
@@ -504,7 +505,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <Field label="SMTP Username">
-                        <input
+                        <FormaInput
                           value={systemForm.smtp_username || ''}
                           onChange={(event) =>
                             setSystemForm((current) => ({
@@ -515,7 +516,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <Field label="SMTP Password">
-                        <input
+                        <FormaInput
                           type="password"
                           value={systemForm.smtp_password || ''}
                           onChange={(event) =>
@@ -527,7 +528,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <Field label="Confirm Password">
-                        <input
+                        <FormaInput
                           type="password"
                           value={systemForm.smtp_password_confirm || ''}
                           onChange={(event) =>
@@ -539,7 +540,7 @@ export function DashboardScreen({
                         />
                       </Field>
                       <label className="toggle">
-                        <input
+                        <FormaInput
                           checked={Boolean(systemForm.smtp_secure)}
                           type="checkbox"
                           onChange={(event) =>
@@ -557,7 +558,7 @@ export function DashboardScreen({
                   <div className="security-grid">
                     {SECURITY_FIELDS.map(([key, label]) => (
                       <Field key={key} label={label}>
-                        <input
+                        <FormaInput
                           min="1"
                           type="number"
                           value={systemForm[key] ?? ''}
@@ -569,7 +570,7 @@ export function DashboardScreen({
                     ))}
                   </div>
 
-                  <button type="submit">保存系统配置</button>
+                  <FormaButton type="submit">保存系统配置</FormaButton>
                 </form>
               </Panel>
             </section>
@@ -582,7 +583,7 @@ export function DashboardScreen({
               <Panel title="模板资产" description="先选中模板，再在右侧完成内容维护。">
                 <div className="template-list">
                   {templates.map((template) => (
-                    <button
+                    <FormaButton
                       key={template.name}
                       className={`template-chip ${selectedTemplate === template.name ? 'active' : ''}`}
                       onClick={() => handleTemplateSelect(template.name)}
@@ -590,7 +591,7 @@ export function DashboardScreen({
                     >
                       <strong>{template.name}</strong>
                       <span>{template.subject || '未设置主题'}</span>
-                    </button>
+                    </FormaButton>
                   ))}
                   {!templates.length && <EmptyState title="没有模板数据" body="请先确认后端模板接口是否返回资产。" />}
                 </div>
@@ -616,7 +617,7 @@ export function DashboardScreen({
               <Panel title="模板编辑器" description="保留主题、HTML 与纯文本三个核心输入，避免引入无效演示字段。">
                 <form className="stack" onSubmit={saveCurrentTemplate}>
                   <Field label="主题">
-                    <input
+                    <FormaInput
                       value={templateForm.subject}
                       onChange={(event) =>
                         setTemplateForm((current) => ({ ...current, subject: event.target.value }))
@@ -624,7 +625,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="HTML">
-                    <textarea
+                    <FormaTextarea
                       rows="12"
                       value={templateForm.html}
                       onChange={(event) =>
@@ -633,7 +634,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="纯文本">
-                    <textarea
+                    <FormaTextarea
                       rows="7"
                       value={templateForm.text}
                       onChange={(event) =>
@@ -641,9 +642,9 @@ export function DashboardScreen({
                       }
                     />
                   </Field>
-                  <button disabled={!selectedTemplate} type="submit">
+                  <FormaButton disabled={!selectedTemplate} type="submit">
                     保存模板
-                  </button>
+                  </FormaButton>
                 </form>
               </Panel>
             </section>
@@ -657,9 +658,9 @@ export function DashboardScreen({
                 title="协议发现"
                 description="聚焦 issuer 与关键端点，不再直接暴露原始 JSON。"
                 actions={
-                  <button className="ghost" onClick={() => safely(loadDiscovery, '协议配置加载失败')} type="button">
+                  <FormaButton className="ghost" onClick={() => safely(loadDiscovery, '协议配置加载失败')} type="button">
                     刷新 Discovery
-                  </button>
+                  </FormaButton>
                 }
               >
                 {criticalEndpoints.length ? (
@@ -673,14 +674,14 @@ export function DashboardScreen({
                 title="客户端列表"
                 description="点击任一客户端即可带入下方表单继续编辑。"
                 actions={
-                  <button className="ghost" onClick={() => safely(loadOidcClients, 'OIDC 客户端加载失败')} type="button">
+                  <FormaButton className="ghost" onClick={() => safely(loadOidcClients, 'OIDC 客户端加载失败')} type="button">
                     刷新客户端
-                  </button>
+                  </FormaButton>
                 }
               >
                 <div className="client-list">
                   {oidcClients.map((client) => (
-                    <button
+                    <FormaButton
                       key={client.client_id}
                       className="entity-card entity-card-button"
                       onClick={() => fillOidcFormFromClient(client, setOidcForm)}
@@ -700,7 +701,7 @@ export function DashboardScreen({
                           </span>
                         ))}
                       </div>
-                    </button>
+                    </FormaButton>
                   ))}
                   {!oidcClients.length && <EmptyState title="暂无客户端" body="创建后会立即出现在这里，并可再次选中进行维护。" />}
                 </div>
@@ -711,7 +712,7 @@ export function DashboardScreen({
               <Panel title="客户端编辑" description="适用于新增，也适用于覆盖更新已有客户端。">
                 <form className="stack" onSubmit={saveOidcClient}>
                   <Field label="Client ID">
-                    <input
+                    <FormaInput
                       value={oidcForm.client_id}
                       onChange={(event) =>
                         setOidcForm((current) => ({ ...current, client_id: event.target.value }))
@@ -720,7 +721,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="Redirect URIs">
-                    <textarea
+                    <FormaTextarea
                       rows="5"
                       value={oidcForm.redirect_uris}
                       onChange={(event) =>
@@ -732,7 +733,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="Scopes">
-                    <textarea
+                    <FormaTextarea
                       rows="4"
                       value={oidcForm.scopes}
                       onChange={(event) =>
@@ -741,7 +742,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="Grant Types">
-                    <textarea
+                    <FormaTextarea
                       rows="4"
                       value={oidcForm.grant_types}
                       onChange={(event) =>
@@ -750,7 +751,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <Field label="Client Secret">
-                    <input
+                    <FormaInput
                       type="password"
                       value={oidcForm.client_secret}
                       onChange={(event) =>
@@ -759,7 +760,7 @@ export function DashboardScreen({
                     />
                   </Field>
                   <label className="toggle">
-                    <input
+                    <FormaInput
                       checked={oidcForm.is_confidential}
                       type="checkbox"
                       onChange={(event) =>
@@ -772,7 +773,7 @@ export function DashboardScreen({
                     <span>Confidential Client</span>
                   </label>
                   <label className="toggle">
-                    <input
+                    <FormaInput
                       checked={oidcForm.is_active}
                       type="checkbox"
                       onChange={(event) =>
@@ -781,7 +782,7 @@ export function DashboardScreen({
                     />
                     <span>启用客户端</span>
                   </label>
-                  <button type="submit">保存 OIDC 客户端</button>
+                  <FormaButton type="submit">保存 OIDC 客户端</FormaButton>
                 </form>
               </Panel>
 
@@ -830,9 +831,9 @@ export function DashboardScreen({
               title="用户列表"
               description="表格只保留管理动作最常核对的字段。"
               actions={
-                <button className="ghost" onClick={() => safely(loadUsers, '用户数据加载失败')} type="button">
+                <FormaButton className="ghost" onClick={() => safely(loadUsers, '用户数据加载失败')} type="button">
                   刷新用户
-                </button>
+                </FormaButton>
               }
             >
               {users.length ? (
@@ -903,9 +904,9 @@ export function DashboardScreen({
               title="审计时间线"
               description="保留事件关键信息，去掉直接堆叠原始对象的调试做法。"
               actions={
-                <button className="ghost" onClick={() => safely(loadAudits, '审计数据加载失败')} type="button">
+                <FormaButton className="ghost" onClick={() => safely(loadAudits, '审计数据加载失败')} type="button">
                   刷新审计
-                </button>
+                </FormaButton>
               }
             >
               <div className="timeline">

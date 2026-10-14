@@ -1,4 +1,6 @@
+import 'forma_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 
 import 'password_policy.dart';
 
@@ -49,6 +51,8 @@ class _RosmNewPasswordFieldState extends State<RosmNewPasswordField> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            RosemaryText(widget.label, role: 'small'),
+            const SizedBox(height: 4),
             TextField(
               controller: widget.controller,
               enabled: widget.enabled,
@@ -59,21 +63,21 @@ class _RosmNewPasswordFieldState extends State<RosmNewPasswordField> {
               autofillHints: const [AutofillHints.newPassword],
               keyboardType: TextInputType.visiblePassword,
               decoration: InputDecoration(
-                labelText: widget.label,
-                floatingLabelBehavior: FloatingLabelBehavior.always,
-                prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                hintText: widget.label,
+                semanticCounterText: widget.label,
+                prefixIcon: const RosmEpassIcon(Icons.lock_outline, size: 20),
                 enabledBorder: value.isNotEmpty && !result.ok
                     ? OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: colors.error),
                       )
                     : null,
-                suffixIcon: IconButton(
+                suffixIcon: RosmEpassIconAction(
                   tooltip: _visible ? '隐藏密码' : '显示密码',
                   onPressed: widget.enabled
                       ? () => setState(() => _visible = !_visible)
                       : null,
-                  icon: Icon(
+                  icon: RosmEpassIcon(
                     _visible
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
@@ -93,7 +97,7 @@ class _RosmNewPasswordFieldState extends State<RosmNewPasswordField> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      RosmEpassIcon(
                         value.isNotEmpty && check.$2
                             ? Icons.check
                             : Icons.circle_outlined,
