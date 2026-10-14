@@ -164,69 +164,81 @@ class RosmEpassBrand extends StatelessWidget {
       return Semantics(
         label: 'Epass',
         excludeSemantics: true,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CustomPaint(
-              size: const Size.square(32),
-              painter: _EpassBadge(
-                Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.onPrimary,
-              ),
-            ),
-            const SizedBox(width: 9),
-            const Text(
-              'Epass',
-              style: TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
-    return Semantics(
-      label: 'Rosemary Epass',
-      excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/rosemary.png',
-            package: 'rosm_passport_flutter',
-            width: 64,
-            height: 64,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 16),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: _brandGraphic(
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Rosemary',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 19.2,
-                  height: 1.15,
+              CustomPaint(
+                size: const Size.square(32),
+                painter: _EpassBadge(
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
-              SizedBox(height: 2.56),
-              Text(
+              const SizedBox(width: 9),
+              const Text(
                 'Epass',
                 style: TextStyle(
                   fontFamily: 'Georgia',
-                  fontSize: 35.84,
-                  height: 1.05,
+                  fontSize: 20,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-        ],
+        ),
+      );
+    return Semantics(
+      label: 'Rosemary Epass',
+      excludeSemantics: true,
+      child: _brandGraphic(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/rosemary.png',
+              package: 'rosm_passport_flutter',
+              width: 64,
+              height: 64,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 16),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rosemary',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 19.2,
+                    height: 1.15,
+                  ),
+                ),
+                SizedBox(height: 2.56),
+                Text(
+                  'Epass',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 35.84,
+                    height: 1.05,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  // A brand lockup is a graphic: keep its mandated type/logo proportions.
+  // Its accessible name remains a separate, unscaled semantic label.
+  Widget _brandGraphic(Widget child) => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: MediaQuery.withNoTextScaling(child: child),
+  );
 }
 
 // Product-approved rounded, tonal badge, generated from the shared geometry.

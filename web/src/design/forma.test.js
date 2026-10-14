@@ -16,7 +16,7 @@ for (const mode of ['light', 'dark']) test(`${mode} has every Forma role and pas
 });
 test('official release assets and source token snapshot match pinned SHA256', () => {
   for (const asset of manifest.designSystem.assets) assert.equal(createHash('sha256').update(read(`../../../${asset.path}`)).digest('hex'), asset.sha256, asset.path);
-  assert.equal(createHash('sha256').update(read('./forma-source.json')).digest('hex'), manifest.designSystem.tokensSha256);
+  assert.equal(createHash('sha256').update(read('./forma-source.json')).digest('hex'), manifest.designSystem.sourceSha256);
   assert.equal(source.sdkVersion,manifest.designSystem.sdkVersion);
   assert.equal(source.specVersion,manifest.designSystem.specVersion);
 });
