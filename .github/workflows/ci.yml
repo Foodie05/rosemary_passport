@@ -188,7 +188,7 @@ jobs:
       - name: Generated design contract gate
         run: |
           python3 scripts/sync_epass_tokens.py
-          git diff --exit-code -- web/src/design/rosemary-tokens.css web/public apps/passport_server/lib/src/utils/epass_*.dart packages/rosm_passport_flutter/lib/src/epass_*.dart
+          git diff --exit-code -- web/src/design/rosemary-tokens.css web/public apps/passport_server/lib/src/utils/epass_*.dart packages/rosm_passport_flutter/lib/src/epass_*.dart ops/postgres/init/001_init.sql
 
   flutter:
     runs-on: ubuntu-24.04

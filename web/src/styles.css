@@ -23,7 +23,7 @@
   --color-info: var(--r-semantic-color-info);
   --color-info-subtle: var(--r-semantic-color-info-subtle);
   --color-overlay: var(--r-semantic-color-overlay);
-  --color-on-danger: var(--r-semantic-color-canvas);
+  --color-on-danger: var(--r-semantic-color-on-danger);
   --font-sans: var(--r-semantic-font-body);
   --font-editorial: var(--r-semantic-font-editorial);
   --font-mono: var(--r-semantic-font-code);
@@ -57,7 +57,7 @@
 
 @layer components {
   .surface-panel { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); }
-  .input-field { @apply w-full px-4 py-2.5 rounded-control; min-height: 44px; border: 1px solid var(--color-control); background: var(--color-surface); color: var(--color-ink); transition: border-color var(--r-semantic-motion-hover); }
+  .input-field { @apply w-full px-4 py-2.5 rounded-control; min-height: 44px; border: 1px solid var(--color-control); background: var(--color-surface); color: var(--color-ink); transition: border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
   .input-field:focus { border-color: var(--color-accent); }
   .btn-primary, .btn-secondary { @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-control text-sm font-medium; min-height: 44px; transition: background-color var(--r-semantic-motion-hover), border-color var(--r-semantic-motion-hover); }
   .btn-primary { background: var(--color-accent); color: var(--color-on-accent); border: 1px solid transparent; }
