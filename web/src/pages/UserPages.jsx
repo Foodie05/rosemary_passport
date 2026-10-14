@@ -1,7 +1,8 @@
+import { FormaButton, FormaInput, FormaLoading } from '../components/Forma';
 import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { KeyRound, Mail, Shield } from 'lucide-react';
+import { KeyRound, Mail, Shield } from '../design/Icons';
 import { cleanDisplayName } from '../utils';
 import { getUserErrorMessage } from '../lib/errors';
 import { cn } from '../lib/utils';
@@ -25,13 +26,13 @@ function Modal({ title, children, onClose, actions }) {
 }
 
 function SettingRow({ title, description, ready, readyLabel, pendingLabel, action, onClick }) {
-  return <div className="epass-setting-row"><div><div className="epass-setting-title"><h3>{title}</h3>{ready !== undefined && <StatusBadge ready={ready} readyLabel={readyLabel} pendingLabel={pendingLabel} />}</div><p>{description}</p></div><button type="button" className="btn-secondary" onClick={onClick}>{action}</button></div>;
+  return <div className="epass-setting-row"><div><div className="epass-setting-title"><h3>{title}</h3>{ready !== undefined && <StatusBadge ready={ready} readyLabel={readyLabel} pendingLabel={pendingLabel} />}</div><p>{description}</p></div><FormaButton type="button" className="btn-secondary" onClick={onClick}>{action}</FormaButton></div>;
 }
 
 function LoadingButtonText({ loading, loadingText, idleText }) {
   return loading ? (
     <span className="inline-flex items-center gap-2">
-      <span className="loading-spinner" aria-hidden="true" />
+      <FormaLoading />
       <span>{loadingText}</span>
     </span>
   ) : (
@@ -107,13 +108,13 @@ function StepUpFields({ methods, excludedFactor, value, onChange, sendStepUpCode
         onChange={(method) => onChange({ method, password: '', code: '', response: null })}
       />
       {selected === 'password' ? (
-        <input aria-label="当前密码" autoComplete="current-password" className="input-field" type="password" placeholder="输入当前密码" value={value.password || ''} onChange={(event) => onChange({ ...value, method: selected, password: event.target.value })} />
+        <FormaInput aria-label="当前密码" autoComplete="current-password" className="input-field" type="password" placeholder="输入当前密码" value={value.password || ''} onChange={(event) => onChange({ ...value, method: selected, password: event.target.value })} />
       ) : selected === 'passkey' ? (
-        <button className="btn-secondary w-full" type="button" disabled={busy} onClick={() => void handleAction()}>{value.response ? '通行密钥已验证' : busy ? '等待系统验证...' : '使用通行密钥验证'}</button>
+        <FormaButton className="btn-secondary w-full" type="button" disabled={busy} onClick={() => void handleAction()}>{value.response ? '通行密钥已验证' : busy ? '等待系统验证...' : '使用通行密钥验证'}</FormaButton>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <input aria-label="身份验证码" autoComplete="one-time-code" className="input-field" inputMode="numeric" placeholder="输入验证码" value={value.code || ''} onChange={(event) => onChange({ ...value, method: selected, code: event.target.value.replace(/\D/g, '') })} />
-          {selected !== 'authenticator' ? <button className="btn-secondary" type="button" disabled={busy} onClick={() => void handleAction()}>{busy ? '发送中...' : '发送'}</button> : null}
+          <FormaInput aria-label="身份验证码" autoComplete="one-time-code" className="input-field" inputMode="numeric" placeholder="输入验证码" value={value.code || ''} onChange={(event) => onChange({ ...value, method: selected, code: event.target.value.replace(/\D/g, '') })} />
+          {selected !== 'authenticator' ? <FormaButton className="btn-secondary" type="button" disabled={busy} onClick={() => void handleAction()}>{busy ? '发送中...' : '发送'}</FormaButton> : null}
         </div>
       )}
       <p className="text-xs text-muted">当前变更项本身不能用于本次校验。</p>
@@ -435,7 +436,7 @@ export function UserAccountPage({
       <section className="epass-account-profile" aria-label="个人资料">
         <div className="epass-avatar" aria-hidden="true">{(session.user?.email || 'R').charAt(0).toUpperCase()}</div>
         <div className="min-w-0 flex-1">
-          {editingNickname ? <input ref={nicknameRef} aria-label="昵称" className="input-field max-w-sm" value={nickname} onChange={(event) => setNickname(event.target.value)} onBlur={() => void handleNicknameBlur()} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /> : <button type="button" onClick={() => setEditingNickname(true)} className="text-left text-xl font-semibold break-all" aria-label={`编辑昵称：${displayName}`}>{displayName}<span className="ml-3 text-xs font-normal text-muted">编辑</span></button>}
+          {editingNickname ? <FormaInput ref={nicknameRef} aria-label="昵称" className="input-field max-w-sm" value={nickname} onChange={(event) => setNickname(event.target.value)} onBlur={() => void handleNicknameBlur()} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /> : <FormaButton type="button" onClick={() => setEditingNickname(true)} className="text-left text-xl font-semibold break-all" aria-label={`编辑昵称：${displayName}`}>{displayName}<span className="ml-3 text-xs font-normal text-muted">编辑</span></FormaButton>}
           <p className="mt-2 break-all text-sm text-muted">{session.user?.email || session.user?.phone_number || '尚未绑定联系方式'}</p>
           <p className="mt-1 break-all font-mono text-xs text-muted">UID · {session.user?.id || '-'}</p>
         </div>
@@ -472,23 +473,23 @@ export function UserAccountPage({
           }}
           actions={
             <>
-              <button type="button" onClick={handleSendBindCode} className="btn-secondary" disabled={bindSendDisabled}>
+              <FormaButton type="button" onClick={handleSendBindCode} className="btn-secondary" disabled={bindSendDisabled}>
                 <LoadingButtonText loading={bindSending} loadingText="发送中..." idleText={bindCooldownRemaining > 0 ? `${bindCooldownRemaining} 秒后重发` : '发送验证码'} />
-              </button>
-              <button type="button" onClick={handleConfirmBindEmail} className="btn-primary" disabled={bindSaving || !bindCodeSent || !bindForm.email_code}>
+              </FormaButton>
+              <FormaButton type="button" onClick={handleConfirmBindEmail} className="btn-primary" disabled={bindSaving || !bindCodeSent || !bindForm.email_code}>
                 <LoadingButtonText loading={bindSaving} loadingText="绑定中..." idleText="完成绑定" />
-              </button>
+              </FormaButton>
             </>
           }
         >
           <div className="space-y-2">
             <label htmlFor="epass-userpages-field-1" className="text-sm font-bold text-ink">新邮箱</label>
-            <input id="epass-userpages-field-1" className="input-field" type="email" value={bindForm.email} onChange={(event) => setBindForm((current) => ({ ...current, email: event.target.value }))} />
+            <FormaInput id="epass-userpages-field-1" className="input-field" type="email" value={bindForm.email} onChange={(event) => setBindForm((current) => ({ ...current, email: event.target.value }))} />
           </div>
           <StepUpFields methods={stepUpMethods} excludedFactor="email" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
             <label htmlFor="epass-userpages-field-2" className="text-sm font-bold text-ink">邮箱验证码</label>
-            <input id="epass-userpages-field-2" className="input-field" value={bindForm.email_code} onChange={(event) => setBindForm((current) => ({ ...current, email_code: event.target.value }))} />
+            <FormaInput id="epass-userpages-field-2" className="input-field" value={bindForm.email_code} onChange={(event) => setBindForm((current) => ({ ...current, email_code: event.target.value }))} />
           </div>
           <p className="text-xs text-muted">发送成功后，这个邮箱会进入共享发码冷却；在倒计时结束前不能再次发送。</p>
           {bindError ? <p className="text-sm text-danger">{bindError}</p> : null}
@@ -505,23 +506,23 @@ export function UserAccountPage({
           }}
           actions={
             <>
-              <button type="button" onClick={handleSendBindPhoneCode} className="btn-secondary" disabled={bindPhoneSendDisabled}>
+              <FormaButton type="button" onClick={handleSendBindPhoneCode} className="btn-secondary" disabled={bindPhoneSendDisabled}>
                 <LoadingButtonText loading={bindPhoneSending} loadingText="发送中..." idleText={bindPhoneCooldownRemaining > 0 ? `${bindPhoneCooldownRemaining} 秒后重发` : '发送验证码'} />
-              </button>
-              <button type="button" onClick={handleConfirmBindPhone} className="btn-primary" disabled={bindPhoneSaving || !bindPhoneCodeSent || !bindPhoneForm.verify_code}>
+              </FormaButton>
+              <FormaButton type="button" onClick={handleConfirmBindPhone} className="btn-primary" disabled={bindPhoneSaving || !bindPhoneCodeSent || !bindPhoneForm.verify_code}>
                 <LoadingButtonText loading={bindPhoneSaving} loadingText="绑定中..." idleText="完成绑定" />
-              </button>
+              </FormaButton>
             </>
           }
         >
           <div className="space-y-2">
             <label htmlFor="epass-userpages-field-3" className="text-sm font-bold text-ink">手机号</label>
-            <input id="epass-userpages-field-3" className="input-field" value={bindPhoneForm.phone_number} onChange={(event) => setBindPhoneForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))} />
+            <FormaInput id="epass-userpages-field-3" className="input-field" value={bindPhoneForm.phone_number} onChange={(event) => setBindPhoneForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))} />
           </div>
           <StepUpFields methods={stepUpMethods} excludedFactor="phone" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
             <label htmlFor="epass-userpages-field-4" className="text-sm font-bold text-ink">短信验证码</label>
-            <input id="epass-userpages-field-4" className="input-field" value={bindPhoneForm.verify_code} onChange={(event) => setBindPhoneForm((current) => ({ ...current, verify_code: event.target.value.replace(/\D/g, '') }))} />
+            <FormaInput id="epass-userpages-field-4" className="input-field" value={bindPhoneForm.verify_code} onChange={(event) => setBindPhoneForm((current) => ({ ...current, verify_code: event.target.value.replace(/\D/g, '') }))} />
           </div>
           {bindPhoneError ? <p className="text-sm text-danger">{bindPhoneError}</p> : null}
         </Modal>
@@ -536,9 +537,9 @@ export function UserAccountPage({
             setStepUp({ method: 'password', password: '', code: '', response: null });
           }}
           actions={
-            <button type="button" onClick={handleResetPassword} className="btn-primary" disabled={resetSaving || !stepUpReady || !evaluatePassword(resetForm.new_password).ok}>
+            <FormaButton type="button" onClick={handleResetPassword} className="btn-primary" disabled={resetSaving || !stepUpReady || !evaluatePassword(resetForm.new_password).ok}>
               <LoadingButtonText loading={resetSaving} loadingText="重置中..." idleText="重置密码" />
-            </button>
+            </FormaButton>
           }
         >
           <div className="rounded-panel border border-line bg-canvas p-4 text-sm text-muted">
@@ -559,9 +560,9 @@ export function UserAccountPage({
             setStepUp({ method: 'password', password: '', code: '', response: null });
           }}
           actions={
-            <button type="button" onClick={handleRegisterPasskey} className="btn-primary" disabled={passkeySaving || passkeyLimitReached || !stepUpReady}>
+            <FormaButton type="button" onClick={handleRegisterPasskey} className="btn-primary" disabled={passkeySaving || passkeyLimitReached || !stepUpReady}>
               <LoadingButtonText loading={passkeySaving} loadingText="等待系统验证..." idleText={passkeyLimitReached ? '已达上限' : '新增通行密钥'} />
-            </button>
+            </FormaButton>
           }
         >
           <div className="rounded-panel border border-line bg-canvas p-4 text-sm text-muted">
@@ -584,7 +585,7 @@ export function UserAccountPage({
                       </p>
                       <p className="mt-1 truncate text-xs text-muted">{credential.credential_id}</p>
                     </div>
-                    <button
+                    <FormaButton
                       type="button"
                       onClick={() => void handleDeletePasskey(credential.credential_id)}
                       className="btn-secondary px-3 py-2"
@@ -595,7 +596,7 @@ export function UserAccountPage({
                         loadingText="移除中..."
                         idleText="移除"
                       />
-                    </button>
+                    </FormaButton>
                   </div>
                 ))
               ) : (
@@ -623,13 +624,13 @@ export function UserAccountPage({
           actions={
             <>
               {!authenticatorSecret ? (
-                <button type="button" onClick={handleBeginAuthenticatorSetup} className="btn-secondary" disabled={authenticatorSettingUp}>
+                <FormaButton type="button" onClick={handleBeginAuthenticatorSetup} className="btn-secondary" disabled={authenticatorSettingUp}>
                   <LoadingButtonText loading={authenticatorSettingUp} loadingText="初始化中..." idleText="显示新验证器" />
-                </button>
+                </FormaButton>
               ) : null}
-              <button type="button" onClick={handleVerifyAuthenticator} className="btn-primary" disabled={authenticatorSaving || !authenticatorSecret || !authenticatorForm.code || !stepUpReady}>
+              <FormaButton type="button" onClick={handleVerifyAuthenticator} className="btn-primary" disabled={authenticatorSaving || !authenticatorSecret || !authenticatorForm.code || !stepUpReady}>
                 <LoadingButtonText loading={authenticatorSaving} loadingText="验证中..." idleText={hasAuthenticator ? '更新验证器' : '完成设置'} />
-              </button>
+              </FormaButton>
             </>
           }
         >
@@ -649,7 +650,7 @@ export function UserAccountPage({
           {authenticatorSecret ? (
             <div className="space-y-2">
               <label htmlFor="epass-userpages-field-6" className="text-sm font-bold text-ink">Authenticator 动态验证码</label>
-              <input id="epass-userpages-field-6" className="input-field" inputMode="numeric" value={authenticatorForm.code} onChange={(event) => setAuthenticatorForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, '') }))} />
+              <FormaInput id="epass-userpages-field-6" className="input-field" inputMode="numeric" value={authenticatorForm.code} onChange={(event) => setAuthenticatorForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, '') }))} />
             </div>
           ) : null}
           {authenticatorError ? <p className="text-sm text-danger">{authenticatorError}</p> : null}

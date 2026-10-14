@@ -1,5 +1,9 @@
+import { useReducedMotion } from './design/MotionPreferences';
+import { RosemaryProvider } from '@rosemary-ui/react';
+import productTheme from './design/epass-theme.json';
+import { FormaButton } from './components/Forma';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { Laptop, Moon, Sun } from 'lucide-react';
+import { Laptop, Moon, Sun } from './design/Icons';
 import { cn } from './lib/utils';
 
 const STORAGE_KEY = 'rosm_theme_preference';
@@ -13,6 +17,7 @@ function getSystemTheme() {
 }
 
 export function ThemeProvider({ children }) {
+  const reduced = useReducedMotion();
   const [preference, setPreference] = useState(() => {
     if (typeof window === 'undefined') {
       return 'system';
@@ -49,7 +54,8 @@ export function ThemeProvider({ children }) {
     [preference, resolvedTheme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  const colors = Object.fromEntries(Object.entries(productTheme.themes[resolvedTheme]).map(([key, color]) => [key.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), color]));
+  return <ThemeContext.Provider value={value}><RosemaryProvider reducedMotion={reduced} mode={resolvedTheme} language="zh" colors={colors}>{children}</RosemaryProvider></ThemeContext.Provider>;
 }
 
 export function useTheme() {
@@ -63,5 +69,5 @@ export function useTheme() {
 export function ThemeToggle({ className = '' }) {
   const { preference, setPreference } = useTheme();
   const options = [{ value: 'system', label: '跟随系统', icon: Laptop }, { value: 'light', label: '浅色主题', icon: Sun }, { value: 'dark', label: '深色主题', icon: Moon }];
-  return <div className={cn('epass-theme', className)} role="group" aria-label="网站主题">{options.map(({ value, label, icon: Icon }) => <button key={value} type="button" onClick={() => setPreference(value)} aria-pressed={preference === value} aria-label={label} title={label}><Icon size={18} aria-hidden="true" /></button>)}</div>;
+  return <div className={cn('epass-theme', className)} role="group" aria-label="网站主题">{options.map(({ value, label, icon: Icon }) => <FormaButton key={value} type="button" onClick={() => setPreference(value)} aria-pressed={preference === value} aria-label={label} title={label}><Icon size={18} aria-hidden="true" /></FormaButton>)}</div>;
 }

@@ -1,3 +1,12 @@
+## 0.10.0
+
+- Align with Rosemary Forma 1.2.0 and official rosemary_ui 0.4.0 at 311a81de1651ba049d3acd476725390de38aacc2.
+- Use the approved capitalized lockup and Epass badge, with shared green light/dark semantic roles.
+- Migrate controlled fields, primary/secondary actions, tabs, checkbox, dialogs and lifecycle-aware two-facet loading. Respect host locale and reduced motion.
+- Require Flutter 3.44.8 / Dart 3.12.2. Existing Rosm APIs and authentication contracts remain compatible.
+
+- Ask for Terms of Use and Privacy Policy consent before advancing authentication, registration or recovery. Declining or dismissing keeps the current form; accepting resumes the requested action once.
+
 ## 0.9.0 — 2026-10-11
 
 - Rename built-in product branding to Rosemary Epass and bundle the official logo.

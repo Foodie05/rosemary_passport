@@ -43,12 +43,12 @@ export function SelectionContent({ value, index = 0, className = '', children })
     if (!changed || !ref.current?.animate) return;
     const element = ref.current;
     const current = getComputedStyle(element);
-    const distance = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r-semantic-space-12'));
+    const distance = 0;
     const start = animation.current?.playState === 'running'
       ? { opacity: current.opacity, transform: current.transform }
       : { opacity: 0, transform: `translateX(${direction * distance}px)` };
     animation.current?.cancel();
-    animation.current = element.animate([start, { opacity: 1, transform: 'none' }], { duration: motionDuration('settle'), easing: motionToken('standard') });
+    animation.current = element.animate([start, { opacity: 1, transform: 'none' }], { duration: motionDuration('tabs'), easing: motionToken('standard') });
   }, [value, index, reduced]);
   useLayoutEffect(() => () => animation.current?.cancel(), []);
   return <div ref={ref} className={className}>{children}</div>;

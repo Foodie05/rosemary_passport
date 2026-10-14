@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@rosemary-ui/react/css" layer(components);
 @import "./design/rosemary-tokens.css";
 
 @theme inline {
@@ -34,10 +35,10 @@
   * { box-sizing: border-box; }
   html { min-width: 0; color-scheme: light; scroll-padding-top: 96px; }
   html[data-theme='dark'] { color-scheme: dark; }
-  body { margin: 0; background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-sans); font-size: 16px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-sans); font-size: 16px; line-height: 1.75; -webkit-font-smoothing: antialiased; }
   #root { min-height: 100dvh; }
   h1, h2, h3 { text-wrap: balance; line-height: 1.3; }
-  h1 { font-family: var(--font-editorial); font-weight: 500; }
+  h1 { font-family: var(--font-sans); font-weight: 500; }
   p { text-wrap: pretty; }
   button, a, input, textarea { -webkit-tap-highlight-color: transparent; }
   button { cursor: pointer; }
@@ -46,7 +47,7 @@
   input::placeholder, textarea::placeholder { color: var(--r-semantic-color-text-tertiary); opacity: 1; }
   :focus-visible { outline: 2px solid var(--r-semantic-color-focus); outline-offset: 4px; }
   img, svg { max-width: 100%; }
-  svg.lucide { stroke-width: 1.75; flex-shrink: 0; }
+  svg.lucide { stroke-width: 1.6; flex-shrink: 0; }
   table { width: 100%; font-size: 14px; border-collapse: collapse; }
   th { color: var(--color-muted); font-weight: 500; }
   td, th { font-variant-numeric: tabular-nums; }
@@ -65,7 +66,6 @@
   .btn-secondary:hover { background: var(--color-subtle); }
   .btn-primary:disabled, .btn-secondary:disabled { opacity: .55; }
   .btn-danger { background: var(--color-danger); color: var(--color-on-danger); }
-  .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin var(--r-semantic-motion-spin) linear infinite; }
   .policy-tooltip { @apply pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-control px-3 py-2 text-xs leading-5 opacity-0; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); }
   .group:hover > .policy-tooltip, .group:focus-within > .policy-tooltip { opacity: 1; }
   .account-security-prompt, .account-security-prompt__panel { background: var(--color-surface); border-color: var(--color-line); }
@@ -76,13 +76,6 @@
   .account-security-dialog__actions { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 }
 
-.epass-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--color-ink); text-decoration: none; flex-shrink: 0; }
-.epass-brand-mark { display: grid; place-items: center; padding: 8px; }
-.epass-brand-mark img { object-fit: contain; width: 32px; height: 32px; }
-.epass-brand-type { font-family: var(--font-editorial); font-size: 24px; line-height: 1.2; letter-spacing: -.04em; white-space: nowrap; }
-.epass-brand-type > span { font-weight: 400; }
-.epass-brand-type small { display: block; font-family: var(--font-sans); font-size: 12px; color: var(--color-muted); margin-top: 8px; letter-spacing: .04em; }
-.epass-brand--compact .epass-brand-type { font-size: 20px; }
 .epass-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--color-line); padding: 24px 32px; color: var(--color-muted); font-size: 12px; }
 .epass-footer nav { display: flex; flex-wrap: wrap; gap: 24px; }
 .epass-footer a:hover { color: var(--color-accent); text-decoration: underline; }
@@ -96,11 +89,8 @@
 .epass-eyebrow { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .12em; font-size: 12px; color: var(--color-muted); }
 .epass-auth-brand h2 { margin: 28px 0 24px; font: 400 clamp(36px, 4.1vw, 64px)/1.25 var(--font-editorial); letter-spacing: -.045em; }
 .epass-auth-brand p { max-width: 30em; color: var(--color-muted); }
-.epass-brand-drawing { width: 100%; max-width: 460px; margin-top: 32px; color: var(--color-accent); stroke: currentColor; stroke-width: .7; }
-.epass-brand-drawing .drawing-grid { stroke: var(--color-line); stroke-dasharray: 2 6; }
-.epass-brand-drawing .drawing-leaf { fill: var(--color-accent-subtle); fill-opacity: .55; }
 .epass-auth-panel { display: flex; flex-direction: column; justify-content: center; padding: 48px clamp(24px, 5vw, 80px); background: var(--color-surface); }
-.epass-auth-panel > div { width: 100%; max-width: 416px; margin-inline: auto; }
+.epass-auth-panel > div { width: 100%; max-width: 480px; margin-inline: auto; }
 .epass-auth-panel h1 { font-size: 36px; font-weight: 400; }
 .epass-auth-panel .btn-primary { min-height: 48px; font-size: 16px; font-weight: 500; padding-block: 12px; }
 .epass-auth-panel form { scroll-margin: 24px; }
@@ -122,10 +112,10 @@
 .epass-nav-item { min-height: 44px; display: flex; gap: 12px; align-items: center; border-radius: 8px; padding: 10px 12px; margin: 4px 0; font-size: 14px; color: var(--color-muted); transition: background-color 120ms; }
 .epass-nav-item:hover { background: var(--color-subtle); }
 .epass-nav-item[aria-current='page'] { background: var(--color-accent-subtle); color: var(--color-accent); font-weight: 600; }
-.epass-topbar { min-height: 80px; border-bottom: 1px solid var(--color-line); display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; gap: 16px; }
-.epass-workspace { width: 100%; max-width: 1400px; margin-inline: auto; padding: 40px; }
+.epass-topbar { min-height: 64px; border-bottom: 1px solid var(--color-line); display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; gap: 16px; }
+.epass-workspace { width: 100%; max-width: 1200px; margin-inline: auto; padding: 40px; }
 .epass-page-heading { padding-bottom: 24px; border-bottom: 1px solid var(--color-line); }
-.epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-editorial); font-size: clamp(28px, 3vw, 40px); font-weight: 400; }
+.epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-sans); font-size: clamp(28px, 3vw, 40px); font-weight: 400; }
 .epass-page-heading p { color: var(--color-muted); margin-top: 8px; max-width: 65ch; }
 .epass-user-main { max-width: 1120px; width: 100%; padding: 48px 32px; margin-inline: auto; flex: 1; }
 .epass-account-profile { display: flex; gap: 24px; align-items: center; padding-block: 32px; border-bottom: 1px solid var(--color-line); }
@@ -138,27 +128,14 @@
 .epass-status { display: inline-flex; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .epass-status[data-ready='true'] { background: var(--color-success-subtle); color: var(--color-success); }
 .epass-status[data-ready='false'] { background: var(--color-warning-subtle); color: var(--color-warning); }
-.epass-dialog { padding: 0; border: 1px solid var(--color-line); border-radius: 16px; background: var(--color-surface); color: var(--color-ink); max-height: calc(100dvh - 32px); width: min(560px, calc(100vw - 32px)); margin: auto; overflow: auto; }
-.epass-dialog::backdrop { background: rgb(0 0 0 / .4); }
-.epass-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px; border-bottom: 1px solid var(--color-line); }
-.epass-dialog-head h2 { font-size: 20px; font-weight: 600; }
-.epass-dialog-body { padding: 24px; }
-.epass-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; padding: 20px 24px; border-top: 1px solid var(--color-line); }
 .epass-select-list { position: fixed; margin: 0; padding: 4px; max-height: 300px; overflow: auto; border: 1px solid var(--color-control); border-radius: 8px; background: var(--color-surface); color: var(--color-ink); z-index: 150; box-shadow: var(--epass-elevation-overlay); }
 .epass-select-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; min-height: 44px; border-radius: 4px; cursor: pointer; font-size: 14px; }
 .epass-select-option[data-active='true'] { background: var(--color-accent-subtle); }
 .epass-select-option[aria-disabled='true'] { opacity: .5; cursor: not-allowed; }
-.epass-checkbox { display: inline-flex; align-items: flex-start; gap: 10px; min-height: 24px; cursor: pointer; font-size: 14px; color: var(--color-muted); }
-.epass-checkbox-control { position: relative; flex: 0 0 20px; height: 20px; margin-top: 3px; }
-.epass-checkbox input { appearance: none; display: block; width: 20px; height: 20px; margin: 0; border: 1px solid var(--color-control); border-radius: 4px; background: var(--color-surface); }
-.epass-checkbox input:checked { background: var(--color-accent); border-color: var(--color-accent); }
-.epass-checkbox svg { position: absolute; inset: 0; margin: auto; pointer-events: none; color: var(--color-on-accent); }
-.epass-checkbox:has(input:disabled) { opacity: .55; cursor: not-allowed; }
 .epass-document { max-width: 76ch; margin: 48px auto; }
 .epass-document article { line-height: 1.9; }
 .epass-document h1 { font-size: clamp(32px, 4vw, 48px); }
 .epass-document h2 { font-family: var(--font-editorial); }
-@keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1023px) {
   .epass-auth-grid { grid-template-columns: 1fr; min-height: auto; }
   .epass-auth-brand { display: none; }
@@ -169,9 +146,6 @@
 }
 @media (max-width: 640px) {
   .epass-auth-header, .epass-topbar { padding: 12px 16px; gap: 8px; }
-  .epass-brand-type { font-size: 20px; }
-  .epass-brand-mark { padding: 6px; }
-  .epass-brand-mark img { width: 24px; height: 24px; }
   .epass-theme button { min-width: 28px; min-height: 36px; }
   .epass-auth-panel { padding: 40px 20px; }
   .epass-auth-panel h1 { font-size: 32px; }
@@ -180,22 +154,20 @@
   .epass-setting-row { grid-template-columns: 1fr; gap: 16px; }
   .epass-setting-row > button { justify-self: start; }
   .epass-account-profile { align-items: flex-start; gap: 16px; }
-  .epass-dialog-actions { flex-wrap: wrap; gap: 8px; padding: 16px; }
-  .epass-dialog-actions > button { flex: 1; padding-inline: 12px; }
   input, textarea, select { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 html[data-reduce-motion='true'] *, html[data-reduce-motion='true'] *::before, html[data-reduce-motion='true'] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-.epass-docs-shell { display: grid; grid-template-columns: 220px minmax(0,1fr); gap: 48px; max-width: 1400px; margin: auto; padding: 40px 32px; }
+.epass-docs-shell { display: grid; grid-template-columns: 220px minmax(0,1fr); gap: 48px; max-width: 1200px; margin: auto; padding: 40px 32px; }
 .epass-docs-nav { position: sticky; top: 32px; align-self: start; }
 .epass-docs-nav > p { margin-bottom: 24px; }
 .epass-docs-content { min-width: 0; }
 .epass-docs-content .surface-panel { background: transparent; border: 0; border-top: 1px solid var(--color-line); border-radius: 0; padding: 32px 0; }
 .epass-docs-content p { max-width: 75ch; }
 .epass-docs-content h2 { font: 400 28px/1.4 var(--font-editorial); }
-.epass-settings-form > .grid > section, .epass-settings-form > section { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 16px; padding: 24px; }
+.epass-settings-form > .grid > section, .epass-settings-form > section { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); padding: 24px; }
 .epass-methods button[aria-pressed='true'] { background: transparent; }
 @media (max-width: 900px) { .epass-docs-shell { grid-template-columns: 1fr; padding: 24px 20px; gap: 32px; } .epass-docs-nav { position: static; display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--color-line); } .epass-docs-nav > p { width: 100%; margin-bottom: 8px; } }
 .epass-help summary { display: inline-flex; align-items: center; cursor: pointer; list-style: none; min-height: 24px; color: var(--color-muted); }
@@ -210,25 +182,12 @@ html[data-reduce-motion='true'] *, html[data-reduce-motion='true'] *::before, ht
 .transition-colors, .epass-methods button, .epass-nav-item, .epass-theme button { transition: color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
 button.btn-primary, button.btn-secondary { transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), transform var(--r-semantic-motion-press) var(--r-semantic-motion-standard); }
 button.btn-primary:active:not(:disabled), button.btn-secondary:active:not(:disabled) { transform: scale(.98); }
-.epass-checkbox input { transition: background-color var(--r-semantic-motion-fast) var(--r-semantic-motion-standard), border-color var(--r-semantic-motion-fast) var(--r-semantic-motion-standard); }
-.epass-checkbox svg { opacity: 0; transform: scale(.8); transition: opacity var(--r-semantic-motion-fast) var(--r-semantic-motion-standard), transform var(--r-semantic-motion-fast) var(--r-semantic-motion-standard); }
-.epass-checkbox input:checked + svg { opacity: 1; transform: none; }
 [role='combobox'] > svg { transition: transform var(--r-semantic-motion-fast) var(--r-semantic-motion-standard); }
 [role='combobox'][aria-expanded='true'] > svg { transform: rotate(180deg); }
-.epass-dialog { opacity: 0; transform: translateY(var(--r-semantic-motion-distance-dialog)); transition: opacity var(--r-semantic-motion-exit) var(--r-semantic-motion-exit-ease), transform var(--r-semantic-motion-exit) var(--r-semantic-motion-exit-ease), display var(--r-semantic-motion-exit) allow-discrete, overlay var(--r-semantic-motion-exit) allow-discrete; }
-.epass-dialog[open] { opacity: 1; transform: none; transition-duration: var(--r-semantic-motion-enter); transition-timing-function: var(--r-semantic-motion-entrance); }
-.epass-dialog::backdrop { opacity: 0; transition: opacity var(--r-semantic-motion-exit) var(--r-semantic-motion-exit-ease), display var(--r-semantic-motion-exit) allow-discrete, overlay var(--r-semantic-motion-exit) allow-discrete; }
-.epass-dialog[open]::backdrop { opacity: 1; transition-duration: var(--r-semantic-motion-enter); }
-.epass-dialog[aria-hidden='true'] { pointer-events: none; }
-.epass-dialog-navigation { height: 100dvh; max-height: 100dvh; width: min(336px, calc(100vw - 32px)); margin: 0 auto 0 0; border-radius: 0 16px 16px 0; transform: translateX(calc(-1 * var(--r-semantic-motion-distance-panel))); }
-.epass-dialog-navigation[open] { transform: none; transition-duration: var(--r-semantic-motion-panel); }
 .epass-select-list { --epass-popup-offset: var(--r-semantic-motion-distance-small); opacity: 1; transform: none; transition: opacity var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance), transform var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance); }
 .epass-select-list[data-side='above'] { --epass-popup-offset: calc(-1 * var(--r-semantic-motion-distance-small)); }
 .epass-select-list[data-motion-state='exiting'] { opacity: 0; transform: translateY(var(--epass-popup-offset)); transition-duration: var(--r-semantic-motion-exit); transition-timing-function: var(--r-semantic-motion-exit-ease); pointer-events: none; }
 @starting-style {
-  .epass-dialog[open] { opacity: 0; transform: translateY(var(--r-semantic-motion-distance-dialog)); }
-  .epass-dialog[open]::backdrop { opacity: 0; }
-  .epass-dialog-navigation[open] { transform: translateX(calc(-1 * var(--r-semantic-motion-distance-panel))); }
   .epass-select-list { opacity: 0; transform: translateY(var(--epass-popup-offset)); }
 }
 @supports (interpolate-size: allow-keywords) {
@@ -242,25 +201,15 @@ html[data-document-hidden='true'] .loading-spinner { animation-play-state: pause
 }
 html[data-reduce-motion='true'] dialog::backdrop, html[data-reduce-motion='true'] details::details-content { animation: none !important; transition: none !important; }
 
-/* Page snapshots move in route order, while URL, content and focus update at once. */
+/* Chapter changes: one current page, 220ms fade and 6px rise. */
 main { view-transition-name: epass-page; }
-html { --epass-page-offset: var(--r-semantic-space-16); }
-html[data-route-motion='peer-back'] { --epass-page-offset: calc(-1 * var(--r-semantic-space-16)); }
-html[data-route-motion='deeper'] { --epass-page-offset: var(--r-semantic-motion-distance-panel); }
-html[data-route-motion='parent'] { --epass-page-offset: calc(-1 * var(--r-semantic-motion-distance-panel)); }
 ::view-transition { pointer-events: none; }
 ::view-transition-group(root), ::view-transition-old(root), ::view-transition-new(root), ::view-transition-group(epass-page) { animation: none; }
-::view-transition-old(epass-page), ::view-transition-new(epass-page) { mix-blend-mode: normal; }
-::view-transition-old(epass-page) { animation: epass-page-out var(--r-semantic-motion-press) var(--r-semantic-motion-standard) both; }
-::view-transition-new(epass-page) { animation: epass-page-in var(--r-semantic-motion-enter) var(--r-semantic-motion-standard) var(--r-semantic-motion-press) both; }
-html[data-route-motion='cross']::view-transition-old(epass-page) { animation-name: epass-page-cross-out; }
-html[data-route-motion='cross']::view-transition-new(epass-page) { animation-name: epass-page-cross-in; }
-@keyframes epass-page-in { from { opacity: 0; transform: translateX(var(--epass-page-offset)); } to { opacity: 1; transform: none; } }
-@keyframes epass-page-out { to { opacity: 0; transform: translateX(calc(-.5 * var(--epass-page-offset))); } }
-@keyframes epass-page-cross-in { from { opacity: 0; transform: translateY(var(--r-semantic-motion-distance-dialog)); } to { opacity: 1; transform: none; } }
-@keyframes epass-page-cross-out { to { opacity: 0; transform: translateY(calc(-1 * var(--r-semantic-motion-distance-small))); } }
-html[data-reduce-motion='true']::view-transition-group(*), html[data-reduce-motion='true']::view-transition-old(*), html[data-reduce-motion='true']::view-transition-new(*) { animation: none !important; }
-@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+::view-transition-old(epass-page) { display: none; }
+::view-transition-new(epass-page) { animation: epass-page-in var(--r-semantic-motion-settle) var(--r-semantic-motion-standard) both; }
+@keyframes epass-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+html[data-reduce-motion='true']::view-transition-new(*) { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-new(*) { animation: none !important; } }
 .epass-select-option { transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
 .epass-notice { opacity: 1; transition: opacity var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance); }
 .epass-notice[data-motion-state='exiting'] { opacity: 0; pointer-events: none; transition-duration: var(--r-semantic-motion-exit); transition-timing-function: var(--r-semantic-motion-exit-ease); }
@@ -271,7 +220,6 @@ html[data-reduce-motion='true']::view-transition-group(*), html[data-reduce-moti
 .epass-setting-row button:active:not(:disabled), table button:active:not(:disabled) { transform: none; }
 
 :root { --epass-elevation-overlay: 0 24px 80px color-mix(in srgb, var(--r-semantic-color-overlay) 24%, transparent); }
-.epass-dialog { box-shadow: var(--epass-elevation-overlay); }
 
 /* Task pages share the same paper, type scale, spacing and control semantics. */
 .epass-password-checks { display: grid; gap: 8px; padding: 0; margin: 12px 0 0; list-style: none; font-size: 14px; line-height: 20px; color: var(--color-muted); }
@@ -308,6 +256,52 @@ html[data-reduce-motion='true']::view-transition-group(*), html[data-reduce-moti
 @media (max-width: 1100px) { .epass-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .epass-stat:nth-child(2) { border-right: 0; } .epass-stat:nth-child(n+3) { border-top: 1px solid var(--color-line); } }
 @media (max-width: 600px) { .epass-stat { padding: 20px 12px; } .epass-stat strong { font-size: 32px; } .epass-settings-section { padding: 20px; } .epass-banned { margin: 32px auto; padding: 24px; } }
 
-.epass-dialog-wide { width: min(700px, calc(100vw - 32px)); }
-.epass-dialog { scroll-padding-block: 24px 96px; }
-.epass-dialog-actions { position: sticky; bottom: 0; z-index: 1; background: var(--color-surface); }
+
+/* Forma owns control and overlay appearance; Epass owns task composition. */
+.rm-theme { min-height: 100dvh; font: 16px/1.75 var(--font-sans); }
+.rm-field > label:empty { display: none; }
+.rm-field { gap: 8px; }
+.epass-auth-field .rm-field { display: contents; }
+.epass-auth-field .rm-field > label:empty { display: none; }
+.rm-check { align-items: center; }
+.rm-check input { flex-shrink: 0; }
+.epass-brand { --brand-height: 64px; display: inline-flex; align-items: center; gap: calc(var(--brand-height) * .25); flex-shrink: 0; color: var(--color-ink); text-decoration: none; direction: ltr; }
+.epass-brand > img { width: var(--brand-height); height: var(--brand-height); object-fit: contain; }
+.epass-brand-words { display: flex; flex-direction: column; gap: calc(var(--brand-height) * .04); font-family: var(--font-editorial); line-height: 1; }
+.epass-brand-words > span { font-size: calc(var(--brand-height) * .30); font-weight: 400; line-height: 1.15; }
+.epass-brand-words > strong { font-size: calc(var(--brand-height) * .56); font-weight: 500; line-height: 1.05; }
+.epass-brand--compact { gap: 9px; }
+.epass-brand-short { font: 500 20px/1.05 var(--font-editorial); }
+.epass-brand-emblem { margin-top: 48px; color: var(--color-accent); }
+.epass-auth-header { padding-block: 16px; }
+.epass-auth-panel h1 { font-family: var(--font-sans); font-size: 40px; font-weight: 500; }
+.epass-topbar { padding-block: 8px; }
+.epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-sans); font-weight: 500; }
+.forma-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: var(--r-semantic-radius-dialog); }
+.forma-dialog > header h2 { font: 500 20px/1.5 var(--font-sans); }
+.forma-dialog > footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.forma-dialog.epass-dialog-navigation { width: min(336px, calc(100vw - 32px)); height: 100dvh; max-height: 100dvh; margin: 0 0 0 auto; border-radius: 20px 0 0 20px; }
+.epass-theme .rm-button { min-width: 44px; padding-inline: 10px; }
+.epass-methods .rm-button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; }
+.epass-segments .rm-button { border: 1px solid var(--color-control); border-radius: 8px; }
+.epass-methods .rm-button[aria-pressed='true'] { color: var(--color-accent) !important; }
+.epass-password-toggle.rm-button { min-width: 44px; padding: 0; }
+.epass-password-checks li[data-passed='true'] { color: var(--color-success); }
+@media (max-width: 640px) {
+  .epass-brand { --brand-height: 48px; }
+  .epass-brand--compact .epass-brand-short { display: none; }
+  .epass-auth-panel { padding-inline: 16px; }
+  .epass-auth-panel h1 { font-size: 32px; }
+  .epass-topbar { min-height: 56px; }
+  .forma-dialog > footer .rm-button { flex: 1; }
+}
+@media (forced-colors: active) { .epass-brand > img { forced-color-adjust: none; } }
+
+.rm-input.pl-12 { padding-left: 48px; }
+.rm-input.pr-12 { padding-right: 48px; }
+.epass-auth-field > .relative > svg { z-index: 1; pointer-events: none; }
+
+/* Align the text's first line with the centre of the 44px checkbox target. */
+.epass-legal-check > span { padding-top: 10px; }
+.epass-legal-check .rm-check > span:last-child:empty { display: none; }
+.epass-brand-emblem > svg { margin-left: -10px; }

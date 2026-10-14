@@ -1,4 +1,5 @@
-import { Link } from '../design/NavigationMotion';
+import { FormaButton, FormaInput, FormaLoading } from '../components/Forma';
+import { Link, useNavigate } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
 import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
 import { useEffect, useId, useState } from 'react';
@@ -19,7 +20,7 @@ import {
   Smartphone,
   ShieldCheck,
   User,
-} from 'lucide-react';
+} from '../design/Icons';
 import { useLocation } from 'react-router-dom';
 import { ThemeToggle } from '../theme';
 import { RosemaryCheckbox } from '../components/ui';
@@ -47,8 +48,8 @@ function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onCha
     <label htmlFor={id}>{label}</label>
     <div className="relative">
       <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={20} aria-hidden="true" />
-      <input id={id} name={inputProps.name || autoComplete || id} type={password && visible ? 'text' : type} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={onChange} className={`input-field pl-12 ${password ? 'pr-12' : ''}`} {...inputProps} />
-      {password && <button type="button" className="epass-password-toggle" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</button>}
+      <FormaInput id={id} name={inputProps.name || autoComplete || id} type={password && visible ? 'text' : type} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={onChange} className={`input-field pl-12 ${password ? 'pr-12' : ''}`} {...inputProps} />
+      {password && <FormaButton type="button" className="epass-password-toggle" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</FormaButton>}
     </div>
   </div>;
 }
@@ -58,8 +59,8 @@ function CodeInputWithAction({ icon: Icon, label, placeholder, value, onChange, 
   return <div className="epass-auth-field">
     <label htmlFor={id}>{label}</label>
     <div className="flex flex-wrap gap-2">
-      <div className="relative min-w-0 flex-1 basis-32"><Icon size={20} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" /><input id={id} name="verification-code" autoComplete="one-time-code" inputMode="numeric" type="text" placeholder={placeholder} value={value} onChange={onChange} className="input-field pl-12" /></div>
-      <button type="button" className="btn-secondary" onClick={onAction} disabled={actionDisabled}>{actionLabel}</button>
+      <div className="relative min-w-0 flex-1 basis-32"><Icon size={20} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" /><FormaInput id={id} name="verification-code" autoComplete="one-time-code" inputMode="numeric" type="text" placeholder={placeholder} value={value} onChange={onChange} className="input-field pl-12" /></div>
+      <FormaButton type="button" className="btn-secondary" onClick={onAction} disabled={actionDisabled}>{actionLabel}</FormaButton>
     </div>
   </div>;
 }
@@ -72,12 +73,13 @@ function RememberMeCheckbox({ checked, onChange }) {
   );
 }
 
-function LegalAgreementCheckbox({ checked, onChange, documents }) {
+function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
   return (
-    <div className="flex items-start gap-2.5 px-1 text-sm leading-6 text-muted">
+    <div className="epass-legal-check flex items-start gap-2.5 px-1 text-sm leading-6 text-muted">
       <RosemaryCheckbox
         checked={checked}
         onCheckedChange={onChange}
+        disabled={disabled}
         ariaLabel="同意使用条款与隐私政策"
       />
       <span>
@@ -91,22 +93,30 @@ function LegalAgreementCheckbox({ checked, onChange, documents }) {
   );
 }
 
-function AccountCenterLink() {
+function AuthActionLink({ requestLegalAcceptance, to, children, ...props }) {
+  const navigate = useNavigate();
+  return <Link {...props} to={to} onClick={async (event) => {
+    event.preventDefault();
+    if (await requestLegalAcceptance()) navigate(to);
+  }}>{children}</Link>;
+}
+
+function AccountCenterLink({ requestLegalAcceptance }) {
   return (
-    <Link
+    <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
       to="/account"
       className="mx-auto flex w-fit items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-muted transition-colors hover:bg-subtle hover:text-ink"
     >
       账户中心
       <ArrowRight size={15} aria-hidden="true" />
-    </Link>
+    </AuthActionLink>
   );
 }
 
 function LoadingButtonText({ loading, loadingText, idleText, icon: Icon }) {
   return loading ? (
     <span className="inline-flex items-center gap-2">
-      <span className="loading-spinner" aria-hidden="true" />
+      <FormaLoading />
       <span>{loadingText}</span>
     </span>
   ) : (
@@ -128,7 +138,7 @@ function BrandSection() {
 
 function FactorListItem({ title, subtitle, onClick }) {
   return (
-    <button
+    <FormaButton
       type="button"
       onClick={onClick}
       className="flex w-full items-center justify-between rounded-panel border border-line bg-surface px-5 py-4 text-left transition-colors hover:border-control hover:bg-canvas"
@@ -138,7 +148,7 @@ function FactorListItem({ title, subtitle, onClick }) {
         {subtitle ? <p className="text-sm leading-relaxed text-muted">{subtitle}</p> : null}
       </div>
       <ArrowRight size={18} className="text-muted" />
-    </button>
+    </FormaButton>
   );
 }
 
@@ -176,6 +186,7 @@ export function LoginPage({
   completeWebAuthnLogin,
   legalAccepted,
   setLegalAccepted,
+  requestLegalAcceptance,
   legalDocuments,
   authNext = '',
 }) {
@@ -254,7 +265,7 @@ export function LoginPage({
             <AuthInput icon={ShieldCheck} label="Authenticator 动态验证码" value={loginForm.authenticator_code} onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value.replace(/\D/g, '') }))} />
           ) : null}
           {view.selectedPasswordFactor === 'webauthn' ? (
-            <button
+            <FormaButton
               type="button"
               disabled={webauthnLoading}
               className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold"
@@ -263,6 +274,7 @@ export function LoginPage({
                 setWebauthnError('');
                 try {
                   const options = await beginDirectLoginStepUpPasskey();
+                  if (!options) return;
                   const credential = await navigator.credentials.get({ publicKey: preparePublicKeyRequestOptions(options) });
                   if (!credential) throw new Error('未获取到系统通行密钥响应');
                   await completeDirectLoginStepUp(null, serializeAuthenticationCredential(credential));
@@ -274,17 +286,17 @@ export function LoginPage({
               }}
             >
               <LoadingButtonText loading={webauthnLoading} loadingText="等待系统验证..." idleText="使用系统通行密钥验证" icon={Fingerprint} />
-            </button>
+            </FormaButton>
           ) : null}
           {webauthnError ? <p className="text-sm text-danger">{webauthnError}</p> : null}
           {view.selectedPasswordFactor && view.selectedPasswordFactor !== 'webauthn' ? (
-            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="验证中..." idleText="完成二次验证" />
-            </button>
+            </FormaButton>
           ) : null}
-          <button type="button" onClick={() => setSelectedPasswordFactor('')} className="flex w-full items-center justify-center gap-2 text-sm font-bold text-muted hover:text-ink">
+          <FormaButton type="button" onClick={() => setSelectedPasswordFactor('')} className="flex w-full items-center justify-center gap-2 text-sm font-bold text-muted hover:text-ink">
             <ChevronLeft size={18} />返回验证方式
-          </button>
+          </FormaButton>
         </form>
       );
     }
@@ -300,9 +312,9 @@ export function LoginPage({
               value={loginForm.phone_number}
               onChange={(event) => setLoginForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
             />
-            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
-            </button>
+            </FormaButton>
           </form>
         );
       }
@@ -319,9 +331,9 @@ export function LoginPage({
             onAction={() => void resendPhoneCodeLogin()}
             actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
           />
-          <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+          <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
-          </button>
+          </FormaButton>
         </form>
       );
     }
@@ -338,9 +350,9 @@ export function LoginPage({
               onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
             />
 
-            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
-            </button>
+            </FormaButton>
           </form>
         );
       }
@@ -357,10 +369,10 @@ export function LoginPage({
             onAction={() => void resendEmailCodeLogin()}
             actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
           />
-          <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+          <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
-          </button>
-          <button
+          </FormaButton>
+          <FormaButton
             type="button"
             onClick={() => {
               if (selectedPasswordFactor) {
@@ -373,7 +385,7 @@ export function LoginPage({
           >
             <ChevronLeft size={18} />
             {selectedPasswordFactor ? '返回验证方式' : '返回上一步'}
-          </button>
+          </FormaButton>
         </form>
       );
     }
@@ -388,6 +400,7 @@ export function LoginPage({
             setWebauthnLoading(true);
             try {
               const options = await beginWebAuthnLogin();
+              if (!options) return;
               const credential = await navigator.credentials.get({
                 publicKey: preparePublicKeyRequestOptions(options),
               });
@@ -409,9 +422,9 @@ export function LoginPage({
           {webauthnError ? (
             <p className="text-sm text-danger">{webauthnError}</p>
           ) : null}
-          <button type="submit" disabled={webauthnLoading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+          <FormaButton type="submit" disabled={webauthnLoading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={webauthnLoading} loadingText="等待系统验证..." idleText="使用系统通行密钥登录" icon={Fingerprint} />
-          </button>
+          </FormaButton>
         </form>
       );
     }
@@ -435,9 +448,9 @@ export function LoginPage({
             onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
           />
 
-          <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+          <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="处理中..." idleText="继续登录" icon={ArrowRight} />
-          </button>
+          </FormaButton>
         </form>
       );
     }
@@ -488,9 +501,9 @@ export function LoginPage({
               onAction={() => void resendPasswordLoginCode()}
               actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
             />
-            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
-            </button>
+            </FormaButton>
           </>
         ) : null}
 
@@ -503,9 +516,9 @@ export function LoginPage({
               value={loginForm.authenticator_code}
               onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value.replace(/\D/g, '') }))}
             />
-            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
-            </button>
+            </FormaButton>
           </>
         ) : null}
 
@@ -521,9 +534,9 @@ export function LoginPage({
               onAction={() => void resendPasswordPhoneCode()}
               actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
             />
-            <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
-            </button>
+            </FormaButton>
           </>
         ) : null}
 
@@ -532,7 +545,7 @@ export function LoginPage({
             {webauthnError ? (
               <p className="text-sm text-danger">{webauthnError}</p>
             ) : null}
-            <button
+            <FormaButton
               type="button"
               disabled={webauthnLoading}
               onClick={async () => {
@@ -540,6 +553,7 @@ export function LoginPage({
                 setWebauthnLoading(true);
                 try {
                   const options = await beginWebAuthnLogin(loginForm.email.trim());
+                  if (!options) return;
                   const credential = await navigator.credentials.get({
                     publicKey: preparePublicKeyRequestOptions(options),
                   });
@@ -560,18 +574,18 @@ export function LoginPage({
               className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold"
             >
               <LoadingButtonText loading={webauthnLoading} loadingText="等待系统验证..." idleText="使用系统通行密钥验证" icon={Fingerprint} />
-            </button>
+            </FormaButton>
           </>
         ) : null}
 
-        <button
+        <FormaButton
           type="button"
           onClick={() => setLoginStep('credentials')}
           className="flex w-full items-center justify-center gap-2 text-sm font-bold text-muted transition-colors hover:text-ink"
         >
           <ChevronLeft size={18} />
           返回上一步
-        </button>
+        </FormaButton>
       </form>
     );
   }
@@ -595,16 +609,16 @@ export function LoginPage({
                         : '请完成身份验证，继续登录。'}
                   </p>
                 </div>
-                <button
+                <FormaButton
                   type="button"
                   onClick={switchAccount}
                   className="shrink-0 rounded-control border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted  transition-colors hover:border-control hover:bg-canvas hover:text-ink"
                 >
                   切换账号
-                </button>
+                </FormaButton>
               </div>
               <SelectionGroup value={loginMethod} label="登录方式">
-                {[['phone_code', '手机'], ['email_code', '邮箱'], ['webauthn', '通行密钥'], ['password', '密码']].map(([method, label]) => <button key={method} type="button" aria-pressed={loginMethod === method} onClick={() => switchTab(method)}>{label}</button>)}
+                {[['phone_code', '手机'], ['email_code', '邮箱'], ['webauthn', '通行密钥'], ['password', '密码']].map(([method, label]) => <FormaButton key={method} type="button" aria-pressed={loginMethod === method} onClick={() => switchTab(method)}>{label}</FormaButton>)}
               </SelectionGroup>
             </div>
 
@@ -621,19 +635,19 @@ export function LoginPage({
             </div>
 
             <div className="space-y-4">
-              <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} />
+              <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} disabled={loading || loginCodeSending || webauthnLoading} />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
                 <p className="text-sm text-muted">
                   还没有账户？
                   {' '}
-                  <Link to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="font-bold text-ink underline-offset-4 hover:underline">
+                  <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="font-bold text-ink underline-offset-4 hover:underline">
                     立即注册
-                  </Link>
+                  </AuthActionLink>
                 </p>
               </div>
 
-              <Link
+              <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
                 to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
                 className="group flex w-full items-center justify-between gap-3 px-1 py-1 text-left"
               >
@@ -642,9 +656,9 @@ export function LoginPage({
                   <span className="ml-2 text-muted">使用已绑定的验证方式重置密码</span>
                 </span>
                 <ArrowRight size={17} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </Link>
+              </AuthActionLink>
 
-              <AccountCenterLink />
+              <AccountCenterLink requestLegalAcceptance={requestLegalAcceptance} />
             </div>
           </div>
         </div>
@@ -669,6 +683,7 @@ export function RegisterPage({
   mountCaptcha,
   legalAccepted,
   setLegalAccepted,
+  requestLegalAcceptance,
   legalDocuments,
   authNext = '',
 }) {
@@ -712,7 +727,7 @@ export function RegisterPage({
           </div>
 
           <SelectionGroup value={registerMethod} label="注册方式" className="!grid-cols-2">
-            <button
+            <FormaButton
               type="button"
               disabled={verificationComplete}
               aria-pressed={registerMethod === 'email'}
@@ -720,8 +735,8 @@ export function RegisterPage({
               className={`relative z-10 rounded-control px-4 py-2 text-sm font-bold transition-colors ${registerMethod === 'email' ? 'text-ink' : 'text-muted hover:text-ink'}`}
             >
               邮箱注册
-            </button>
-            <button
+            </FormaButton>
+            <FormaButton
               type="button"
               disabled={verificationComplete}
               aria-pressed={registerMethod === 'phone'}
@@ -729,7 +744,7 @@ export function RegisterPage({
               className={`relative z-10 rounded-control px-4 py-2 text-sm font-bold transition-colors ${registerMethod === 'phone' ? 'text-ink' : 'text-muted hover:text-ink'}`}
             >
               手机注册
-            </button>
+            </FormaButton>
           </SelectionGroup>
 
           <SelectionContent value={registerMethod} index={registerMethod === 'email' ? 0 : 1}><form className="space-y-5" onSubmit={(event) => { if (!passwordValid) { event.preventDefault(); return; } submitRegister(event); }}>
@@ -772,13 +787,13 @@ export function RegisterPage({
                 value={registerMethod === 'email' ? registerForm.email_code : registerForm.phone_code}
                 onChange={(event) => setRegisterForm((current) => ({ ...current, [registerMethod === 'email' ? 'email_code' : 'phone_code']: event.target.value }))}
               />
-              <button type="button" onClick={() => void submitRegisterCode()} className="btn-secondary whitespace-nowrap px-4 min-[400px]:mt-[30px]" disabled={registerCodeDisabled}>
+              <FormaButton type="button" onClick={() => void submitRegisterCode()} className="btn-secondary whitespace-nowrap px-4 min-[400px]:mt-[30px]" disabled={registerCodeDisabled}>
                 <LoadingButtonText
                   loading={registerCodeSending}
                   loadingText="发送中..."
                   idleText={registerCodeCooldownRemaining > 0 ? `${registerCodeCooldownRemaining} 秒后重发` : '发送验证码'}
                 />
-              </button>
+              </FormaButton>
             </div>
             )}
             <NewPasswordField value={registerForm.password} personalInfo={[registerForm.nickname, registerForm.email, registerForm.phone_number]} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} />
@@ -800,19 +815,19 @@ export function RegisterPage({
               </div>
             </div>
 
-            <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} />
+            <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} disabled={loading || registerCodeSending} />
 
-            <button type="submit" disabled={loading || !passwordValid} className="btn-primary w-full py-4 text-lg font-bold">
+            <FormaButton type="submit" disabled={loading || !passwordValid} className="btn-primary w-full py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="注册中..." idleText="注册账户" />
-            </button>
+            </FormaButton>
           </form></SelectionContent>
 
           <p className="text-center text-sm text-muted">
             已经有账户了？
             {' '}
-            <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="font-bold text-ink underline-offset-4 hover:underline">
+            <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="font-bold text-ink underline-offset-4 hover:underline">
               返回登录
-            </Link>
+            </AuthActionLink>
           </p>
         </div>
       </div>
@@ -826,6 +841,7 @@ export function ForgotPasswordPage({
   sendRecoveryCode,
   resetPasswordByCode,
   beginWebAuthnLogin,
+  requestLegalAcceptance,
   authNext = '',
 }) {
   const [method, setMethod] = useState('email');
@@ -852,30 +868,31 @@ export function ForgotPasswordPage({
 
                 <div className="space-y-6">
                   <SelectionGroup value={method} label="账户恢复方式" indicator={false} className="!grid-cols-2 epass-segments">
-                    <button type="button" aria-pressed={method === 'email'} onClick={() => setMethod('email')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'email' ? 'bg-surface text-ink' : 'text-muted'}`}>邮箱</button>
-                    <button type="button" aria-pressed={method === 'phone'} onClick={() => setMethod('phone')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'phone' ? 'bg-surface text-ink' : 'text-muted'}`}>手机</button>
-                    <button type="button" aria-pressed={method === 'authenticator'} onClick={() => setMethod('authenticator')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'authenticator' ? 'bg-surface text-ink' : 'text-muted'}`}>Authenticator</button>
-                    <button type="button" aria-pressed={method === 'passkey'} onClick={() => setMethod('passkey')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'passkey' ? 'bg-surface text-ink' : 'text-muted'}`}>通行密钥</button>
+                    <FormaButton type="button" aria-pressed={method === 'email'} onClick={() => setMethod('email')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'email' ? 'bg-surface text-ink' : 'text-muted'}`}>邮箱</FormaButton>
+                    <FormaButton type="button" aria-pressed={method === 'phone'} onClick={() => setMethod('phone')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'phone' ? 'bg-surface text-ink' : 'text-muted'}`}>手机</FormaButton>
+                    <FormaButton type="button" aria-pressed={method === 'authenticator'} onClick={() => setMethod('authenticator')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'authenticator' ? 'bg-surface text-ink' : 'text-muted'}`}>Authenticator</FormaButton>
+                    <FormaButton type="button" aria-pressed={method === 'passkey'} onClick={() => setMethod('passkey')} className={`rounded-control px-4 py-2 text-sm font-bold ${method === 'passkey' ? 'bg-surface text-ink' : 'text-muted'}`}>通行密钥</FormaButton>
                   </SelectionGroup>
                   <SelectionContent value={method} index={['email', 'phone', 'authenticator', 'passkey'].indexOf(method)}>
                   {method !== 'passkey' ? <AuthInput icon={method === 'phone' ? Smartphone : Mail} label={method === 'phone' ? '手机号码' : '账户邮箱或手机号'} placeholder={method === 'phone' ? '13800138000' : 'name@example.com'} value={form.account} onChange={(event) => setForm((current) => ({ ...current, account: event.target.value }))} /> : null}
                   </SelectionContent>
                   {error ? <p className="text-sm text-danger">{error}</p> : null}
-                  <button onClick={async () => {
+                  <FormaButton onClick={async () => {
                     setError('');
                     try {
-                      await sendRecoveryCode({ method, account: form.account });
+                      const result = await sendRecoveryCode({ method, account: form.account });
+                      if (result === null) return;
                       setStep('verify');
                     } catch (e) {
                       setError(getUserErrorMessage(e, '发送失败，请稍后重试。'));
                     }
                   }} className="btn-primary w-full py-4 font-bold" type="button" disabled={loading}>
                     {method === 'email' || method === 'phone' ? '发送验证码' : '继续验证'}
-                  </button>
-                  <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="flex items-center justify-center gap-2 text-sm font-bold text-muted transition-colors hover:text-muted">
+                  </FormaButton>
+                  <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="flex items-center justify-center gap-2 text-sm font-bold text-muted transition-colors hover:text-muted">
                     <ChevronLeft size={18} />
                     返回登录
-                  </Link>
+                  </AuthActionLink>
                 </div>
               </div>
             ) : step === 'verify' ? (
@@ -893,36 +910,38 @@ export function ForgotPasswordPage({
                     <NewPasswordField label="新密码" value={form.new_password} onChange={(event) => setForm((current) => ({ ...current, new_password: event.target.value }))} />
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                   </div>
-                  <button onClick={async () => {
+                  <FormaButton onClick={async () => {
                     setError('');
                     try {
                       let passkeyResponse;
                       if (method === 'passkey') {
                         const options = await beginWebAuthnLogin();
+                        if (!options) return;
                         const credential = await navigator.credentials.get({ publicKey: preparePublicKeyRequestOptions(options) });
                         if (!credential) throw new Error('未获取到通行密钥响应');
                         passkeyResponse = serializeAuthenticationCredential(credential);
                       }
-                      await resetPasswordByCode({
+                      const result = await resetPasswordByCode({
                         method,
                         account: form.account,
                         code: form.code,
                         new_password: form.new_password,
                         ...(passkeyResponse ? { passkey_response: passkeyResponse } : {}),
                       });
+                      if (result === null) return;
                       setStep('done');
                     } catch (e) {
                       setError(getUserErrorMessage(e, '重置失败，请稍后重试。'));
                     }
                   }} className="btn-primary mb-3 mt-4 w-full py-4 font-bold" type="button" disabled={loading || !evaluatePassword(form.new_password).ok}>
                     重置密码
-                  </button>
-                  <button onClick={() => setStep('request')} className="btn-secondary mb-4 w-full py-4 font-bold" type="button">
+                  </FormaButton>
+                  <FormaButton onClick={() => setStep('request')} className="btn-secondary mb-4 w-full py-4 font-bold" type="button">
                     重新填写
-                  </button>
-                  <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="text-sm font-bold text-muted underline-offset-4 hover:underline">
+                  </FormaButton>
+                  <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="text-sm font-bold text-muted underline-offset-4 hover:underline">
                     返回登录页面
-                  </Link>
+                  </AuthActionLink>
                 </div>
               </div>
             ) : (
@@ -934,9 +953,9 @@ export function ForgotPasswordPage({
                   <h1 className="text-2xl font-bold text-ink">密码已重置</h1>
                   <p className="leading-relaxed text-muted">旧会话已失效，请使用新密码重新登录。</p>
                 </div>
-                <Link to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="btn-primary block w-full py-4 font-bold">
+                <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="btn-primary block w-full py-4 font-bold">
                   返回登录
-                </Link>
+                </AuthActionLink>
               </div>
             )}
 
@@ -957,8 +976,8 @@ export function PostRegisterPasskeyPrompt({
 }) {
 
   return <AnimatePresence>{open && <Dialog key="passkey-prompt" title="添加通行密钥" onClose={() => { if (!saving) onSkip(); }} actions={<>
-    <button type="button" className="btn-secondary" disabled={saving} onClick={onSkip}>稍后再说</button>
-    <button type="button" className="btn-primary" disabled={saving} onClick={onConfirm}><LoadingButtonText loading={saving} loadingText="等待系统验证…" idleText="添加通行密钥" icon={Fingerprint} /></button>
+    <FormaButton type="button" className="btn-secondary" disabled={saving} onClick={onSkip}>稍后再说</FormaButton>
+    <FormaButton type="button" className="btn-primary" disabled={saving} onClick={onConfirm}><LoadingButtonText loading={saving} loadingText="等待系统验证…" idleText="添加通行密钥" icon={Fingerprint} /></FormaButton>
   </>}><div className="space-y-4 text-sm text-muted"><p>账户已创建。添加通行密钥后，可以使用指纹、人脸或设备解锁登录。</p><p>建议再添加一种不同于当前注册方式的验证方式：{registrationMethod === 'phone' ? '邮箱、验证器或通行密钥。' : '手机、验证器或通行密钥。'}</p><p>也可以稍后在账户安全中设置。</p>{error && <p className="rounded-control bg-danger-subtle p-3 text-danger" role="alert">{error}</p>}</div></Dialog>}</AnimatePresence>;
 }
 
@@ -1026,8 +1045,8 @@ export function PostRegisterBindingPrompt({
   }
 
   return <AnimatePresence>{open && <Dialog key="binding-prompt" title={bindingPhone ? '添加手机号码' : '添加邮箱地址'} onClose={() => { if (!sending && !saving) onSkip(); }} actions={<>
-    <button type="button" className="btn-secondary" onClick={onSkip} disabled={sending || saving}>跳过</button>
-    <button type="button" className="btn-primary" onClick={() => void handleConfirm()} disabled={saving || !codeSent || !code.trim() || !account.trim()}><LoadingButtonText loading={saving} loadingText="验证并绑定中…" idleText="验证并添加" /></button>
+    <FormaButton type="button" className="btn-secondary" onClick={onSkip} disabled={sending || saving}>跳过</FormaButton>
+    <FormaButton type="button" className="btn-primary" onClick={() => void handleConfirm()} disabled={saving || !codeSent || !code.trim() || !account.trim()}><LoadingButtonText loading={saving} loadingText="验证并绑定中…" idleText="验证并添加" /></FormaButton>
   </>}><div className="space-y-5"><p className="text-sm text-muted">添加另一种联系方式，用于登录和恢复账户。</p>
     <AuthInput icon={bindingPhone ? Smartphone : Mail} label={bindingPhone ? '手机号码' : '邮箱地址'} type={bindingPhone ? 'tel' : 'email'} placeholder={bindingPhone ? '13800138000' : 'name@example.com'} value={account} onChange={(event) => setAccount(bindingPhone ? event.target.value.replace(/[^\d+]/g, '') : event.target.value)} />
     <CodeInputWithAction icon={ShieldCheck} label={bindingPhone ? '短信验证码' : '邮箱验证码'} placeholder="输入验证码" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} onAction={() => void handleSendCode()} actionDisabled={sending || cooldown > 0 || !account.trim()} actionLabel={sending ? '发送中…' : cooldown > 0 ? `${cooldown} 秒后重发` : '发送验证码'} />

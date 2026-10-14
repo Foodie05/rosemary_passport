@@ -88,12 +88,7 @@ Response _authorizationErrorPage(
     <div class="shell">
       <section class="brand">
         <div class="brand-content">
-          <div class="brand-head">
-            <div class="brand-logo">
-              <img src="$brandLogoUrl" alt="Rosemary Epass" />
-            </div>
-            <div class="brand-name">Rosemary Epass</div>
-          </div>
+          ${epassBrandMarkup(brandLogoUrl)}
           <div class="brand-copy">
             <h1>登录暂时无法继续</h1>
             <p>Rosemary Epass 已拦下这次授权请求，避免在应用配置异常时把您带入不安全或不完整的登录流程。</p>

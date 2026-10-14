@@ -1,5 +1,6 @@
+import { FormaButton, FormaInput } from './Forma';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check, Circle, Eye, EyeOff, Lock } from 'lucide-react';
+import { Check, Circle, Eye, EyeOff, Lock } from '../design/Icons';
 import { evaluatePassword, passwordContainsPersonalInfo } from '../lib/password-policy';
 
 export function NewPasswordField({ label = '设置密码', value = '', onChange, personalInfo = [], className = '', ...props }) {
@@ -19,8 +20,8 @@ export function NewPasswordField({ label = '设置密码', value = '', onChange,
     <label htmlFor={id}>{label}</label>
     <div className="relative">
       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={20} aria-hidden="true" />
-      <input {...props} ref={input} id={id} name="new-password" type={visible ? 'text' : 'password'} autoComplete="new-password" required value={value} onChange={onChange} aria-invalid={value && !result.ok ? true : undefined} aria-describedby={`${id}-requirements ${id}-status ${id}-advice`} className="input-field pl-12 pr-12" />
-      <button type="button" className="epass-password-toggle" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+      <FormaInput {...props} ref={input} id={id} name="new-password" type={visible ? 'text' : 'password'} autoComplete="new-password" required value={value} onChange={onChange} aria-invalid={value && !result.ok ? true : undefined} aria-describedby={`${id}-requirements ${id}-status ${id}-advice`} className="input-field pl-12 pr-12" />
+      <FormaButton type="button" className="epass-password-toggle" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</FormaButton>
     </div>
     <ul id={`${id}-requirements`} className="epass-password-checks">
       {checks.map(([text, passed]) => <li key={text} data-passed={Boolean(value && passed)}>{value && passed ? <Check size={16} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />}<span>{text}{value && passed && <span className="sr-only">，已满足</span>}</span></li>)}

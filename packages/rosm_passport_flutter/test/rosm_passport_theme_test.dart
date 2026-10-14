@@ -46,7 +46,7 @@ void main() {
     tester,
   ) async {
     await _pumpSignIn(tester, RosmPassportThemeMode.dark);
-    await tester.enterText(find.byType(TextField).first, '13800138000');
+    await tester.enterText(find.byType(EditableText).first, '13800138000');
 
     final editable = tester.widget<EditableText>(
       find.byType(EditableText).first,

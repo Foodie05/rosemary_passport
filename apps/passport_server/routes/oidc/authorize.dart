@@ -1,3 +1,4 @@
+import '../../lib/src/utils/epass_loading.dart';
 import '../../lib/src/utils/epass_design.dart';
 
 import 'dart:convert';
@@ -353,21 +354,13 @@ Response authorizationConsentPage(
         <div class="panel-stack">
           <section class="panel">
             <div class="panel-top">
-              <div class="brand">
-                <div class="logo">
-                  <img src="${_escapeHtml(brandLogoUrl)}" alt="Rosemary Epass" />
-                </div>
-                <div>
-                  <p class="eyebrow">Rosemary Epass 授权确认</p>
-                  <strong>Rosemary Epass</strong>
-                </div>
-              </div>
+              ${epassBrandMarkup(brandLogoUrl, compact: true)}
               <a class="switch-account" href="${_escapeHtml(switchAccountUrl)}">切换账号</a>
             </div>
           <div class="trust-badge">
             <span class="trust-icon${isOfficial ? '' : ' hidden'}">
               <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M13.2 4.4L6.6 11L2.8 7.2" stroke="#6e926e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M13.2 4.4L6.6 11L2.8 7.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
             $escapedBadgeLabel
@@ -376,7 +369,7 @@ Response authorizationConsentPage(
           ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 Rosemary Epass 验证你的登录状态。</p>' : '<p class="permission-head">此应用将获得以下信息：</p><ul class="permission-list">$scopeListHtml</ul>'}
           <div class="actions">
             <a class="button secondary" href="${_escapeHtml(cancelUrl)}">取消</a>
-            <a id="approve-button" class="button primary" href="${_escapeHtml(approveUrl)}">确认</a>
+            <a id="approve-button" class="button primary" href="${_escapeHtml(approveUrl)}">$epassLoadingMarkup<span id="approve-label">确认</span></a>
           </div>
           </section>
           <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">Rosemary Epass 账号中心 <span aria-hidden="true">→</span></a>
@@ -388,10 +381,20 @@ Response authorizationConsentPage(
         var approveButton = document.getElementById('approve-button');
         if (!approveButton) return;
 
+        var loader = document.getElementById('approve-loader');
+        var label = document.getElementById('approve-label');
+        var loadingTimer;
+        function pauseApprovalLoading() {
+          clearTimeout(loadingTimer);
+          loader.dataset.active = 'false';
+          loader.dataset.visible = 'false';
+        }
         function resetApprovalState() {
+          pauseApprovalLoading();
+          approveButton.removeAttribute('aria-busy');
           approveButton.removeAttribute('aria-disabled');
           approveButton.removeAttribute('data-submitting');
-          approveButton.textContent = '确认';
+          label.textContent = '确认';
         }
 
         approveButton.addEventListener('click', function(event) {
@@ -401,9 +404,18 @@ Response authorizationConsentPage(
           }
           approveButton.dataset.submitting = 'true';
           approveButton.setAttribute('aria-disabled', 'true');
-          approveButton.textContent = '授权处理中…';
+          approveButton.setAttribute('aria-busy', 'true');
+          label.textContent = '授权处理中…';
+          loadingTimer = setTimeout(function() {
+            loader.dataset.visible = 'true';
+            loader.dataset.active = String(!document.hidden);
+          }, 300);
         });
         window.addEventListener('pageshow', resetApprovalState);
+        window.addEventListener('pagehide', pauseApprovalLoading);
+        document.addEventListener('visibilitychange', function() {
+          loader.dataset.active = String(!document.hidden && loader.dataset.visible === 'true');
+        });
       })();
     </script>
   </body>

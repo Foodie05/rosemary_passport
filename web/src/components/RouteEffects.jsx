@@ -27,10 +27,7 @@ export function RouteEffects() {
       main.setAttribute('tabindex', '-1');
       main.focus({ preventScroll: true });
       if (document.documentElement.dataset.reduceMotion !== 'true' && !matchMedia('(prefers-reduced-motion: reduce)').matches && document.documentElement.dataset.routeTransition !== 'native') {
-        const root = getComputedStyle(document.documentElement);
-        const distance = parseFloat(root.getPropertyValue(motion === 'cross' ? '--r-semantic-motion-distance-dialog' : motion === 'deeper' || motion === 'parent' ? '--r-semantic-motion-distance-panel' : '--r-semantic-space-16'));
-        const sign = motion === 'parent' || motion === 'peer-back' ? -1 : 1;
-        animation.current = main.animate([{ opacity: 0, transform: `translate${motion === 'cross' ? 'Y' : 'X'}(${sign * distance}px)` }, { opacity: 1, transform: 'none' }], { duration: motionDuration('settle'), easing: motionToken('standard') });
+        animation.current = main.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: motionDuration('settle'), easing: motionToken('standard') });
       }
       return true;
     };

@@ -10,15 +10,15 @@ import { RosemaryDialogProvider } from './components/ui';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <MotionPreferences>
+    <MotionPreferences>
+      <ThemeProvider>
       <RosemaryDialogProvider>
         <BrowserRouter>
           <RouteEffects />
           <App />
         </BrowserRouter>
       </RosemaryDialogProvider>
-    </MotionPreferences>
     </ThemeProvider>
+    </MotionPreferences>
   </React.StrictMode>,
 );

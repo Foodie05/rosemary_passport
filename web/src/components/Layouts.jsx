@@ -1,7 +1,8 @@
+import { FormaButton } from './Forma';
 import { Link, useNavigate } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
 import { useState } from 'react';
-import { Activity, BookOpen, FileText, Key, LayoutDashboard, LogOut, Menu, ShieldCheck, ScrollText, Users, Mail } from 'lucide-react';
+import { Activity, BookOpen, FileText, Key, LayoutDashboard, LogOut, Menu, ShieldCheck, ScrollText, Users, Mail } from '../design/Icons';
 import { Outlet, useLocation } from 'react-router-dom';
 import { cleanDisplayName, getInitial } from '../utils';
 import { ThemeToggle } from '../theme';
@@ -39,11 +40,11 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
     <aside className="epass-sidebar">
       <Brand compact subtitle="管理控制台" to="/admin/dashboard" />
       <Navigation />
-      <div className="border-t border-line pt-4"><Link className="epass-nav-item" to="/docs"><BookOpen size={20} />接入文档</Link><button className="epass-nav-item w-full" type="button" onClick={exit}><LogOut size={20} />退出登录</button></div>
+      <div className="border-t border-line pt-4"><Link className="epass-nav-item" to="/docs"><BookOpen size={20} />接入文档</Link><FormaButton className="epass-nav-item w-full" type="button" onClick={exit}><LogOut size={20} />退出登录</FormaButton></div>
     </aside>
     <div className="flex min-w-0 flex-col">
       <header className="epass-topbar">
-        <div className="flex min-w-0 items-center gap-3"><button type="button" className="inline-flex h-11 w-11 items-center justify-center lg:hidden" aria-label="打开导航" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={20} /></button><p className="text-sm text-muted"><span className="hidden sm:inline">管理控制台 <span className="mx-3">/</span></span><span className="text-ink">{pageName}</span></p></div>
+        <div className="flex min-w-0 items-center gap-3"><FormaButton type="button" className="inline-flex h-11 w-11 items-center justify-center lg:hidden" aria-label="打开导航" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={20} /></FormaButton><p className="text-sm text-muted"><span className="hidden sm:inline">管理控制台 <span className="mx-3">/</span></span><span className="text-ink">{pageName}</span></p></div>
         <div className="flex items-center gap-4"><ThemeToggle /><Link to="/admin/account" className="flex items-center gap-3" aria-label={`账户安全：${displayName}`}><span className="hidden text-sm sm:block">{displayName}</span><span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-subtle text-sm text-accent">{getInitial(session.user?.email)}</span></Link></div>
       </header>
       <main id="main-content" tabIndex={-1} className="epass-workspace flex-1">
@@ -52,7 +53,7 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
       </main>
       <SiteFooter />
     </div>
-    <AnimatePresence>{menuOpen && <Dialog key="navigation" className="epass-dialog-navigation" title="管理控制台" onClose={() => setMenuOpen(false)}><Brand compact /><Navigation close={() => setMenuOpen(false)} /><Link to="/docs" className="epass-nav-item" onClick={() => setMenuOpen(false)}><BookOpen size={20} />接入文档</Link><button type="button" className="epass-nav-item" onClick={exit}><LogOut size={20} />退出登录</button></Dialog>}</AnimatePresence>
+    <AnimatePresence>{menuOpen && <Dialog key="navigation" className="epass-dialog-navigation" title="管理控制台" onClose={() => setMenuOpen(false)}><Brand compact /><Navigation close={() => setMenuOpen(false)} /><Link to="/docs" className="epass-nav-item" onClick={() => setMenuOpen(false)}><BookOpen size={20} />接入文档</Link><FormaButton type="button" className="epass-nav-item" onClick={exit}><LogOut size={20} />退出登录</FormaButton></Dialog>}</AnimatePresence>
   </div>;
 }
 
@@ -60,8 +61,8 @@ export function UserLayout({ session, logout }) {
   const navigate = useNavigate();
   return <div className="flex min-h-dvh flex-col">
     <a href="#main-content" className="epass-skip">跳到主要内容</a>
-    <header className="epass-topbar"><Brand to="/account" /><div className="flex items-center gap-3"><ThemeToggle /><button type="button" className="hidden min-h-11 px-3 text-sm text-muted sm:block" onClick={() => { logout(); navigate('/login'); }}>退出登录</button></div></header>
-    <main id="main-content" tabIndex={-1} className="epass-user-main"><Outlet /><button type="button" className="btn-secondary mt-8 sm:hidden" onClick={() => { logout(); navigate('/login'); }}>退出登录</button></main>
+    <header className="epass-topbar"><Brand compact to="/account" /><div className="flex items-center gap-3"><ThemeToggle /><FormaButton type="button" className="hidden min-h-11 px-3 text-sm text-muted sm:block" onClick={() => { logout(); navigate('/login'); }}>退出登录</FormaButton></div></header>
+    <main id="main-content" tabIndex={-1} className="epass-user-main"><Outlet /><FormaButton type="button" className="btn-secondary mt-8 sm:hidden" onClick={() => { logout(); navigate('/login'); }}>退出登录</FormaButton></main>
     <SiteFooter />
   </div>;
 }

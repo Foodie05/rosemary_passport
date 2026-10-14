@@ -1,0 +1,418 @@
+{
+  "schemaVersion": 1,
+  "sdkVersion": "0.4.0",
+  "specVersion": "1.2.0",
+  "colorFormat": "opaque-srgb-hex6",
+  "themes": {
+    "light": {
+      "canvas": "#F8F7FB",
+      "surface": "#FFFFFF",
+      "raised": "#FFFFFF",
+      "ink": "#302B3B",
+      "muted": "#706579",
+      "border": "#DED8E5",
+      "control": "#8D8198",
+      "primary": "#614578",
+      "on-primary": "#FFFFFF",
+      "primary-soft": "#E8E1F0",
+      "sun": "#F3CD6B",
+      "on-sun": "#513F13",
+      "sky": "#DDEBF6",
+      "on-sky": "#34516C",
+      "success": "#2F6952",
+      "success-soft": "#EAF4EE",
+      "warning": "#815300",
+      "warning-soft": "#FBF0D9",
+      "danger": "#A53C46",
+      "danger-soft": "#FBECEE",
+      "on-danger": "#FFFFFF",
+      "info": "#315F9A",
+      "info-soft": "#EAF1FC",
+      "focus": "#745291"
+    },
+    "dark": {
+      "canvas": "#1C1922",
+      "surface": "#25212D",
+      "raised": "#302A39",
+      "ink": "#F0EAF6",
+      "muted": "#B9AEC6",
+      "border": "#43394F",
+      "control": "#94859F",
+      "primary": "#CDB5EA",
+      "on-primary": "#2D2038",
+      "primary-soft": "#3C2F4C",
+      "sun": "#E4C16B",
+      "on-sun": "#3E3010",
+      "sky": "#2B4256",
+      "on-sky": "#D9EBFB",
+      "success": "#9DD5B5",
+      "success-soft": "#213D30",
+      "warning": "#EBC97C",
+      "warning-soft": "#44371C",
+      "danger": "#F1ADB6",
+      "danger-soft": "#452830",
+      "on-danger": "#30171D",
+      "info": "#AAC9EF",
+      "info-soft": "#253B57",
+      "focus": "#CDB5EA"
+    }
+  },
+  "typography": {
+    "ui": "-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif",
+    "editorial": "Songti SC, STSong, Noto Serif CJK SC, Georgia, serif",
+    "latinEditorial": "Georgia, Times New Roman, serif",
+    "code": "SFMono-Regular, Consolas, Liberation Mono, monospace",
+    "webScalePx": {
+      "caption": 12,
+      "small": 14,
+      "body": 16,
+      "lead": 20,
+      "heading": 28,
+      "title": 40,
+      "display": 64
+    },
+    "lineHeight": {
+      "body": 1.75,
+      "compact": 1.5,
+      "heading": 1.3
+    },
+    "weights": {
+      "regular": 400,
+      "medium": 500,
+      "semibold": 600
+    }
+  },
+  "space": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96
+  ],
+  "radius": {
+    "control": 8,
+    "content": 12,
+    "dialog": 20,
+    "pill": 999
+  },
+  "motion": {
+    "instantFeedback": 120,
+    "state": 180,
+    "transition": 260,
+    "exit": 160,
+    "layout": 240,
+    "confirmation": 220,
+    "restoration": 480,
+    "page": 220,
+    "easing": "cubic-bezier(0.2, 0.7, 0.2, 1)",
+    "drawerEnterMs": 220,
+    "drawerExitMs": 180,
+    "tabsMs": 180,
+    "loadingCycleMs": 1200,
+    "progressMs": 320,
+    "progressFlowMs": 1800,
+    "skeletonCycleMs": 1500
+  },
+  "components": {
+    "button": {
+      "foreground": "on-primary",
+      "background": "primary",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "height": {
+        "small": 32,
+        "medium": 40,
+        "large": 48
+      },
+      "paddingInline": 16
+    },
+    "link": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "iconButton": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "input": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "minHeight": 44
+    },
+    "textarea": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "select": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "minHeight": 44
+    },
+    "search": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "minHeight": 44
+    },
+    "checkbox": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "radio": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "switch": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "slider": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "date": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "minHeight": 44
+    },
+    "upload": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "tabs": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "indicatorMs": 180,
+      "contentMs": 180
+    },
+    "breadcrumb": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "pagination": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "menu": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "tooltip": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "popover": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "dialog": {
+      "foreground": "ink",
+      "background": "raised",
+      "focus": "focus",
+      "border": "control",
+      "radius": "dialog",
+      "minTouchTarget": 44,
+      "enterMs": 260,
+      "exitMs": 160,
+      "completion": "animation-finished",
+      "interruptible": true
+    },
+    "drawer": {
+      "foreground": "ink",
+      "background": "raised",
+      "focus": "focus",
+      "border": "control",
+      "radius": "dialog",
+      "minTouchTarget": 44,
+      "enterMs": 220,
+      "exitMs": 180,
+      "completion": "animation-finished",
+      "interruptible": true
+    },
+    "toast": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "alert": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "card": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "border",
+      "radius": "content",
+      "minTouchTarget": 44
+    },
+    "list": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "border",
+      "radius": "content",
+      "minTouchTarget": 44
+    },
+    "table": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "border",
+      "radius": "content",
+      "minTouchTarget": 44
+    },
+    "badge": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "avatar": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    },
+    "empty": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "border",
+      "radius": "content",
+      "minTouchTarget": 44
+    },
+    "skeleton": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "border",
+      "radius": "content",
+      "minTouchTarget": 44
+    },
+    "loading": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "sizes": [
+        17,
+        32,
+        48
+      ],
+      "cycleMs": 1200,
+      "appearanceDelayMs": 300,
+      "reducedMotion": "static",
+      "shape": "two-fold-long-axis"
+    },
+    "progress": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44,
+      "transitionMs": 320,
+      "reducedMotion": "immediate",
+      "valueSemantics": "actual-completed-work"
+    },
+    "stepper": {
+      "foreground": "ink",
+      "background": "surface",
+      "focus": "focus",
+      "border": "control",
+      "radius": "control",
+      "minTouchTarget": 44
+    }
+  }
+}

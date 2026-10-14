@@ -1,72 +1,61 @@
 {
   "product": "Rosemary Epass",
   "designSystem": {
-    "site": "https://design.cruty.cn",
+    "site": "https://design.cruty.cn/",
     "repository": "https://github.com/Foodie05/Rosemary-Design-System",
-    "version": "v2.0.0-beta.2-banner.2",
-    "commit": "a36510e38277a2f84ab4150e074bbfbee55ddefd",
-    "tokensSource": "src/generated/tokens.css",
-    "guides": [
-      "public/guide/motion.md",
-      "src/components/common/SelectionMotion.tsx",
-      "src/hooks/usePresence.ts",
-      "src/pageMotion.ts",
-      "src/index.css",
-      "public/guide/content.md"
+    "specVersion": "1.2.0",
+    "sdkVersion": "0.4.0",
+    "commit": "311a81de1651ba049d3acd476725390de38aacc2",
+    "tokensSource": "design/tokens.json",
+    "tokensSha256": "88f9f98a556d223004fcc55d21e575cf75abfd015180b01ca91f405d396663fc",
+    "assets": [
+      {
+        "path": "web/vendor/rosemary/rosemary-ui-icons-0.4.0.tgz",
+        "sha256": "ff4f9bdb3706d724518c9080af57978645b922aedefdb41ea62ca0185b306eba"
+      },
+      {
+        "path": "web/vendor/rosemary/rosemary-ui-react-0.4.0.tgz",
+        "sha256": "983367325771893b41c6cf76d0521d092179bbfd89ee487482a74d920f0035f5"
+      },
+      {
+        "path": "web/vendor/rosemary/rosemary-ui-tokens-0.4.0.tgz",
+        "sha256": "4b4573b2782732102d501a53952aa626abac67fd63c8e6b1c4d0fc0f2fdef50c"
+      }
     ],
-    "sourceSha256": "294120f5c74c8ade573afb819c704883447feb215b9db3115dfbcdb8f18e20e2"
+    "flutterSourceArchiveSha256": "8bfd763a3487316f7e678a0578c2ffc8c2a31c7796bf539fc176a820f6ac9157"
   },
   "brand": {
     "name": "Rosemary Epass",
-    "logo": "web/public/brand/rosemary.png",
-    "logoSource": "https://tianyue.s3.bitiful.net/logo/rosemary_pure.png",
-    "direction": "Organic Precision",
-    "palette": "Official light/dark semantic tokens; paper and pine",
-    "identityCompatibility": "Existing storage keys, issuer URLs, RP IDs and published legal records are preserved."
+    "motherLogo": "web/public/brand/rosemary.png",
+    "motherLogoSha256": "fe0ee00522c8a47f2242676f8417b240d299263e8dbc7b7bddc28ece9bb36d4c",
+    "productMark": "web/src/design/epass-mark.json",
+    "approvedOverrides": [
+      "Retain green product primary with 24 complete light/dark roles.",
+      "Product owner requested capital initials: Rosemary Epass.",
+      "Product owner requested rounded arch feet and tonal layers on the Epass product badge. Mother-brand bitmap is unchanged."
+    ]
   },
   "tokens": {
+    "theme": "web/src/design/epass-theme.json",
     "web": "web/src/design/rosemary-tokens.css",
     "standalone": "apps/passport_server/lib/src/utils/epass_tokens.dart",
-    "sync": "python3 scripts/sync_epass_tokens.py",
-    "flutter": "packages/rosm_passport_flutter/lib/src/epass_tokens.dart"
+    "flutter": "packages/rosm_passport_flutter/lib/src/epass_tokens.dart",
+    "sync": "python3 scripts/sync_epass_tokens.py"
   },
   "motion": {
-    "timingSource": "CSS semantic tokens, resolved at runtime for Web Animations",
-    "selection": "Measured shared indicator; immediate single live panel; interrupted movement resumes current transform",
-    "dialogs": "Native modality closes immediately; only inert, aria-hidden visual exit is retained",
-    "navigation": "View Transition snapshots for internal links and explicit navigation; single live-content transition for history/redirect fallback; initial load and query-only changes stay static",
-    "preferences": "Reactive system reduced motion plus persisted rosemary_motion; spinners pause when document is hidden"
-  },
-  "validation": {
-    "date": "2026-10-11",
-    "browser": "Codex In-app Browser",
-    "frontendTests": 34,
-    "backendFocusedTests": 26,
-    "motionBrowserAssertions": 20,
-    "motionHarness": "web/tests/browser/motion.html (Vite dev server; reload before each run)",
-    "motionReport": "output/epass/motion-verification.json",
-    "manualChecks": [
-      "Desktop light/dark login, account and dashboard",
-      "320px login, registration, recovery and documentation: no horizontal page overflow",
-      "390px admin user table: contained horizontal scrolling",
-      "320px native account dialog, keyboard select, Escape and restored trigger focus",
-      "320px navigation drawer",
-      "Standalone authorization consent and error pages; local logo visible",
-      "Login/register page direction and main-content focus",
-      "13 page fixtures at 320px without horizontal page overflow",
-      "320px OIDC editor; Escape restores trigger focus",
-      "Live registration feedback: length, common password, edge whitespace, valid two-category passphrase",
-      "Admin new-user weak-password feedback and disabled create action",
-      "User details opened with Enter",
-      "Documentation native contents link locates a stable chapter ID"
-    ],
-    "limitations": [
-      "Account/admin previews use synthetic local fixtures; no live backend end-to-end login or credential changes were performed.",
-      "Safari, Firefox, real mobile hardware, screen readers and OS-level preference changes have not been manually verified.",
-      "Animation values and intermediate computed state were tested in browser; no frame-by-frame video review was performed.",
-      "No production deployment performed."
-    ],
-    "pageLayoutReport": "output/epass/page-layout-verification.json"
+    "curve": "cubic-bezier(.2,.7,.2,1)",
+    "instantFeedbackMs": 120,
+    "stateMs": 180,
+    "pageMs": 220,
+    "pageOffsetPx": 6,
+    "dialogEnterMs": 260,
+    "dialogExitMs": 160,
+    "drawerEnterMs": 220,
+    "drawerExitMs": 180,
+    "loadingCycleMs": 1200,
+    "loadingDelayMs": 300,
+    "overlay": "Official overlay retained until actual animation completion; interruption reverses from current frame; native focus restoration.",
+    "preferences": "System reduced motion takes priority; persisted user reduction also applies; official loading stops on document/lifecycle background."
   },
   "passwordPolicy": {
     "reference": "https://support.google.com/accounts/answer/32040?hl=zh-Hans",
@@ -78,15 +67,18 @@
     "referenceNote": "Google guidance informs advice; the 8-character minimum and two-category requirement are product requirements."
   },
   "flutterSdk": {
-    "package": "rosemary_reference",
-    "version": "0.3.0-prototype.2",
-    "commit": "a36510e38277a2f84ab4150e074bbfbee55ddefd",
-    "usage": [
-      "official theme extension",
-      "platform-adaptive primary buttons",
-      "lifecycle-aware native spinner"
-    ],
-    "status": "Upstream Prototype; manual assistive-technology acceptance not complete",
-    "runtime": "Flutter >=3.44 / Dart >=3.12"
+    "package": "rosemary_ui",
+    "version": "0.4.0",
+    "productVersion": "0.10.0",
+    "commit": "311a81de1651ba049d3acd476725390de38aacc2",
+    "path": "platforms/flutter/rosemary_ui",
+    "runtime": "Flutter >=3.44.8 / Dart >=3.12.2",
+    "inputAdapter": "Official controlled inputs; native editor adapter where 0.4.0 lacks autofill/IME support."
+  },
+  "validation": {
+    "report": "docs/forma-0.10.0-validation.md",
+    "motionHarness": "web/tests/browser/motion.html",
+    "pageHarness": "web/tests/browser/forma.html",
+    "consentHarness": "web/tests/browser/legal-consent.html"
   }
 }

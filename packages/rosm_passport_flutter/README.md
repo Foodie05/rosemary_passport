@@ -16,7 +16,7 @@ dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: v0.9.0
+      ref: v0.10.0
       path: packages/rosm_passport_flutter
 ```
 
@@ -44,9 +44,9 @@ final result = await showRosmPassportSignIn(
 final appSession = result?.serverPayload;
 ```
 
-The built-in UI supports email code login, phone code login, password login, password MFA, password recovery, email registration, version-bound Terms of Use and Privacy Policy acceptance, and the final OIDC consent page. It loads the current legal versions, lets the user read each document in a ROSM Pass dialog, and blocks completion until the checkbox is selected. Registration is enabled by default. Set `enableRegistration: false` if an app wants to hide account creation.
+The built-in UI supports email code login, phone code login, password login, password MFA, password recovery, email registration, version-bound Terms of Use and Privacy Policy acceptance, and the final OIDC consent page. It loads the current legal versions and lets the user read each document in a Rosemary Epass dialog. If the checkbox is not selected, it asks for consent before advancing to registration or recovery, requesting a code, or authenticating. Declining or dismissing preserves the current form; accepting selects the checkbox and resumes the requested action exactly once. Registration is enabled by default. Set `enableRegistration: false` if an app wants to hide account creation.
 
-The built-in sign-in and account-management screens follow the device appearance by default. They use the same sage-based ROSM Pass visual language in both light and dark mode. An app can explicitly select an appearance when needed:
+The built-in sign-in and account-management screens follow the device appearance by default. They use the same green Rosemary Forma visual language in both light and dark mode. An app can explicitly select an appearance when needed:
 
 ```dart
 const signInConfig = RosmPassportSignInConfig(
@@ -297,7 +297,7 @@ For phone recovery, pass the phone number as `account` and use `RosmPasswordReco
 
 ## Design system and runtime
 
-Flutter **3.44+** and Dart **3.12+** are required from v0.9.0. The SDK depends on the official `rosemary_reference` **0.3.0-prototype.2**, pinned to commit `a36510e38277a2f84ab4150e074bbfbee55ddefd` in [Rosemary Design System](https://github.com/Foodie05/Rosemary-Design-System). It uses the official theme, platform-adaptive primary actions and loading feedback. Product fields extend that theme for password autofill, visibility and live security feedback. Semantic tokens are generated from the same source as the website; system reduced motion, appearance and text scaling remain active. The upstream library is still Prototype; this release does not claim upstream Beta or completed manual VoiceOver/TalkBack acceptance.
+Flutter **3.44.8+** and Dart **3.12.2+** are required from v0.10.0. The SDK uses official `rosemary_ui` **0.4.0**, pinned to commit `311a81de1651ba049d3acd476725390de38aacc2` in [Rosemary Design System](https://github.com/Foodie05/Rosemary-Design-System). It follows **Forma 1.2.0**, with the approved `Rosemary Epass` lockup, rounded, tonal Epass product badge and the existing green palette. All 24 light/dark semantic roles are generated from `web/src/design/epass-theme.json`; status colors follow Forma. Buttons, controlled inputs, tabs, checkbox, modal overlays and two-facet loading use the official SDK. System appearance, text scaling, reduced motion and host localization are retained. Fields that require password-manager/OTP autofill or IME actions retain a native editor adapter with the official top-label geometry; new-password fields retain native editing/autofill with Forma appearance and live validation. This release does not claim completed real-device or VoiceOver/TalkBack acceptance.
 
 Existing `Rosm*` API names, OIDC endpoints and stored sessions remain compatible. Integration now requires the runtime upgrade above. New-password client methods reject invalid input before sending HTTP; existing-password login remains unrestricted.
 
@@ -313,3 +313,8 @@ final result = const RosmPasswordPolicy().evaluate(passwordController.text);
 ```
 
 Use the field for registration or password changes, never for existing-password sign-in. `registerWithEmail`, `registerWithPhone`, `resetPasswordByCode`, `resetOwnPassword` and `updateAccount(newPassword: ...)` perform the same local validation.
+
+
+### Upgrading from 0.9.0
+
+Keep the existing `Rosm*` APIs, configuration and OIDC callbacks. Update the Git ref and Flutter/Dart toolchain, then run `flutter pub get`. The internal dependency changes from `rosemary_reference` to `rosemary_ui`; do not import either library through private Epass internals. Custom consumers that separately import the old design SDK must follow its upstream migration guide. Authentication endpoints, token storage keys, issuer/RP IDs and password policy are unchanged. UI animation durations now come from Forma 1.2.0; system reduced motion takes precedence.

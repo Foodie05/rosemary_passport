@@ -1,11 +1,11 @@
+import 'forma_controls.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:rosemary_reference/rosemary.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 
 import 'models.dart';
 import 'epass_motion.dart';
-import 'epass_tokens.dart';
 import 'new_password_field.dart';
 import 'password_policy.dart';
 import 'rosm_aliyun_captcha.dart';
@@ -370,7 +370,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                     currentPassword: _currentPassword.text,
                     emailCode: _code.text.trim(),
                   );
-                  if (mounted) Navigator.of(context).pop();
+                  if (mounted) _closeAccountDialog?.call(null);
                   await _load();
                 }),
               ),
@@ -419,7 +419,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                     currentPassword: _currentPassword.text,
                     verifyCode: _code.text.trim(),
                   );
-                  if (mounted) Navigator.of(context).pop();
+                  if (mounted) _closeAccountDialog?.call(null);
                   await _load();
                 }),
               ),
@@ -464,7 +464,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                     newPassword: _newPassword.text,
                     emailCode: _code.text.trim(),
                   );
-                  if (mounted) Navigator.of(context).pop();
+                  if (mounted) _closeAccountDialog?.call(null);
                 }),
               ),
             );
@@ -505,7 +505,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                   secret: setup.secret,
                   code: _authenticatorCode.text.trim(),
                 );
-                if (mounted) Navigator.of(context).pop();
+                if (mounted) _closeAccountDialog?.call(null);
                 await _load();
               }),
             ),
@@ -525,64 +525,29 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     return {'error_type': error.runtimeType.toString()};
   }
 
+  ValueChanged<void>? _closeAccountDialog;
+
   Future<void> _showSheet({required String title, required Widget child}) {
     final theme = buildRosmPassportTheme(context, widget.config.themeMode);
-    final colors = theme.colorScheme;
-    return showModalBottomSheet<void>(
+    return showRosmEpassDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: colors.surfaceContainerLowest,
-      sheetAnimationStyle: AnimationStyle(
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : RosmEpassMotion.panel,
-        reverseDuration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : RosmEpassMotion.exit,
-      ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Theme(
-          data: theme,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 22,
-              right: 22,
-              top: 18,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: _busy
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  child,
-                ],
+      theme: theme,
+      title: title,
+      builder: (dialogContext, close) {
+        _closeAccountDialog = close;
+        return SizedBox(
+          width: double.infinity,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              child,
+              const SizedBox(height: 16),
+              RosmEpassTextButton(
+                onPressed: () => close(null),
+                child: const Text('关闭'),
               ),
-            ),
+            ],
           ),
         );
       },
@@ -643,19 +608,19 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     final account = _account;
     final theme = buildRosmPassportTheme(context, widget.config.themeMode);
     final colors = theme.colorScheme;
-    return Theme(
+    return RosmEpassTheme(
       data: theme,
       child: Scaffold(
         backgroundColor: colors.surface,
         appBar: AppBar(
           backgroundColor: colors.surface,
           elevation: 0,
-          title: const Text('账号管理'),
+          title: const RosmEpassBrand(compact: true),
           actions: [
-            IconButton(
+            RosmEpassIconAction(
               tooltip: '刷新',
               onPressed: _busy ? null : _load,
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const RosmEpassIcon(Icons.refresh_rounded),
             ),
           ],
         ),
@@ -768,7 +733,7 @@ class _ProfileCard extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: TextField(
+                child: RosmEpassInput(
                   controller: nickname,
                   enabled: !busy,
                   decoration: const InputDecoration(labelText: '昵称'),
@@ -781,7 +746,7 @@ class _ProfileCard extends StatelessWidget {
           const SizedBox(height: 12),
           RosemaryButton(
             onPressed: busy ? null : onSaveNickname,
-            loading: busy,
+            busy: busy,
             label: '保存',
           ),
           const SizedBox(height: 14),
@@ -934,7 +899,7 @@ class _PasswordSheet extends StatelessWidget {
                 busy || !const RosmPasswordPolicy().evaluate(value.text).ok
                 ? null
                 : onSubmit,
-            loading: busy,
+            busy: busy,
             label: '重置密码',
           ),
         ],
@@ -999,13 +964,13 @@ class _CodeSheetFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
+        RosmEpassInput(
           controller: primary,
           keyboardType: keyboardType,
           decoration: InputDecoration(labelText: primaryLabel),
         ),
         const SizedBox(height: 12),
-        TextField(
+        RosmEpassInput(
           controller: currentPassword,
           obscureText: true,
           decoration: const InputDecoration(labelText: '当前密码'),
@@ -1022,7 +987,7 @@ class _CodeSheetFields extends StatelessWidget {
         const SizedBox(height: 18),
         RosemaryButton(
           onPressed: busy ? null : onSubmit,
-          loading: busy,
+          busy: busy,
           label: submitLabel,
         ),
       ],
@@ -1052,7 +1017,7 @@ class _CodeRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: TextField(
+          child: RosmEpassInput(
             controller: controller,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(labelText: label),
@@ -1061,7 +1026,7 @@ class _CodeRow extends StatelessWidget {
         const SizedBox(width: 10),
         SizedBox(
           width: 98,
-          child: OutlinedButton(
+          child: RosmEpassOutlinedButton(
             onPressed: busy || sendDisabled ? null : onSend,
             child: _BusyText(busy: busy, text: cooldownLabel),
           ),
@@ -1096,7 +1061,7 @@ class _AuthenticatorSheet extends StatelessWidget {
       children: [
         const Text('验证当前密码后，将生成可添加到 Authenticator 应用的密钥。'),
         const SizedBox(height: 12),
-        TextField(
+        RosmEpassInput(
           controller: currentPassword,
           obscureText: true,
           decoration: const InputDecoration(labelText: '当前密码'),
@@ -1105,7 +1070,7 @@ class _AuthenticatorSheet extends StatelessWidget {
         if (current == null)
           RosemaryButton(
             onPressed: busy ? null : onBegin,
-            loading: busy,
+            busy: busy,
             label: '生成密钥',
           )
         else ...[
@@ -1127,7 +1092,7 @@ class _AuthenticatorSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
+          RosmEpassInput(
             controller: code,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: '动态验证码'),
@@ -1135,7 +1100,7 @@ class _AuthenticatorSheet extends StatelessWidget {
           const SizedBox(height: 18),
           RosemaryButton(
             onPressed: busy ? null : onSubmit,
-            loading: busy,
+            busy: busy,
             label: '完成设置',
           ),
         ],
@@ -1169,7 +1134,7 @@ class _ActionTile extends StatelessWidget {
           onTap: onTap,
           child: Row(
             children: [
-              Icon(icon, color: colors.primary),
+              RosmEpassIcon(icon, color: colors.primary),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1190,7 +1155,7 @@ class _ActionTile extends StatelessWidget {
                 ),
               ),
               Text(trailing, style: TextStyle(color: colors.primary)),
-              const Icon(Icons.chevron_right_rounded),
+              const RosmEpassIcon(Icons.chevron_right_rounded),
             ],
           ),
         ),
@@ -1212,7 +1177,7 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: colors.onSurfaceVariant),
+          RosmEpassIcon(icon, size: 18, color: colors.onSurfaceVariant),
           const SizedBox(width: 8),
           Text(
             text,
@@ -1240,7 +1205,7 @@ class _AccountCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surfaceContainerLowest,
         border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: child,
     );
@@ -1314,7 +1279,7 @@ class _AccountMessage extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.errorContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.error.withAlpha(89)),
       ),
       child: Text(text, style: TextStyle(color: colors.onErrorContainer)),

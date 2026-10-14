@@ -10,7 +10,7 @@ void main() {
     expect(source, contains('_buildLegalAcceptance(colors)'));
     expect(source, contains('_requireLegalAcceptance()'));
     expect(source, contains('documents.acceptance'));
-    expect(source, contains('使用条款与隐私政策同意'));
+    expect(source, contains('我已阅读并同意'));
     expect(source, isNot(contains('CheckboxListTile')));
     expect(source, isNot(contains('AlertDialog')));
   });
@@ -20,6 +20,6 @@ void main() {
 
     expect(readme, contains('currentLegalDocuments()'));
     expect(readme, contains('legalAcceptance: legalDocuments.acceptance'));
-    expect(readme, contains('ref: v0.9.0'));
+    expect(readme, contains('ref: v0.10.0'));
   });
 }

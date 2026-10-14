@@ -43,3 +43,24 @@ test('admin-only surfaces include dashboard, legal publishing, and account statu
   assert.match(admin, /export function AdminLegalDocuments/);
   assert.match(admin, /updateUserStatus\(viewingUser\.id, 'banned'/);
 });
+
+
+test('every auth operation gates consent before captcha, HTTP or advancing a step', () => {
+  const operations = ['submitRegisterCode', 'requestPasswordLoginCode', 'requestPasswordPhoneCode', 'selectPasswordFactor', 'prepareLogin', 'completeLogin', 'requestEmailCodeLogin', 'requestPhoneCodeLogin', 'preparePhoneCodeLogin', 'completePhoneCodeLogin', 'prepareEmailCodeLogin', 'completeEmailCodeLogin', 'selectDirectLoginStepUpFactor', 'completeDirectLoginStepUp', 'submitRegister', 'sendRecoveryCode', 'resetPasswordByCode', 'beginWebAuthnLogin', 'completeWebAuthnLogin', 'beginDirectLoginStepUpPasskey'];
+  for (const name of operations) {
+    const start = app.indexOf(`function ${name}(`);
+    const body = app.slice(app.indexOf('{\n', start) + 2);
+    assert.match(body, /^\s*(?:event(?:\?\.)?[^\n]*\n\s*)?if \(!await requestLegalAcceptance\(\)\) return null;/, name);
+  }
+  assert.match(auth, /if \(!options\) return;/);
+  assert.match(auth, /if \(result === null\) return;\n\s*setStep\('verify'\)/);
+  assert.match(auth, /if \(result === null\) return;\n\s*setStep\('done'\)/);
+});
+
+
+test('authentication page links ask before navigating and retain the requested route', () => {
+  assert.match(auth, /function AuthActionLink/);
+  assert.match(auth, /event\.preventDefault\(\);\n\s*if \(await requestLegalAcceptance\(\)\) navigate\(to\)/);
+  assert.doesNotMatch(auth, /<Link\s+to=\{authNext/);
+  assert.match(app, /requestLegalAcceptance=\{requestLegalAcceptance\}/);
+});

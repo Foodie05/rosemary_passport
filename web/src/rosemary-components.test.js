@@ -21,8 +21,10 @@ test('active pages use Rosemary controls instead of browser-native widgets', () 
 test('confirmation and alert flows use the shared Rosemary dialog provider', () => {
   assert.match(main, /<RosemaryDialogProvider>/);
   assert.match(ui, /role="alertdialog"/);
-  assert.match(dialog, /aria-modal=\{present \? 'true' : undefined\}/);
-  assert.match(dialog, /element.showModal\(\)/);
+  assert.match(dialog, /Dialog as FormaDialog, Drawer/);
+  assert.match(dialog, /open=\{present\}/);
+  assert.match(dialog, /onAnimationComplete/);
+  assert.doesNotMatch(dialog, /createPortal/);
   assert.match(ui, /useRosemaryDialog/);
 });
 
