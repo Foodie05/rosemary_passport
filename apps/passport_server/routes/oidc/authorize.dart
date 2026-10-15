@@ -304,6 +304,11 @@ Response authorizationConsentPage(
   final escapedTitle = _escapeHtml('是否授权登录 $clientDisplayName？');
   final badgeLabel = isOfficial ? '官方应用' : '第三方应用';
   final escapedBadgeLabel = _escapeHtml(badgeLabel);
+  // Official @rosemary-ui/icons 0.4.0 check.svg; explicit size also supports
+  // browsers that do not infer an inline SVG's height inside a flex container.
+  final officialIcon = isOfficial
+      ? '''<span class="trust-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>'''
+      : '';
   final scopeListHtml = scopeLines
       .map((line) => '<li>${_escapeHtml(line)}</li>')
       .join();
@@ -358,12 +363,7 @@ Response authorizationConsentPage(
               <a class="switch-account" href="${_escapeHtml(switchAccountUrl)}">切换账号</a>
             </div>
           <div class="trust-badge">
-            <span class="trust-icon${isOfficial ? '' : ' hidden'}">
-              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M13.2 4.4L6.6 11L2.8 7.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
-            $escapedBadgeLabel
+            $officialIcon<span>$escapedBadgeLabel</span>
           </div>
           <h1>$escapedTitle</h1>
           ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 Rosemary Epass 验证你的登录状态。</p>' : '<p class="permission-head">此应用将获得以下信息：</p><ul class="permission-list">$scopeListHtml</ul>'}
