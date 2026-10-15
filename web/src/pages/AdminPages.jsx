@@ -1,10 +1,11 @@
 import { FormaImport } from '../components/Forma';
 import { FormaButton, FormaInput, FormaTextarea } from '../components/Forma';
+import { IconButton } from '@rosemary-ui/react';
 import { Link } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
 import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react';
 
-import { Activity, Ban, BookOpen, Check, Clock3, Copy, FileText, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from '../design/Icons';
+import { Activity, Ban, BookOpen, Check, ChevronDown, Clock3, Copy, FileText, Key, Mail, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from '../design/Icons';
 import { NewPasswordField } from '../components/NewPasswordField';
 import { evaluatePassword } from '../lib/password-policy';
 import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
@@ -579,7 +580,7 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
         <div className="surface-panel rounded-panel p-6"><h2 className="mb-5 text-lg font-bold">登录与 OIDC 授权</h2><MiniLineChart data={data?.authentication_activity || []} series={[{ key: 'logins', label: '登录', color: 'var(--r-semantic-color-chart-one)' }, { key: 'authorizations', label: '授权码', color: 'var(--r-semantic-color-chart-four)' }]} /></div>
         <div className="surface-panel rounded-panel p-6 xl:col-span-2"><h2 className="mb-5 text-lg font-bold">邮箱与短信验证码发送</h2><MiniLineChart data={data?.verification_activity || []} series={[{ key: 'email_codes', label: '邮箱发放尝试', color: 'var(--r-semantic-color-chart-one)' }, { key: 'sms_codes', label: '短信成功响应', color: 'var(--r-semantic-color-chart-three)' }]} /></div>
       </div>
-      {Object.keys(data?.definitions || {}).length > 0 && <details className="epass-disclosure"><summary>统计口径</summary><div className="space-y-2 py-4 text-sm leading-6 text-muted">{Object.values(data.definitions).map((definition) => <p key={definition}>{definition}</p>)}</div></details>}
+      {Object.keys(data?.definitions || {}).length > 0 && <details className="epass-disclosure"><summary>统计口径<ChevronDown size={16} className="epass-disclosure-icon" aria-hidden="true" /></summary><div className="space-y-2 py-4 text-sm leading-6 text-muted">{Object.values(data.definitions).map((definition) => <p key={definition}>{definition}</p>)}</div></details>}
     </div>
   );
 }
@@ -807,9 +808,12 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
             <tbody className="divide-y divide-line">
               {users.map((user, index) => (
                 <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-canvas" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
-                  <td className="px-6 py-4">
-                    <FormaButton type="button" className="epass-table-link" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>{cleanDisplayName(user.nickname, user.email || '-')}<span className="sr-only">，查看用户详情</span></FormaButton>
-                    <p className="text-xs text-muted">{user.email || '-'}</p>
+                  <td className="epass-user-cell px-6 py-4">
+                    <FormaButton type="button" className="epass-user-identity" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>
+                      <span className="epass-user-name">{cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}</span>
+                      <span className="epass-user-contacts">{[user.email, user.phone_number].filter(Boolean).map((account) => <span key={account}>{account}</span>)}{!user.email && !user.phone_number && <span>未绑定邮箱或手机号</span>}</span>
+                      <span className="sr-only">查看用户详情</span>
+                    </FormaButton>
                   </td>
                   <td className="px-6 py-4">
                     <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', user.account_status === 'banned' ? 'bg-danger-subtle text-danger' : user.is_email_verified ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning')}>
@@ -828,28 +832,29 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                   <td className="px-6 py-4 text-sm text-muted">{user.id || '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      <FormaButton
+                      <IconButton
                         type="button"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-line bg-surface text-muted transition-colors hover:bg-canvas"
-                        aria-label={`编辑 ${cleanDisplayName(user.nickname, user.email || '-')}`}
+                        variant="secondary"
+                        icon="pencil"
+                        label={`编辑 ${cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           setEditingUser(user);
                           setEditingRoles((user.roles || []).join(', '));
                         }}
-                      >
-                        <Pencil size={20} />
-                      </FormaButton>
-                      <FormaButton
+                      />
+                      <IconButton
                         type="button"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-danger bg-surface text-danger transition-colors hover:bg-danger-subtle"
-                        aria-label={`删除 ${cleanDisplayName(user.nickname, user.email || '-')}`}
+                        variant="secondary"
+                        icon="trash"
+                        className="epass-icon-danger"
+                        label={`删除 ${cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           void safely(async () => {
                             const confirmed = await confirm({
                               title: '删除用户',
-                              message: `确定删除用户“${cleanDisplayName(user.nickname, user.email || '未命名用户')}”吗？此操作不可撤销。`,
+                              message: `确定删除用户“${cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}”吗？此操作不可撤销。`,
                               confirmLabel: '删除用户',
                               tone: 'danger',
                             });
@@ -860,9 +865,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                             await loadUsers({ page: pagination.page || 1, search });
                           }, '删除用户失败');
                         }}
-                      >
-                        <Trash2 size={20} />
-                      </FormaButton>
+                      />
                     </div>
                   </td>
                 </tr>
@@ -999,7 +1002,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           {viewingUser.account_status === 'banned' ? (
             <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><FormaButton type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</FormaButton></div>
           ) : (
-            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><label htmlFor="epass-adminpages-field-1" className="text-sm font-bold text-danger">封禁原因</label><FormaTextarea id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} className="mt-3 inline-flex items-center gap-2 rounded-control bg-danger px-4 py-2 font-bold text-on-danger disabled:opacity-40" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
+            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><label htmlFor="epass-adminpages-field-1" className="text-sm font-bold text-danger">封禁原因</label><FormaTextarea id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} variant="danger" className="mt-3" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
           )}
         </Modal>
       )}</AnimatePresence>
@@ -1157,18 +1160,19 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                     <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', client.is_active === false ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success')}>
                       {client.is_active === false ? '停用' : '启用'}
                     </span>
-                    <FormaButton
+                    <IconButton
                       type="button"
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface text-muted hover:bg-canvas"
-                      aria-label={`编辑 ${client.client_id}`}
+                      variant="secondary"
+                      icon="pencil"
+                      label={`编辑 ${client.client_id}`}
                       onClick={() => openEditModal(client)}
-                    >
-                      <Pencil size={20} />
-                    </FormaButton>
-                    <FormaButton
+                    />
+                    <IconButton
                       type="button"
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-danger bg-surface text-danger hover:bg-danger-subtle"
-                      aria-label={`删除 ${client.client_id}`}
+                      variant="secondary"
+                      icon="trash"
+                      className="epass-icon-danger"
+                      label={`删除 ${client.client_id}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         void safely(async () => {
@@ -1187,9 +1191,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                           }
                         }, '删除 OIDC 应用失败');
                       }}
-                    >
-                      <Trash2 size={20} />
-                    </FormaButton>
+                    />
                   </div>
                 </div>
                 <p className="mt-3 break-all text-sm leading-6 text-muted">{(client.redirect_uris || []).join(', ') || '未配置 redirect URI'}</p>
@@ -1198,7 +1200,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
         </div>
       </section>
       <details className="epass-disclosure">
-        <summary>协议与端点</summary>
+        <summary>协议与端点<ChevronDown size={16} className="epass-disclosure-icon" aria-hidden="true" /></summary>
         <div className="space-y-6 py-6">
           <p className="text-sm text-muted">当前对外发布的协议地址与认证能力。</p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2006,7 +2008,7 @@ function DocsLayout({ children, current }) {
         <p className="epass-eyebrow">DEVELOPER GUIDES</p>
         <Link className="epass-nav-item" aria-current={current === 'oidc' ? 'page' : undefined} to="/docs/oidc">OIDC 接入</Link>
         <Link className="epass-nav-item" aria-current={current === 'flutter' ? 'page' : undefined} to="/docs/flutter-sdk">Flutter SDK</Link>
-        <details className="epass-docs-contents" open={contentsOpen} onToggle={(event) => setContentsOpen(event.currentTarget.open)}><summary>本页目录</summary><div>{contents.map(([id, label]) => <a key={id} href={`#${current}-${id}`}>{label}</a>)}</div></details>
+        <details className="epass-docs-contents" open={contentsOpen} onToggle={(event) => setContentsOpen(event.currentTarget.open)}><summary>本页目录<ChevronDown size={16} className="epass-disclosure-icon" aria-hidden="true" /></summary><div>{contents.map(([id, label]) => <a key={id} href={`#${current}-${id}`}>{label}</a>)}</div></details>
         <Link className="epass-nav-item" to="/account">返回账户中心</Link>
       </nav>
       <main id="docs-main" tabIndex={-1} className="epass-docs-content">{children}</main>

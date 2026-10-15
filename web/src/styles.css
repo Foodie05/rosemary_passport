@@ -55,6 +55,9 @@
   ::selection { background: var(--color-accent-subtle); color: var(--color-ink); }
 }
 
+/* Route and anchor focus moves the reading position, not control selection. */
+:where(main, h1, h2, h3)[tabindex='-1']:focus { outline: none; }
+
 @layer components {
   .surface-panel { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); }
   .input-field { @apply w-full px-4 py-2.5 rounded-control; min-height: 44px; border: 1px solid var(--color-control); background: var(--color-surface); color: var(--color-ink); transition: border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
@@ -244,9 +247,18 @@ html[data-reduce-motion='true']::view-transition-new(*) { animation: none !impor
 .epass-file-input::file-selector-button { margin-right: 12px; min-height: 44px; border: 1px solid var(--color-control); border-radius: var(--radius-control); padding: 8px 16px; background: var(--color-surface); color: var(--color-ink); cursor: pointer; }
 .epass-file-input::file-selector-button:hover { background: var(--color-canvas); }
 .epass-disclosure { border-block: 1px solid var(--color-line); }
-.epass-disclosure > summary { cursor: pointer; padding: 20px 0; font: 400 24px/1.4 var(--font-editorial); }
+.epass-disclosure > summary { padding: 16px 0; font: 500 14px/24px var(--font-sans); }
+.epass-disclosure > summary, .epass-docs-contents > summary { display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%; min-height: 44px; list-style: none; cursor: pointer; }
+.epass-disclosure > summary::-webkit-details-marker, .epass-docs-contents > summary::-webkit-details-marker { display: none; }
+.epass-disclosure > summary::marker, .epass-docs-contents > summary::marker { content: ''; }
+.epass-disclosure-icon { flex-shrink: 0; color: var(--color-muted); transform: rotate(-90deg); transition: transform var(--r-semantic-motion-fast) var(--r-semantic-motion-standard); }
+details[open] > summary > .epass-disclosure-icon { transform: none; }
 .epass-client-row { padding: 24px; }
-.epass-table-link { min-height: 44px; text-align: left; font-weight: 600; color: var(--color-ink); text-decoration: underline; text-underline-offset: 4px; }
+.epass-user-cell { min-width: 220px; }
+.epass-user-identity.rm-button { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; width: 100%; max-width: 24rem; min-height: 44px; padding: 0; border: 0; border-radius: 0; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.epass-user-name { font-size: 14px; font-weight: 600; line-height: 24px; color: var(--color-ink); }
+.epass-user-contacts { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; font-size: 12px; font-weight: 400; line-height: 20px; color: var(--color-muted); }
+.epass-user-identity:hover .epass-user-name { text-decoration: underline; text-underline-offset: 4px; }
 .epass-docs-contents { width: 100%; margin: 24px 0; border-block: 1px solid var(--color-line); }
 .epass-docs-contents summary { min-height: 44px; padding: 12px 0; font-size: 14px; font-weight: 600; cursor: pointer; }
 .epass-docs-contents a { display: block; padding: 8px 0; font-size: 14px; line-height: 24px; color: var(--color-muted); }
@@ -277,7 +289,9 @@ html[data-reduce-motion='true']::view-transition-new(*) { animation: none !impor
 .epass-auth-panel h1 { font-family: var(--font-sans); font-size: 40px; font-weight: 500; }
 .epass-topbar { padding-block: 8px; }
 .epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-sans); font-weight: 500; }
-.forma-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: var(--r-semantic-radius-dialog); }
+.forma-dialog { margin: auto; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: var(--r-semantic-radius-dialog); }
+.epass-icon-danger { --rm-ink: var(--color-danger); --rm-control: var(--color-danger); }
+.rm-button[data-variant='danger']:disabled { --rm-on-danger: var(--color-danger); background: var(--color-danger-subtle); border-color: var(--color-danger); opacity: 1; }
 .forma-dialog > header h2 { font: 500 20px/1.5 var(--font-sans); }
 .forma-dialog > footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
 .forma-dialog.epass-dialog-navigation { width: min(336px, calc(100vw - 32px)); height: 100dvh; max-height: 100dvh; margin: 0 0 0 auto; border-radius: 20px 0 0 20px; }
