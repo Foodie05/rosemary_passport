@@ -1,5 +1,5 @@
-import 'dart:convert';
 import '../utils/epass_email.dart';
+import '../utils/verification_email.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
@@ -27,14 +27,6 @@ class EmailService {
   }) async {
     final smtp = await _resolveSmtpSettings();
     final stored = await _settingsRepository.getEmailTemplate(templateName);
-    final template = normalizeEpassEmailTemplate(stored ?? _defaultTemplate());
-
-    final subject = _renderTemplate(
-      template['subject']?.toString() ?? '',
-      code,
-    );
-    final html = _renderTemplate(template['html']?.toString() ?? '', code);
-    final text = _renderTemplate(template['text']?.toString() ?? '', code);
 
     final host = (smtp['host'] ?? '').toString();
     final port = smtp['port'] is int
@@ -59,12 +51,12 @@ class EmailService {
       allowInsecure: false,
     );
 
-    final message = Message()
-      ..from = from
-      ..recipients.add(email)
-      ..subject = subject
-      ..text = text
-      ..html = html;
+    final message = buildVerificationEmail(
+      from: from,
+      recipient: email,
+      code: code,
+      template: stored ?? _defaultTemplate(),
+    );
 
     try {
       await send(message, smtpServer);
@@ -98,19 +90,6 @@ class EmailService {
       'html': epassVerificationEmail,
       'text': 'Rosemary Epass 验证码: {{code}}，有效期5分钟。',
     };
-  }
-
-  String _renderTemplate(String value, String code) {
-    return value
-        .replaceAll('{{code}}', code)
-        .replaceAll(
-          '{{brand_logo_url}}',
-          const HtmlEscape().convert(
-            Uri.parse(
-              _config.webBaseUrl,
-            ).resolve('/brand/rosemary.png').toString(),
-          ),
-        );
   }
 
   Address _parseFromAddress(String raw) {

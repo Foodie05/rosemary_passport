@@ -33,7 +33,13 @@
       "Retain green product primary with 24 complete light/dark roles.",
       "Product owner requested capital initials: Rosemary Epass.",
       "Product owner requested rounded arch feet and tonal layers on the Epass product badge. Mother-brand bitmap is unchanged."
-    ]
+    ],
+    "emailLogo": {
+      "path": "web/public/brand/rosemary-email.png",
+      "width": 128,
+      "height": 128,
+      "sha256": "e7285f77273adf7b55483f0d1a5550aff0f45630eb2dfb6378356f136d3e7971"
+    }
   },
   "tokens": {
     "theme": "web/src/design/epass-theme.json",
