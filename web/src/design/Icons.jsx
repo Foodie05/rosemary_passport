@@ -5,6 +5,7 @@ export function BookOpen(props) { return <Icon name="book" {...props} />; }
 export function Check(props) { return <Icon name="check" {...props} />; }
 export function CheckCircle2(props) { return <Icon name="check" {...props} />; }
 export function ChevronLeft(props) { return <Icon name="arrow-left" {...props} />; }
+export function ChevronDown(props) { return <Icon name="down" {...props} />; }
 export function Clock3(props) { return <Icon name="clock" {...props} />; }
 export function Copy(props) { return <Icon name="copy" {...props} />; }
 export function ExternalLink(props) { return <Icon name="external-link" {...props} />; }

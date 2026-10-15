@@ -4,7 +4,7 @@ import { Link } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
 import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react';
 
-import { Activity, Ban, BookOpen, Check, Clock3, Copy, FileText, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from '../design/Icons';
+import { Activity, Ban, BookOpen, Check, ChevronDown, Clock3, Copy, FileText, Key, Mail, Pencil, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from '../design/Icons';
 import { NewPasswordField } from '../components/NewPasswordField';
 import { evaluatePassword } from '../lib/password-policy';
 import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
@@ -579,7 +579,7 @@ export function AdminDashboard({ data, loadDashboard, safely }) {
         <div className="surface-panel rounded-panel p-6"><h2 className="mb-5 text-lg font-bold">登录与 OIDC 授权</h2><MiniLineChart data={data?.authentication_activity || []} series={[{ key: 'logins', label: '登录', color: 'var(--r-semantic-color-chart-one)' }, { key: 'authorizations', label: '授权码', color: 'var(--r-semantic-color-chart-four)' }]} /></div>
         <div className="surface-panel rounded-panel p-6 xl:col-span-2"><h2 className="mb-5 text-lg font-bold">邮箱与短信验证码发送</h2><MiniLineChart data={data?.verification_activity || []} series={[{ key: 'email_codes', label: '邮箱发放尝试', color: 'var(--r-semantic-color-chart-one)' }, { key: 'sms_codes', label: '短信成功响应', color: 'var(--r-semantic-color-chart-three)' }]} /></div>
       </div>
-      {Object.keys(data?.definitions || {}).length > 0 && <details className="epass-disclosure"><summary>统计口径</summary><div className="space-y-2 py-4 text-sm leading-6 text-muted">{Object.values(data.definitions).map((definition) => <p key={definition}>{definition}</p>)}</div></details>}
+      {Object.keys(data?.definitions || {}).length > 0 && <details className="epass-disclosure"><summary>统计口径<ChevronDown size={16} className="epass-disclosure-icon" aria-hidden="true" /></summary><div className="space-y-2 py-4 text-sm leading-6 text-muted">{Object.values(data.definitions).map((definition) => <p key={definition}>{definition}</p>)}</div></details>}
     </div>
   );
 }
@@ -807,9 +807,12 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
             <tbody className="divide-y divide-line">
               {users.map((user, index) => (
                 <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-canvas" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
-                  <td className="px-6 py-4">
-                    <FormaButton type="button" className="epass-table-link" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>{cleanDisplayName(user.nickname, user.email || '-')}<span className="sr-only">，查看用户详情</span></FormaButton>
-                    <p className="text-xs text-muted">{user.email || '-'}</p>
+                  <td className="epass-user-cell px-6 py-4">
+                    <FormaButton type="button" className="epass-user-identity" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>
+                      <span className="epass-user-name">{cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}</span>
+                      <span className="epass-user-contacts">{[user.email, user.phone_number].filter(Boolean).map((account) => <span key={account}>{account}</span>)}{!user.email && !user.phone_number && <span>未绑定邮箱或手机号</span>}</span>
+                      <span className="sr-only">查看用户详情</span>
+                    </FormaButton>
                   </td>
                   <td className="px-6 py-4">
                     <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', user.account_status === 'banned' ? 'bg-danger-subtle text-danger' : user.is_email_verified ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning')}>
@@ -831,7 +834,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                       <FormaButton
                         type="button"
                         className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-line bg-surface text-muted transition-colors hover:bg-canvas"
-                        aria-label={`编辑 ${cleanDisplayName(user.nickname, user.email || '-')}`}
+                        aria-label={`编辑 ${cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           setEditingUser(user);
@@ -843,13 +846,13 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                       <FormaButton
                         type="button"
                         className="inline-flex h-11 w-11 items-center justify-center rounded-control border border-danger bg-surface text-danger transition-colors hover:bg-danger-subtle"
-                        aria-label={`删除 ${cleanDisplayName(user.nickname, user.email || '-')}`}
+                        aria-label={`删除 ${cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           void safely(async () => {
                             const confirmed = await confirm({
                               title: '删除用户',
-                              message: `确定删除用户“${cleanDisplayName(user.nickname, user.email || '未命名用户')}”吗？此操作不可撤销。`,
+                              message: `确定删除用户“${cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}”吗？此操作不可撤销。`,
                               confirmLabel: '删除用户',
                               tone: 'danger',
                             });
@@ -1198,7 +1201,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
         </div>
       </section>
       <details className="epass-disclosure">
-        <summary>协议与端点</summary>
+        <summary>协议与端点<ChevronDown size={16} className="epass-disclosure-icon" aria-hidden="true" /></summary>
         <div className="space-y-6 py-6">
           <p className="text-sm text-muted">当前对外发布的协议地址与认证能力。</p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2006,7 +2009,7 @@ function DocsLayout({ children, current }) {
         <p className="epass-eyebrow">DEVELOPER GUIDES</p>
         <Link className="epass-nav-item" aria-current={current === 'oidc' ? 'page' : undefined} to="/docs/oidc">OIDC 接入</Link>
         <Link className="epass-nav-item" aria-current={current === 'flutter' ? 'page' : undefined} to="/docs/flutter-sdk">Flutter SDK</Link>
-        <details className="epass-docs-contents" open={contentsOpen} onToggle={(event) => setContentsOpen(event.currentTarget.open)}><summary>本页目录</summary><div>{contents.map(([id, label]) => <a key={id} href={`#${current}-${id}`}>{label}</a>)}</div></details>
+        <details className="epass-docs-contents" open={contentsOpen} onToggle={(event) => setContentsOpen(event.currentTarget.open)}><summary>本页目录<ChevronDown size={16} className="epass-disclosure-icon" aria-hidden="true" /></summary><div>{contents.map(([id, label]) => <a key={id} href={`#${current}-${id}`}>{label}</a>)}</div></details>
         <Link className="epass-nav-item" to="/account">返回账户中心</Link>
       </nav>
       <main id="docs-main" tabIndex={-1} className="epass-docs-content">{children}</main>
