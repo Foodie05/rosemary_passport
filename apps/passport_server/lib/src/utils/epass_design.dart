@@ -32,8 +32,8 @@ a { color: inherit; }
 .switch-account { font-size: 14px; text-underline-offset: 4px; padding: 8px; }
 .trust-badge, .badge { display: inline-flex; gap: 8px; align-items: center; padding: 4px 8px; border-radius: 4px; background: var(--r-semantic-color-accent-subtle); color: var(--r-semantic-color-accent); font-size: 12px; }
 .epass-error .badge { background: var(--r-semantic-color-warning-subtle); color: var(--r-semantic-color-warning); }
-.trust-icon { display: flex; width: 16px; }
-.trust-icon path { stroke: currentColor; }
+.trust-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 16px; }
+.trust-icon svg { display: block; width: 16px; height: 16px; flex: none; }
 .hidden { display: none; }
 .permission-head { font-size: 14px; color: var(--r-semantic-color-text-secondary); }
 .permission-list { list-style: none; padding: 0; margin: 16px 0 32px; border-top: 1px solid var(--r-semantic-color-border); }
