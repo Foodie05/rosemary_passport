@@ -289,7 +289,9 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 .epass-auth-panel h1 { font-family: var(--font-sans); font-size: 40px; font-weight: 500; }
 .epass-topbar { padding-block: 8px; }
 .epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-sans); font-weight: 500; }
-.forma-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: var(--r-semantic-radius-dialog); }
+.forma-dialog { margin: auto; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: var(--r-semantic-radius-dialog); }
+.epass-icon-danger { --rm-ink: var(--color-danger); --rm-control: var(--color-danger); }
+.rm-button[data-variant='danger']:disabled { --rm-on-danger: var(--color-danger); background: var(--color-danger-subtle); border-color: var(--color-danger); opacity: 1; }
 .forma-dialog > header h2 { font: 500 20px/1.5 var(--font-sans); }
 .forma-dialog > footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
 .forma-dialog.epass-dialog-navigation { width: min(336px, calc(100vw - 32px)); height: 100dvh; max-height: 100dvh; margin: 0 0 0 auto; border-radius: 20px 0 0 20px; }
