@@ -10,6 +10,7 @@ import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIEL
 import { useTheme } from './theme';
 import { getUserErrorMessage, getUserMessage } from './lib/errors';
 import { oidcAuthorizationParameters } from './lib/oidc';
+import { oidcClientRedirectUris, validateOidcClient } from './lib/oidc-client';
 import { normalizeInternalRedirect } from './lib/redirects';
 import { createSingleFlightRefresh, requestWithSessionRefresh } from './lib/session';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
@@ -2214,16 +2215,18 @@ function App() {
 
   async function saveOidcClient(event) {
     event.preventDefault();
+    const validationError = Object.values(validateOidcClient(oidcForm))[0];
+    if (validationError) {
+      showToast(validationError, 'error');
+      return;
+    }
     const parseLines = (value, fallback = []) =>
       value
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean)
         .reduce((items, item) => (items.includes(item) ? items : [...items, item]), fallback);
-    const combinedRedirectUris = [
-      ...(oidcForm.enable_web ? parseLines(oidcForm.web_redirect_uris || oidcForm.redirect_uris) : []),
-      ...(oidcForm.enable_app ? parseLines(oidcForm.app_redirect_uri) : []),
-    ].reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
+    const combinedRedirectUris = oidcClientRedirectUris(oidcForm);
     try {
       const result = await api(`/api/v1/admin/oidc/clients/${encodeURIComponent(oidcForm.client_id.trim())}`, {
         method: 'PUT',
@@ -2297,7 +2300,7 @@ function App() {
       />
       {legalPrompt}
       <AnimatePresence>{toast && (
-        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`fixed right-4 top-4 z-50 max-w-[calc(100vw-2rem)] rounded-control border border-line px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
+        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`rounded-control border border-line px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
           {toast.message}
         </Notice>
       )}</AnimatePresence>

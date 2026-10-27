@@ -214,7 +214,8 @@ main { view-transition-name: epass-page; }
 html[data-reduce-motion='true']::view-transition-new(*) { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { ::view-transition-new(*) { animation: none !important; } }
 .epass-select-option { transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
-.epass-notice { opacity: 1; transition: opacity var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance); }
+.epass-notice { position: fixed; inset: auto max(16px, env(safe-area-inset-right)) auto auto; top: max(16px, env(safe-area-inset-top)); width: max-content; max-width: min(420px, calc(100vw - 32px)); margin: 0; z-index: 200; pointer-events: none; overflow-wrap: anywhere; box-shadow: var(--epass-elevation-overlay); opacity: 1; transition: opacity var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance); }
+.epass-notice::backdrop { background: transparent; pointer-events: none; }
 .epass-notice[data-motion-state='exiting'] { opacity: 0; pointer-events: none; transition-duration: var(--r-semantic-motion-exit); transition-timing-function: var(--r-semantic-motion-exit-ease); }
 @starting-style { .epass-notice { opacity: 0; } }
 .epass-segments { border-bottom: 0; gap: 8px; }

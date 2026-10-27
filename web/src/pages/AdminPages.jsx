@@ -16,6 +16,7 @@ import { cn } from '../lib/utils';
 import { SECURITY_FIELDS, SECURITY_FIELD_DEFAULTS, SECURITY_FIELD_HINTS, SECURITY_TOGGLE_DEFAULTS } from '../constants';
 import { cleanDisplayName } from '../utils';
 import { RosemaryCheckbox, useRosemaryDialog } from '../components/ui';
+import { validateOidcClient } from '../lib/oidc-client';
 
 const SECURITY_GROUPS = [
   {
@@ -133,7 +134,7 @@ function ConfigField({ label, hint, defaultValue, children }) {
   const child = Children.toArray(children)[0];
   const grouped = isValidElement(child) && child.type === 'div';
   const caption = <>{label}{defaultValue !== undefined && <span className="ml-2 font-normal text-muted">默认 {String(defaultValue)}</span>}</>;
-  const content = <>{Children.map(children, (item) => isValidElement(item) && !grouped ? cloneElement(item, { id, 'aria-describedby': hint ? `${id}-hint` : undefined }) : item)}{hint && <p id={`${id}-hint`} className="text-sm leading-6 text-muted">{hint}</p>}</>;
+  const content = <>{Children.map(children, (item, index) => isValidElement(item) && index === 0 && !grouped ? cloneElement(item, { id, 'aria-describedby': [item.props['aria-describedby'], hint ? `${id}-hint` : ''].filter(Boolean).join(' ') || undefined }) : item)}{hint && <p id={`${id}-hint`} className="text-sm leading-6 text-muted">{hint}</p>}</>;
   return grouped ? <fieldset className="min-w-0 space-y-2"><legend className="mb-2 text-sm font-medium text-ink">{caption}</legend>{content}</fieldset> : <div className="min-w-0 space-y-2"><label htmlFor={id} className="block text-sm font-medium text-ink">{caption}</label>{content}</div>;
 }
 
@@ -1016,6 +1017,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
   const [editingClientId, setEditingClientId] = useState('');
   const [oneTimeSecret, setOneTimeSecret] = useState(null);
   const [copyingSecret, setCopyingSecret] = useState(false);
+  const [saveAttempted, setSaveAttempted] = useState(false);
+  const errorId = useId();
+  const validationErrors = validateOidcClient(oidcForm);
+  const visibleError = (field) => (saveAttempted || String(oidcForm[field] || '').trim()) ? validationErrors[field] : '';
 
   useEffect(() => {
     if (!discovery) {
@@ -1027,6 +1032,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
   }, [discovery, loadDiscovery, loadOidcClients, oidcClients.length, safely]);
 
   function openCreateModal() {
+    setSaveAttempted(false);
     setOidcForm({
       client_id: '',
       display_name: '',
@@ -1048,6 +1054,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
   }
 
   function openEditModal(client) {
+    setSaveAttempted(false);
     const redirectUris = client.redirect_uris || [];
     const appRedirectUris = redirectUris.filter(isMobileCustomRedirectUri);
     const webRedirectUris = redirectUris.filter((uri) => !isMobileCustomRedirectUri(uri));
@@ -1227,7 +1234,8 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               <FormaButton
                 type="button"
                 className="btn-primary"
-                onClick={() =>
+                onClick={() => {
+                  setSaveAttempted(true);
                   void safely(async () => {
                     const result = await saveOidcClient({ preventDefault() {} });
                     if (!result) return;
@@ -1238,8 +1246,8 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                         value: result.client_secret,
                       });
                     }
-                  }, editingClientId ? '更新应用失败' : '添加应用失败')
-                }
+                  }, editingClientId ? '更新应用失败' : '添加应用失败');
+                }}
               >
                 保存应用
               </FormaButton>
@@ -1248,21 +1256,24 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <ConfigField label="Client ID">
-              <FormaInput className="input-field" placeholder="例如 com.rosm.donut" value={oidcForm.client_id} onChange={(event) => setOidcForm((current) => ({ ...current, client_id: event.target.value }))} required />
+              <FormaInput className="input-field" placeholder="例如 com.rosm.donut" value={oidcForm.client_id} onChange={(event) => setOidcForm((current) => ({ ...current, client_id: event.target.value }))} aria-invalid={Boolean(visibleError('client_id'))} aria-describedby={visibleError('client_id') ? `${errorId}-client` : undefined} required />
+              {visibleError('client_id') && <p id={`${errorId}-client`} className="mt-2 text-sm text-danger" role="alert">{validationErrors.client_id}</p>}
             </ConfigField>
             <ConfigField label="展示名称">
               <FormaInput className="input-field" placeholder="例如 Donut App" value={oidcForm.display_name} onChange={(event) => setOidcForm((current) => ({ ...current, display_name: event.target.value }))} />
             </ConfigField>
           </div>
 
+          {validationErrors.redirect_uris && <p className="text-sm text-danger" role="alert">{validationErrors.redirect_uris}</p>}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-panel border border-line bg-canvas p-4">
               <div className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
                 <span>启用 Web</span>
                 <RosemaryCheckbox checked={Boolean(oidcForm.enable_web)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_web: checked }))} ariaLabel="启用 Web" />
               </div>
-              <p className="mt-2 text-xs leading-5 text-muted">Web 使用 HTTPS 或 loopback 回调。仅 Web 启用时可选择机密客户端。</p>
-              <FormaTextarea aria-label="Web 回调地址（每行一条）" rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} />
+              <p className="mt-2 text-xs leading-5 text-muted">Web 使用 HTTPS 或本机回环 HTTP 回调。</p>
+              <FormaTextarea aria-label="Web 回调地址（每行一条）" rows="3" className="input-field mt-3" disabled={!oidcForm.enable_web} placeholder="https://app.example.com/auth/callback" value={oidcForm.web_redirect_uris || ''} onChange={(event) => setOidcForm((current) => ({ ...current, web_redirect_uris: event.target.value }))} aria-invalid={Boolean(visibleError('web_redirect_uris'))} aria-describedby={visibleError('web_redirect_uris') ? `${errorId}-web` : undefined} />
+              {visibleError('web_redirect_uris') && <p id={`${errorId}-web`} className="mt-2 text-sm leading-6 text-danger" role="alert">{validationErrors.web_redirect_uris}</p>}
             </div>
 
             <div className="rounded-panel border border-line bg-canvas p-4">
@@ -1277,7 +1288,8 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                   生成
                 </FormaButton>
               </div>
-              <FormaInput aria-label="App 回调地址" className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} />
+              <FormaInput aria-label="App 回调地址" className="input-field mt-3" disabled={!oidcForm.enable_app} placeholder="com.example.app:/oidc/callback" value={oidcForm.app_redirect_uri || ''} onChange={(event) => setOidcForm((current) => ({ ...current, app_redirect_uri: event.target.value }))} aria-invalid={Boolean(visibleError('app_redirect_uri'))} aria-describedby={visibleError('app_redirect_uri') ? `${errorId}-app` : undefined} />
+              {visibleError('app_redirect_uri') && <p id={`${errorId}-app`} className="mt-2 text-sm leading-6 text-danger" role="alert">{validationErrors.app_redirect_uri}</p>}
             </div>
           </div>
 
@@ -1328,9 +1340,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
                 onCheckedChange={(checked) => setOidcForm((current) => ({
                   ...current,
                   is_confidential: checked,
-                  generate_client_secret: checked && !current.is_confidential
-                    ? true
-                    : current.generate_client_secret,
+                  generate_client_secret: checked && (!current.is_confidential || current.generate_client_secret),
                 }))}
               >
               机密客户端
