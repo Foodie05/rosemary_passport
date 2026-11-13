@@ -13,6 +13,7 @@ import { oidcAuthorizationParameters } from './lib/oidc';
 import { oidcClientRedirectUris, validateOidcClient } from './lib/oidc-client';
 import { normalizeInternalRedirect } from './lib/redirects';
 import { createSingleFlightRefresh, requestWithSessionRefresh } from './lib/session';
+import { createAliyunCaptchaPopup, destroyAliyunCaptcha } from './lib/aliyun-captcha';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
@@ -523,8 +524,7 @@ function App() {
   const publicCaptchaConfigRef = useRef('');
   const backgroundCaptchaContainerRef = useRef(null);
   const backgroundCaptchaButtonRef = useRef(null);
-  const backgroundCaptchaInstanceRef = useRef(null);
-  const backgroundCaptchaPromiseRef = useRef(null);
+  const backgroundCaptchaRequestRef = useRef(null);
   const refreshFirstPartySession = useMemo(
     () => createSingleFlightRefresh(async () => {
       const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
@@ -608,6 +608,10 @@ function App() {
       // ignore malformed URL parsing
     }
   }, [location.pathname, location.search]);
+
+  useEffect(() => () => {
+    backgroundCaptchaRequestRef.current?.cancel();
+  }, []);
 
   useEffect(() => {
     void ensurePublicCaptchaWidget();
@@ -1013,11 +1017,7 @@ function App() {
   }
 
   function destroyCaptchaInstance(instanceRef) {
-    try {
-      instanceRef.current?.destroy?.();
-    } catch (_) {
-      // Ignore provider cleanup errors and rebuild the widget.
-    }
+    destroyAliyunCaptcha(instanceRef.current);
     instanceRef.current = null;
   }
 
@@ -1081,72 +1081,43 @@ function App() {
     if (!config.prefix || !config.sceneId || !backgroundCaptchaContainerRef.current) {
       throw new Error('当前未配置阿里云验证码');
     }
-    if (backgroundCaptchaPromiseRef.current) {
+    if (backgroundCaptchaRequestRef.current) {
       throw new Error('人机验证正在处理中，请稍后再试。');
     }
-    await waitForAliyunCaptchaReady(config);
-
-    destroyCaptchaInstance(backgroundCaptchaInstanceRef);
-    backgroundCaptchaContainerRef.current.innerHTML = '';
-    return new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        backgroundCaptchaPromiseRef.current = null;
-        reject(new Error('人机验证已超时，请重试。'));
-      }, 120000);
-      const finish = (callback, value) => {
-        const pending = backgroundCaptchaPromiseRef.current;
-        if (!pending) {
-          return;
+    // Reserve this request before loading the SDK so concurrent callers cannot
+    // initialize competing widgets against the same DOM elements.
+    let cancelled = false;
+    const request = {
+      cancel: () => {
+        cancelled = true;
+        request.challenge?.cancel();
+      },
+    };
+    backgroundCaptchaRequestRef.current = request;
+    try {
+      await waitForAliyunCaptchaReady(config);
+      if (cancelled) throw new Error('人机验证已取消。');
+      backgroundCaptchaContainerRef.current.innerHTML = '';
+      request.challenge = createAliyunCaptchaPopup({
+        initCaptcha: (options) => window.initAliyunCaptcha(options),
+        sceneId: config.sceneId,
+        element: '#aliyun-background-captcha',
+        button: '#aliyun-background-captcha-trigger',
+        trigger: () => backgroundCaptchaButtonRef.current?.click(),
+      });
+      return await request.challenge.promise;
+    } finally {
+      if (backgroundCaptchaRequestRef.current === request) {
+        backgroundCaptchaRequestRef.current = null;
+        if (backgroundCaptchaContainerRef.current) {
+          backgroundCaptchaContainerRef.current.innerHTML = '';
         }
-        window.clearTimeout(pending.timer);
-        if (pending.triggerTimer) {
-          window.clearTimeout(pending.triggerTimer);
-        }
-        backgroundCaptchaPromiseRef.current = null;
-        callback(value);
-      };
-      backgroundCaptchaPromiseRef.current = { resolve, reject, timer, triggerTimer: null };
-      try {
-        window.initAliyunCaptcha({
-          SceneId: config.sceneId,
-          mode: 'popup',
-          element: '#aliyun-background-captcha',
-          button: '#aliyun-background-captcha-trigger',
-          slideStyle: { width: 360, height: 40 },
-          success: (captchaVerifyParam) => {
-            if (!captchaVerifyParam) {
-              finish(reject, new Error('人机验证未生成有效凭据，请重试。'));
-              return;
-            }
-            finish(resolve, captchaVerifyParam);
-          },
-          fail: () => finish(
-            reject,
-            new Error('人机验证未通过，请刷新验证后重试。'),
-          ),
-          close: () => finish(reject, new Error('人机验证已取消。')),
-          getInstance: (instance) => {
-            backgroundCaptchaInstanceRef.current = instance;
-            const pending = backgroundCaptchaPromiseRef.current;
-            if (!pending || pending.triggerTimer) {
-              return;
-            }
-            pending.triggerTimer = window.setTimeout(() => {
-              backgroundCaptchaButtonRef.current?.click();
-            }, 2100);
-          },
-        });
-      } catch (error) {
-        finish(reject, error instanceof Error ? error : new Error('人机验证加载失败。'));
       }
-    });
+    }
   }
 
   function resetBackgroundCaptcha() {
-    destroyCaptchaInstance(backgroundCaptchaInstanceRef);
-    if (backgroundCaptchaContainerRef.current) {
-      backgroundCaptchaContainerRef.current.innerHTML = '';
-    }
+    backgroundCaptchaRequestRef.current?.cancel();
   }
 
   async function submitRegisterCode() {
