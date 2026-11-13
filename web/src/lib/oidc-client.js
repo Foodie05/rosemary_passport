@@ -19,7 +19,7 @@ function redirectError(value, isConfidential) {
   if (uri.protocol === 'http:' && /^http:\/\//i.test(value)) {
     return ['localhost', '127.0.0.1'].includes(uri.hostname) ? '' : 'HTTP 回调仅可使用 localhost 或 127.0.0.1；线上请使用 HTTPS。';
   }
-  if (['about:', 'data:', 'file:', 'ftp:', 'http:', 'https:', 'javascript:', 'mailto:', 'tel:'].includes(uri.protocol)) {
+  if (['about:', 'data:', 'file:', 'ftp:', 'http:', 'https:', 'javascript:', 'vbscript:', 'mailto:', 'tel:'].includes(uri.protocol)) {
     return '回调地址须使用 HTTPS、本机回环 HTTP 或 App 自定义 scheme。';
   }
   if (isConfidential) return CONFIDENTIAL_REDIRECT_MESSAGE;

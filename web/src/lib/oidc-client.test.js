@@ -20,7 +20,7 @@ test('allows server handoff and development loopback without disabling confident
 test('keeps every redirect validated in combined Web/App mode', () => {
   const form = { ...app, is_confidential: true, enable_web: true, web_redirect_uris: 'https://api.example.com/callback' };
   assert.equal(validateOidcClient(form).app_redirect_uri, CONFIDENTIAL_REDIRECT_MESSAGE);
-  for (const uri of ['http://example.com/callback', 'https://example.com/cb#secret', 'https://name:password@example.com/cb', 'javascript:alert(1)', 'not a URI']) {
+  for (const uri of ['http://example.com/callback', 'https://example.com/cb#secret', 'https://name:password@example.com/cb', 'javascript:alert(1)', 'vbscript:msgbox(1)', 'VbScRiPt:msgbox(1)', 'not a URI']) {
     assert.ok(validateOidcClient({ ...app, app_redirect_uri: uri }).app_redirect_uri, uri);
   }
 });

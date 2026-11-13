@@ -124,6 +124,7 @@ class OidcAdminService {
       'http',
       'https',
       'javascript',
+      'vbscript',
       'mailto',
       'tel',
     };

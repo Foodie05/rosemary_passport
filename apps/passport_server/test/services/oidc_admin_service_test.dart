@@ -85,6 +85,8 @@ void main() {
     () async {
       for (final uri in [
         'javascript:alert(1)',
+        'vbscript:msgbox(1)',
+        'VbScRiPt:msgbox(1)',
         'http://example.com/callback',
         'https://example.com/callback#fragment',
       ]) {
