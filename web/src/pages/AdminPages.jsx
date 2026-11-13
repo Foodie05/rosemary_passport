@@ -792,14 +792,14 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                     </FormaButton>
                   </> },
 { id: 'status', header: '状态', render: user => <>
-                    <Badge tone={user.account_status === 'banned' ? 'danger' : user.is_email_verified ? 'success' : 'warning'}>
-                      {user.account_status === 'banned' ? '已封禁' : user.is_email_verified ? '已验证' : '待验证'}
+                    <Badge tone={user.account_status === 'banned' ? 'danger' : (user.is_email_verified || user.is_phone_verified) ? 'success' : 'warning'}>
+                      {user.account_status === 'banned' ? '已封禁' : (user.is_email_verified || user.is_phone_verified) ? '已验证' : '待验证'}
                     </Badge>
                   </> },
 { id: 'roles', header: '角色', render: user => <>
                     <div className="flex flex-wrap gap-2">
                       {(user.roles || []).map((role) => (
-                        <Badge key={role} tone="neutral">
+                        <Badge key={role} tone="primary">
                           {role}
                         </Badge>
                       ))}
