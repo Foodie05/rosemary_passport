@@ -1,3 +1,5 @@
+import 'package:rosm_passport_flutter/src/forma_field_outline.dart';
+import 'package:rosm_passport_flutter/src/epass_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rosemary_ui/rosemary_ui.dart';
@@ -7,42 +9,104 @@ import 'package:rosm_passport_flutter/src/rosm_passport_theme.dart';
 
 void main() {
   testWidgets(
-    'autofill changes immediately update local feedback and visibility',
+    'creation requirements arm on blur, update live, reset on clearing and preserve autofill',
     (tester) async {
       final controller = TextEditingController();
       addTearDown(controller.dispose);
       await tester.pumpWidget(_field(controller));
-      expect(find.text('不少于 8 个字符'), findsOneWidget);
-      expect(find.textContaining('128'), findsNothing);
+      expect(find.text('8–32 个字符'), findsOneWidget);
       controller.text = 'orchid';
       await tester.pump();
-      expect(find.text('不少于 8 个字符，还需 2 个。'), findsOneWidget);
-      controller.text = 'aBcDeFgH';
-      await tester.pump();
-      expect(find.text('字母、数字、符号中至少包含两种。'), findsOneWidget);
-      controller.text = 'orchid-willow';
-      await tester.pump();
-      expect(find.text('已满足密码要求。'), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byType(TextField)).obscureText,
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
+        isFalse,
+      );
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
         isTrue,
       );
+      expect(
+        tester
+            .widget<RosemaryFieldRequirements>(
+              find.byType(RosemaryFieldRequirements),
+            )
+            .active,
+        isTrue,
+      );
+      controller.text = 'orchid-willow';
+      await tester.pump();
+      expect(
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
+        isFalse,
+      );
+      expect(tester.widget<TextField>(find.byType(TextField)).autofillHints, [
+        AutofillHints.newPassword,
+      ]);
       await tester.tap(find.bySemanticsLabel('显示密码'));
       await tester.pump();
       expect(
         tester.widget<TextField>(find.byType(TextField)).obscureText,
         isFalse,
       );
-      controller.text = 'x' * 129;
+      controller.clear();
       await tester.pump();
-      expect(find.text('最多 128 个字符，请缩短密码。'), findsOneWidget);
-      controller.text = 'Password!2026';
+      expect(
+        tester
+            .widget<RosemaryFieldRequirements>(
+              find.byType(RosemaryFieldRequirements),
+            )
+            .active,
+        isFalse,
+      );
+      controller.text = 'short';
       await tester.pump();
-      expect(find.textContaining('很容易被猜到'), findsOneWidget);
+      expect(
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
+        isFalse,
+      );
     },
   );
   testWidgets(
-    '320px, 200% text scale preserves all guidance without overflow',
+    'composition defers failure and retains the controller editing range',
+    (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(_field(controller));
+      await tester.tap(find.byType(TextField));
+      controller.text = 'orchid';
+      await tester.pump();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
+        isTrue,
+      );
+      controller.value = const TextEditingValue(
+        text: '中文组合',
+        selection: TextSelection.collapsed(offset: 2),
+        composing: TextRange(start: 0, end: 4),
+      );
+      await tester.pump();
+      expect(
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
+        isFalse,
+      );
+      expect(controller.selection.baseOffset, 2);
+      expect(controller.value.composing, const TextRange(start: 0, end: 4));
+      controller.value = controller.value.copyWith(composing: TextRange.empty);
+      await tester.pump();
+      expect(
+        tester.widget<RosmFieldOutline>(find.byType(RosmFieldOutline)).invalid,
+        isTrue,
+      );
+    },
+  );
+  testWidgets(
+    '320px and 200% text scale retain adjacent requirements without overflow',
     (tester) async {
       tester.view.physicalSize = const Size(320, 900);
       tester.view.devicePixelRatio = 1;
@@ -52,12 +116,12 @@ void main() {
       addTearDown(controller.dispose);
       await tester.pumpWidget(_field(controller, scale: 2));
       await tester.pump();
+      expect(find.text('8–32 个字符'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      expect(find.text('已满足密码要求。'), findsOneWidget);
     },
   );
   testWidgets(
-    'theme consumes official extension and exact light/dark semantic colors',
+    'both modes consume all 45 generated roles and pass official contrast checks',
     (tester) async {
       for (final dark in [false, true]) {
         late ThemeData theme;
@@ -76,15 +140,20 @@ void main() {
             ),
           ),
         );
-        expect(theme.extension<RosemaryThemeData>(), isNotNull);
+        final expected = dark
+            ? RosmEpassDarkTokens.colors
+            : RosmEpassLightTokens.colors;
         expect(
-          theme.scaffoldBackgroundColor,
-          Color(dark ? 0xff141c18 : 0xfff6f5ef),
+          theme.extension<RosemaryThemeData>()!.colors.toMap(),
+          expected.toMap(),
         );
+        expect(expected.toMap(), hasLength(45));
         expect(
-          theme.colorScheme.primary,
-          Color(dark ? 0xffb8cbb5 : 0xff315747),
+          rosemaryValidateTheme(expected).where((d) => !d.passes),
+          isEmpty,
         );
+        expect(theme.scaffoldBackgroundColor, expected.canvas);
+        expect(theme.colorScheme.primary, expected.primary);
       }
     },
   );

@@ -27,4 +27,6 @@ const info = document.createElement('aside');
 info.style = 'position:fixed;bottom:0;left:0;z-index:60;max-width:300px;max-height:140px;overflow:auto;background:#fff;color:#242e29;padding:8px;font-size:11px';
 info.innerHTML = '<strong>本地验收 · 所有协议及请求均为模拟</strong><pre id="requests"></pre>';
 document.body.append(info);
-createRoot(document.getElementById('root')).render(<MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[route]}><App /></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>);
+const fixtureRoot = import.meta.hot?.data.root ?? createRoot(document.getElementById('root'));
+if (import.meta.hot) import.meta.hot.data.root = fixtureRoot;
+fixtureRoot.render(<MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[route]}><App /></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>);

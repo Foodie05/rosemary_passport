@@ -1,3 +1,10 @@
+## 0.11.0 — adaptation branch
+
+- Integrate official Rosemary Forma 1.3.0 / SDK 0.5.0, pinned release source with license and SHA256 provenance.
+- Generate all 45 light/dark semantic roles with the official HCT recipe; use official cards and field requirements.
+- Preserve native editing, composition, autofill and controllers through the documented input adapter.
+- Arm field validation after nonempty blur; clear to neutral. New passwords use 8–32 visible ASCII characters without spaces; preserve legacy login and sessions.
+
 ## 0.10.0
 
 - Align with Rosemary Forma 1.2.0 and official rosemary_ui 0.4.0 at 311a81de1651ba049d3acd476725390de38aacc2.

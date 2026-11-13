@@ -1,6 +1,6 @@
 import { FormaImport } from '../components/Forma';
 import { FormaButton, FormaInput, FormaTextarea } from '../components/Forma';
-import { IconButton } from '@rosemary-ui/react';
+import { IconButton, Table, Search as FormaSearch, Pagination, Badge } from '@rosemary-ui/react';
 import { Link } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
 import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react';
@@ -84,7 +84,7 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
-const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.10.0/packages/rosm_passport_flutter';
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/codex/forma-13-sdk-050/packages/rosm_passport_flutter';
 const DASHBOARD_PERIODS = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
@@ -133,9 +133,11 @@ function ConfigField({ label, hint, defaultValue, children }) {
   const id = useId();
   const child = Children.toArray(children)[0];
   const grouped = isValidElement(child) && child.type === 'div';
-  const caption = <>{label}{defaultValue !== undefined && <span className="ml-2 font-normal text-muted">默认 {String(defaultValue)}</span>}</>;
-  const content = <>{Children.map(children, (item, index) => isValidElement(item) && index === 0 && !grouped ? cloneElement(item, { id, 'aria-describedby': [item.props['aria-describedby'], hint ? `${id}-hint` : ''].filter(Boolean).join(' ') || undefined }) : item)}{hint && <p id={`${id}-hint`} className="text-sm leading-6 text-muted">{hint}</p>}</>;
-  return grouped ? <fieldset className="min-w-0 space-y-2"><legend className="mb-2 text-sm font-medium text-ink">{caption}</legend>{content}</fieldset> : <div className="min-w-0 space-y-2"><label htmlFor={id} className="block text-sm font-medium text-ink">{caption}</label>{content}</div>;
+  const description = [defaultValue !== undefined ? `默认 ${String(defaultValue)}` : '', hint].filter(Boolean).join('；');
+  if (!grouped && isValidElement(child) && [FormaInput, FormaTextarea].includes(child.type)) {
+    return <div className="min-w-0">{Children.map(children, (item,index) => index === 0 ? cloneElement(item,{id,label,description}) : item)}</div>;
+  }
+  return <fieldset className="min-w-0 space-y-2"><legend className="mb-2 text-sm font-medium text-ink">{label}</legend>{children}{description && <p className="text-sm text-muted">{description}</p>}</fieldset>;
 }
 
 const PROVIDER_PATTERN = /^@[a-z0-9.-]+\.[a-z]{2,}$/i;
@@ -166,7 +168,7 @@ function ProviderListSection({
   onRemove,
 }) {
   return (
-    <div className="space-y-4 rounded-panel border border-line bg-surface p-5">
+    <div className="space-y-4 rounded-panel bg-group p-5">
       <div>
         <h3 className="text-base font-bold text-ink">{title}</h3>
         <p className="mt-1 text-sm text-muted">{description}</p>
@@ -230,7 +232,7 @@ function CodeBlock({ children }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div className="rounded-panel border border-line bg-surface p-4">
+    <div className="rounded-panel bg-group p-4">
       <p className="text-xs font-bold uppercase tracking-wider text-muted">{label}</p>
       <p className="mt-2 break-all text-sm font-medium text-ink">{value || '未提供'}</p>
     </div>
@@ -382,7 +384,7 @@ export function AdminSecurityPolicy({
       actions={<FormaButton className="btn-primary" type="submit">保存安全策略</FormaButton>}
     >
       <div className="space-y-8">
-        <div className="space-y-6 rounded-panel border border-line bg-surface p-6">
+        <div className="space-y-6 rounded-panel bg-group p-6">
           <div>
             <h2 className="epass-section-title">策略开关</h2>
             <p className="mt-1 text-sm text-muted">分别限制同一账户与同一来源 IP 的高频请求。</p>
@@ -406,7 +408,7 @@ export function AdminSecurityPolicy({
         </div>
 
         {SECURITY_GROUPS.filter((group) => group.fields.length > 0).map((group) => (
-          <div key={group.title} className="space-y-6 rounded-panel border border-line bg-surface p-6">
+          <div key={group.title} className="space-y-6 rounded-panel bg-group p-6">
             <div>
               <h2 className="epass-section-title">{group.title}</h2>
               <p className="mt-1 text-sm text-muted">{group.description}</p>
@@ -432,7 +434,7 @@ export function AdminSecurityPolicy({
           </div>
         ))}
 
-        <div className="space-y-6 rounded-panel border border-line bg-surface p-6">
+        <div className="space-y-6 rounded-panel bg-group p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="epass-section-title">注册邮箱管理</h2>
@@ -681,10 +683,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
 
       <div className="surface-panel space-y-4 rounded-panel p-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-          <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-            <FormaInput aria-label="搜索冷却记录" className="input-field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、手机号、IP 或冷却类型" onKeyDown={(event) => { if (event.key === 'Enter') void safely(() => refresh(1), '冷却状态加载失败'); }} />
-          </div>
+          <div className="min-w-0 flex-1"><FormaSearch label="搜索冷却记录" value={search} onValueChange={setSearch} placeholder="邮箱、手机号、IP 或冷却类型" onSearch={() => void safely(() => refresh(1), '冷却状态加载失败')} /></div>
           <SelectionGroup value={subjectType} label="主体类型" className="epass-segments epass-compact-methods" indicator={false}>
             {COOLDOWN_SUBJECT_TYPES.map((item) => (
               <FormaButton key={item.value} type="button" aria-pressed={subjectType === item.value} className={cn('rounded-control px-3 py-2 text-sm font-bold transition-colors', subjectType === item.value ? 'text-ink' : 'text-muted hover:text-ink')} onClick={() => setSubjectType(item.value)}>{item.label}</FormaButton>
@@ -697,40 +696,22 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
       </div>
 
       <div className="surface-panel overflow-hidden rounded-panel">
-        <div className="overflow-x-auto" role="region" aria-label="数据表格，可横向滚动" tabIndex={0}>
-          <table className="w-full min-w-[1120px] border-collapse text-left">
-            <thead><tr className="border-b border-line bg-canvas">
-              {['类型', '主体 / IP', '尝试次数', '计数窗口开始', '最后更新', '冷却截止', '剩余时间', '操作'].map((label) => <th scope="col" key={label} className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-muted">{label}</th>)}
-            </tr></thead>
-            <tbody className="divide-y divide-line">
-              {loadState === 'ready' && cooldowns.map((record) => {
-                const key = `${record.scope}\u0000${record.subject}`;
-                const active = record.blocked_until && new Date(record.blocked_until).getTime() > now;
-                return (
-                  <tr key={key} className="transition-colors hover:bg-canvas">
-                    <td className="px-5 py-4"><p className="font-bold text-ink">{cooldownScopeLabel(record.scope)}</p><p className="mt-1 font-mono text-xs text-muted">{record.scope.includes(':cooldown:') ? '发送冷却' : '频率窗口'}</p></td>
-                    <td className="px-5 py-4"><p className="max-w-[300px] break-all font-mono text-sm text-ink">{record.subject}</p><span className="mt-1 inline-flex rounded-full bg-subtle px-2 py-0.5 text-xs font-bold uppercase text-muted">{record.subject_type === 'ip' ? 'IP' : record.subject_type === 'phone' ? '手机' : '邮箱'}</span></td>
-                    <td className="px-5 py-4 text-lg font-bold text-ink">{record.hits ?? 0}</td>
-                    <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.window_started_at)}</td>
-                    <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.updated_at)}</td>
-                    <td className="px-5 py-4 text-sm text-muted">{formatBeijingDateTime(record.blocked_until)}</td>
-                    <td className="px-5 py-4"><span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', active ? 'bg-warning-subtle text-warning' : 'bg-subtle text-muted')}><Clock3 size={13} />{formatRemaining(record, now)}</span></td>
-                    <td className="px-5 py-4"><FormaButton type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</FormaButton></td>
-                  </tr>
-                );
-              })}
-              {loadState === 'loading' ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-muted" role="status">正在加载冷却记录…</td></tr> : null}
-              {loadState === 'error' ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-danger" role="alert">冷却记录加载失败，请点击刷新重试。</td></tr> : null}
-              {loadState === 'ready' && !cooldowns.length ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-muted"><Activity className="mx-auto mb-3" size={30} />暂无符合条件的验证码冷却记录</td></tr> : null}
-            </tbody>
-          </table>
+        <div className="epass-table">
+          <Table caption="验证码冷却记录" rows={loadState === 'ready' ? cooldowns : []} rowKey={record => `${record.scope}\u0000${record.subject}`}
+ columns={[
+{ id: 'scope', header: '类型', render: record => <><p className="font-bold text-ink">{cooldownScopeLabel(record.scope)}</p><p className="mt-1 font-mono text-xs text-muted">{record.scope.includes(':cooldown:') ? '发送冷却' : '频率窗口'}</p></> },
+{ id: 'subject', header: '主体 / IP', render: record => <><p className="max-w-[300px] break-all font-mono text-sm text-ink">{record.subject}</p><Badge className="mt-1">{record.subject_type === 'ip' ? 'IP' : record.subject_type === 'phone' ? '手机' : '邮箱'}</Badge></> },
+{ id: 'hits', header: '尝试次数', render: record => <>{record.hits ?? 0}</> },
+{ id: 'window', header: '计数窗口开始', render: record => <>{formatBeijingDateTime(record.window_started_at)}</> },
+{ id: 'updated', header: '最后更新', render: record => <>{formatBeijingDateTime(record.updated_at)}</> },
+{ id: 'deadline', header: '冷却截止', render: record => <>{formatBeijingDateTime(record.blocked_until)}</> },
+{ id: 'remaining', header: '剩余时间', render: record => <><span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', (record.blocked_until && new Date(record.blocked_until).getTime() > now) ? 'bg-warning-subtle text-warning' : 'bg-subtle text-muted')}><Clock3 size={13} />{formatRemaining(record, now)}</span></> },
+{ id: 'actions', header: '操作', render: record => { const key = `${record.scope}\u0000${record.subject}`; return <><FormaButton type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</FormaButton></>; } }
+]} empty={<div role={loadState === 'error' ? 'alert' : 'status'}>{loadState === 'loading' ? '正在加载冷却记录…' : loadState === 'error' ? '冷却记录加载失败，请点击刷新重试。' : '暂无符合条件的验证码冷却记录'}</div>} />
         </div>
         <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>{loadState === 'ready' ? <>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</> : loadState === 'loading' ? '正在加载冷却记录…' : '加载失败，记录数量暂不可用。'}</p>
-          <div className="flex gap-2">
-            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={loadState !== 'ready' || pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</FormaButton>
-            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={loadState !== 'ready' || pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => refresh(pagination.page + 1), '冷却状态加载失败')}>下一页</FormaButton>
-          </div>
+          <Pagination page={pagination.page} pageCount={Math.max(1, pagination.total_pages)} disabled={loadState !== 'ready'} onPageChange={page => void safely(() => refresh(page), '冷却状态加载失败')} label="冷却记录分页" />
         </div>
       </div>
     </div>
@@ -797,54 +778,37 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
 
       <div className="surface-panel rounded-panel p-4">
         <div className="flex flex-col gap-4 md:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
-            <FormaInput onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败'); } }} aria-label="搜索用户" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索昵称或邮箱..." className="input-field pl-10" />
-          </div>
-          <FormaButton type="button" className="btn-secondary" onClick={() => void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败')}>
-            查询
-          </FormaButton>
+          <div className="min-w-0 flex-1"><FormaSearch label="搜索用户" value={search} onValueChange={setSearch} placeholder="昵称或邮箱" onSearch={() => void safely(() => loadUsers({ page: 1, search }), '用户数据加载失败')} /></div>
         </div>
       </div>
 
       <div className="surface-panel overflow-hidden rounded-panel">
-        <div className="overflow-x-auto" role="region" aria-label="数据表格，可横向滚动" tabIndex={0}>
-          <table className="min-w-[760px] w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-line bg-canvas">
-                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">用户</th>
-                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">状态</th>
-                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">角色</th>
-                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">用户 ID</th>
-                <th scope="col" className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {users.map((user, index) => (
-                <tr key={user.id || `${user.email}-${index}`} className="cursor-pointer transition-colors hover:bg-canvas" onClick={() => void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败')}>
-                  <td className="epass-user-cell px-6 py-4">
+        <div className="epass-table">
+          <Table caption="已注册用户" rows={users} rowKey={user => user.id || user.email || user.phone_number}
+ columns={[
+{ id: 'identity', header: '用户', render: user => <>
                     <FormaButton type="button" className="epass-user-identity" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>
                       <span className="epass-user-name">{cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}</span>
                       <span className="epass-user-contacts">{[user.email, user.phone_number].filter(Boolean).map((account) => <span key={account}>{account}</span>)}{!user.email && !user.phone_number && <span>未绑定邮箱或手机号</span>}</span>
                       <span className="sr-only">查看用户详情</span>
                     </FormaButton>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide', user.account_status === 'banned' ? 'bg-danger-subtle text-danger' : user.is_email_verified ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning')}>
+                  </> },
+{ id: 'status', header: '状态', render: user => <>
+                    <Badge tone={user.account_status === 'banned' ? 'danger' : user.is_email_verified ? 'success' : 'warning'}>
                       {user.account_status === 'banned' ? '已封禁' : user.is_email_verified ? '已验证' : '待验证'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
+                    </Badge>
+                  </> },
+{ id: 'roles', header: '角色', render: user => <>
                     <div className="flex flex-wrap gap-2">
                       {(user.roles || []).map((role) => (
-                        <span key={role} className="rounded-full bg-subtle px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ink">
+                        <Badge key={role} tone="neutral">
                           {role}
-                        </span>
+                        </Badge>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted">{user.id || '-'}</td>
-                  <td className="px-6 py-4">
+                  </> },
+{ id: 'id', header: '用户 ID', render: user => <>{user.id || '-'}</> },
+{ id: 'actions', header: '操作', render: user => <>
                     <div className="flex gap-2">
                       <IconButton
                         type="button"
@@ -881,27 +845,12 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                         }}
                       />
                     </div>
-                  </td>
-                </tr>
-              ))}
-              {!users.length && (
-                <tr>
-                  <td colSpan="5" className="px-6 py-10 text-center text-sm text-muted">暂无用户数据</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </> }
+]} empty={'暂无用户数据'} />
         </div>
         <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 位用户</p>
-          <div className="flex gap-2">
-            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => loadUsers({ page: pagination.page - 1, search }), '用户数据加载失败')}>
-              上一页
-            </FormaButton>
-            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => loadUsers({ page: pagination.page + 1, search }), '用户数据加载失败')}>
-              下一页
-            </FormaButton>
-          </div>
+          <Pagination page={pagination.page} pageCount={Math.max(1, pagination.total_pages)} onPageChange={page => void safely(() => loadUsers({page, search}), '用户数据加载失败')} label="用户分页" />
         </div>
       </div>
 
@@ -1016,7 +965,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           {viewingUser.account_status === 'banned' ? (
             <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><FormaButton type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</FormaButton></div>
           ) : (
-            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><label htmlFor="epass-adminpages-field-1" className="text-sm font-bold text-danger">封禁原因</label><FormaTextarea id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} variant="danger" className="mt-3" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
+            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><FormaTextarea label="封禁原因" id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} variant="danger" className="mt-3" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
           )}
         </Modal>
       )}</AnimatePresence>
@@ -1475,7 +1424,7 @@ function OidcDocsContent({ discovery, oidcSettings }) {
     '  rosm_passport_flutter:',
     '    git:',
     '      url: https://github.com/Foodie05/rosemary_passport.git',
-    '      ref: v0.10.0',
+    '      ref: codex/forma-13-sdk-050',
     '      path: packages/rosm_passport_flutter',
     '```',
     '',
@@ -1812,13 +1761,13 @@ Scopes:
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-dependencies" tabIndex={-1} className="text-lg font-bold text-ink">2. 添加 SDK 依赖</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">v0.10.0 使用官方 Rosemary Forma 1.2.0 Flutter SDK 0.4.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；应用可通过 Git 标签接入。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">v0.11.0 使用官方 Rosemary Forma 1.3.0 Flutter SDK 0.5.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；当前适配版通过下方 Git 分支接入；待发布标签后可切换至固定标签。</p>
         </div>
         <CodeBlock>{`dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: v0.10.0
+      ref: codex/forma-13-sdk-050
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
@@ -1947,7 +1896,7 @@ await passport.resetPasswordByCode(
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-passkeys" tabIndex={-1} className="text-lg font-bold text-ink">6. 新密码与即时反馈</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">注册、找回和账户重置密码时，内置 UI 会随输入即时检查；新密码须为 8–128 个字符，并在字母、数字、符号中至少包含两类。大小写都算字母，内部空格不算符号，首尾不能有空格。常规提示只显示“不少于 8 个字符”。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">注册、找回和账户重置密码时，新密码须为 8–32 个 ASCII 可见字符，不含空格，并在字母、数字、符号中至少包含两类。规则首次显示为中性；首次非空失焦后开始校验，此后随输入更新，输入法组合期间不提前判错，清空后恢复中性。历史密码登录保持兼容。</p>
         </div>
         <CodeBlock>{`final passwordController = TextEditingController();
 // 宿主持有控制器，离开界面时 dispose。
@@ -1966,7 +1915,7 @@ final validation = const RosmPasswordPolicy().evaluate(
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <InfoRow label="运行环境" value="Flutter 3.44.8+ / Dart 3.12.2+" />
-          <InfoRow label="设计 SDK" value="rosemary_ui 0.4.0，固定提交" />
+          <InfoRow label="设计 SDK" value="rosemary_ui 0.5.0，固定官方发布源码" />
           <InfoRow label="版本状态" value="官方设计库仍为 Prototype；人工辅助技术验收尚未完成" />
           <InfoRow label="通行密钥" value="当前 Flutter SDK 不包含原生 Passkey API；网站的 WebAuthn 能力独立提供" />
         </div>
@@ -2007,7 +1956,7 @@ await passport.signOut();`}</CodeBlock>
           <p>只有 Public 直连模式才使用自定义 scheme，例如 <InlineCode>com.cruos.zion:/oidc/callback</InlineCode>。</p>
           <p>接入方服务器必须校验 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>issuer</InlineCode>、<InlineCode>aud</InlineCode>、过期时间和 redirect URI。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
-          <p>升级至 v0.10.0 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
+          <p>升级至 v0.11.0 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
           <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
           <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>

@@ -49,4 +49,6 @@ function Preview(){
  <Route path="oidc" element={<AdminOIDCConfig discovery={{}} oidcClients={[{client_id:'com.example.reader',display_name:'示例阅读应用',is_active:true,redirect_uris:['https://example.com/auth/callback']}]} oidcForm={oidcForm} setOidcForm={setOidcForm} loadDiscovery={noop} loadOidcClients={noop} safely={safely}/>}/>
  </Route></Routes></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>;
 }
-createRoot(document.getElementById('root')).render(<Preview/>);
+const fixtureRoot = import.meta.hot?.data.root ?? createRoot(document.getElementById('root'));
+if (import.meta.hot) import.meta.hot.data.root = fixtureRoot;
+fixtureRoot.render(<Preview/>);

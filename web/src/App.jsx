@@ -1,3 +1,4 @@
+import { fieldFeedbackTarget, publishFieldFeedback } from './lib/field-feedback';
 import { FormaButton, FormaInput } from './components/Forma';
 import { AnimatePresence } from 'motion/react';
 import { Notice } from './components/Notice';
@@ -638,6 +639,7 @@ function App() {
   }, [loginCodeCooldownRemaining]);
 
   function showToast(message, type = 'info') {
+    if (/^\/(?:login|register|forgot-password)$/.test(window.location.pathname) && publishFieldFeedback(getUserMessage(message), type)) return;
     setToast({ message: type === 'error' ? getUserMessage(message) : message, type });
   }
 
@@ -1093,6 +1095,8 @@ function App() {
         request.challenge?.cancel();
       },
     };
+    const feedback = fieldFeedbackTarget();
+    feedback('请完成人机验证后继续。');
     backgroundCaptchaRequestRef.current = request;
     try {
       await waitForAliyunCaptchaReady(config);
@@ -1105,7 +1109,12 @@ function App() {
         button: '#aliyun-background-captcha-trigger',
         trigger: () => backgroundCaptchaButtonRef.current?.click(),
       });
-      return await request.challenge.promise;
+      const token = await request.challenge.promise;
+      feedback('人机验证已完成，正在继续。');
+      return token;
+    } catch (error) {
+      feedback(getUserErrorMessage(error, '安全验证未完成，请重试。'), error.message?.includes('取消') ? 'info' : 'error');
+      throw error;
     } finally {
       if (backgroundCaptchaRequestRef.current === request) {
         backgroundCaptchaRequestRef.current = null;

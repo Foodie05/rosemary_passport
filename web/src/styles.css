@@ -4,7 +4,10 @@
 
 @theme inline {
   --color-canvas: var(--r-semantic-color-canvas);
-  --color-surface: var(--r-semantic-color-surface);
+  --color-surface: var(--r-semantic-color-surface-group);
+  --color-group: var(--r-semantic-color-surface-group);
+  --color-inset: var(--r-semantic-color-surface-inset);
+  --color-floating: var(--r-semantic-color-surface-floating);
   --color-subtle: var(--r-semantic-color-surface-subtle);
   --color-ink: var(--r-semantic-color-text);
   --color-muted: var(--r-semantic-color-text-secondary);
@@ -47,7 +50,7 @@
   input::placeholder, textarea::placeholder { color: var(--r-semantic-color-text-tertiary); opacity: 1; }
   :focus-visible { outline: 2px solid var(--r-semantic-color-focus); outline-offset: 4px; }
   img, svg { max-width: 100%; }
-  svg.lucide { stroke-width: 1.6; flex-shrink: 0; }
+
   table { width: 100%; font-size: 14px; border-collapse: collapse; }
   th { color: var(--color-muted); font-weight: 500; }
   td, th { font-variant-numeric: tabular-nums; }
@@ -59,16 +62,7 @@
 :where(main, h1, h2, h3)[tabindex='-1']:focus { outline: none; }
 
 @layer components {
-  .surface-panel { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); }
-  .input-field { @apply w-full px-4 py-2.5 rounded-control; min-height: 44px; border: 1px solid var(--color-control); background: var(--color-surface); color: var(--color-ink); transition: border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
-  .input-field:focus { border-color: var(--color-accent); }
-  .btn-primary, .btn-secondary { @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-control text-sm font-medium; min-height: 44px; transition: background-color var(--r-semantic-motion-hover), border-color var(--r-semantic-motion-hover); }
-  .btn-primary { background: var(--color-accent); color: var(--color-on-accent); border: 1px solid transparent; }
-  .btn-primary:hover { background: var(--color-accent-hover); }
-  .btn-secondary { background: var(--color-surface); color: var(--color-ink); border: 1px solid var(--color-control); }
-  .btn-secondary:hover { background: var(--color-subtle); }
-  .btn-primary:disabled, .btn-secondary:disabled { opacity: .55; }
-  .btn-danger { background: var(--color-danger); color: var(--color-on-danger); }
+  .surface-panel { background: var(--r-semantic-color-surface-group); border: 0; border-radius: var(--radius-panel); }
   .policy-tooltip { @apply pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-control px-3 py-2 text-xs leading-5 opacity-0; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); }
   .group:hover > .policy-tooltip, .group:focus-within > .policy-tooltip { opacity: 1; }
   .account-security-prompt, .account-security-prompt__panel { background: var(--color-surface); border-color: var(--color-line); }
@@ -95,18 +89,12 @@
 .epass-auth-panel { display: flex; flex-direction: column; justify-content: center; padding: 48px clamp(24px, 5vw, 80px); background: var(--color-surface); }
 .epass-auth-panel > div { width: 100%; max-width: 480px; margin-inline: auto; }
 .epass-auth-panel h1 { font-size: 36px; font-weight: 400; }
-.epass-auth-panel .btn-primary { min-height: 48px; font-size: 16px; font-weight: 500; padding-block: 12px; }
 .epass-auth-panel form { scroll-margin: 24px; }
 .epass-auth-field { display: grid; gap: 8px; }
 .epass-auth-field > label { font-size: 14px; font-weight: 500; }
-.epass-auth-field .input-field { min-height: 48px; }
-.epass-password-toggle { position: absolute; right: 4px; top: 2px; width: 44px; height: 44px; display: grid; place-items: center; color: var(--color-muted); border-radius: 8px; }
 .epass-methods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--color-line); gap: 4px; }
-.epass-methods button { min-height: 48px; border-bottom: 2px solid transparent; color: var(--color-muted); font-size: 14px; }
+.epass-methods button { border-bottom: 2px solid transparent; color: var(--color-muted); }
 .epass-methods button[aria-pressed='true'] { border-bottom-color: var(--color-accent); color: var(--color-accent); font-weight: 600; }
-.epass-theme { display: inline-flex; gap: 2px; padding: 4px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-canvas); }
-.epass-theme button { min-width: 36px; min-height: 36px; display: grid; place-items: center; border-radius: 4px; color: var(--color-muted); }
-.epass-theme button[aria-pressed='true'] { background: var(--color-accent-subtle); color: var(--color-accent); }
 .epass-motion { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-muted); min-height: 44px; }
 .epass-shell { min-height: 100dvh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
 .epass-sidebar { overflow-y: auto; position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; padding: 24px 20px; border-right: 1px solid var(--color-line); gap: 40px; }
@@ -131,10 +119,6 @@
 .epass-status { display: inline-flex; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .epass-status[data-ready='true'] { background: var(--color-success-subtle); color: var(--color-success); }
 .epass-status[data-ready='false'] { background: var(--color-warning-subtle); color: var(--color-warning); }
-.epass-select-list { position: fixed; margin: 0; padding: 4px; max-height: 300px; overflow: auto; border: 1px solid var(--color-control); border-radius: 8px; background: var(--color-surface); color: var(--color-ink); z-index: 150; box-shadow: var(--epass-elevation-overlay); }
-.epass-select-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; min-height: 44px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.epass-select-option[data-active='true'] { background: var(--color-accent-subtle); }
-.epass-select-option[aria-disabled='true'] { opacity: .5; cursor: not-allowed; }
 .epass-document { max-width: 76ch; margin: 48px auto; }
 .epass-document article { line-height: 1.9; }
 .epass-document h1 { font-size: clamp(32px, 4vw, 48px); }
@@ -149,7 +133,6 @@
 }
 @media (max-width: 640px) {
   .epass-auth-header, .epass-topbar { padding: 12px 16px; gap: 8px; }
-  .epass-theme button { min-width: 28px; min-height: 36px; }
   .epass-auth-panel { padding: 40px 20px; }
   .epass-auth-panel h1 { font-size: 32px; }
   .epass-footer { padding: 24px 20px; }
@@ -170,7 +153,7 @@ html[data-reduce-motion='true'] *, html[data-reduce-motion='true'] *::before, ht
 .epass-docs-content .surface-panel { background: transparent; border: 0; border-top: 1px solid var(--color-line); border-radius: 0; padding: 32px 0; }
 .epass-docs-content p { max-width: 75ch; }
 .epass-docs-content h2 { font: 400 28px/1.4 var(--font-editorial); }
-.epass-settings-form > .grid > section, .epass-settings-form > section { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); padding: 24px; }
+.epass-settings-form > .grid > section, .epass-settings-form > section { background: var(--r-semantic-color-surface-group); border: 0; border-radius: var(--radius-panel); padding: 24px; }
 .epass-methods button[aria-pressed='true'] { background: transparent; }
 @media (max-width: 900px) { .epass-docs-shell { grid-template-columns: 1fr; padding: 24px 20px; gap: 32px; } .epass-docs-nav { position: static; display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--color-line); } .epass-docs-nav > p { width: 100%; margin-bottom: 8px; } }
 .epass-help summary { display: inline-flex; align-items: center; cursor: pointer; list-style: none; min-height: 24px; color: var(--color-muted); }
@@ -182,17 +165,7 @@ html[data-reduce-motion='true'] *, html[data-reduce-motion='true'] *::before, ht
 .epass-methods { position: relative; }
 .epass-methods button[aria-pressed='true'] { border-bottom-color: transparent; }
 .epass-selection-indicator { position: absolute; left: 0; top: 0; height: 2px; background: var(--color-accent); pointer-events: none; transition: transform var(--r-semantic-motion-fast) var(--r-semantic-motion-standard), width var(--r-semantic-motion-fast) var(--r-semantic-motion-standard); }
-.transition-colors, .epass-methods button, .epass-nav-item, .epass-theme button { transition: color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
-button.btn-primary, button.btn-secondary { transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), transform var(--r-semantic-motion-press) var(--r-semantic-motion-standard); }
-button.btn-primary:active:not(:disabled), button.btn-secondary:active:not(:disabled) { transform: scale(.98); }
-[role='combobox'] > svg { transition: transform var(--r-semantic-motion-fast) var(--r-semantic-motion-standard); }
-[role='combobox'][aria-expanded='true'] > svg { transform: rotate(180deg); }
-.epass-select-list { --epass-popup-offset: var(--r-semantic-motion-distance-small); opacity: 1; transform: none; transition: opacity var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance), transform var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance); }
-.epass-select-list[data-side='above'] { --epass-popup-offset: calc(-1 * var(--r-semantic-motion-distance-small)); }
-.epass-select-list[data-motion-state='exiting'] { opacity: 0; transform: translateY(var(--epass-popup-offset)); transition-duration: var(--r-semantic-motion-exit); transition-timing-function: var(--r-semantic-motion-exit-ease); pointer-events: none; }
-@starting-style {
-  .epass-select-list { opacity: 0; transform: translateY(var(--epass-popup-offset)); }
-}
+.transition-colors, .epass-methods button, .epass-nav-item { transition: color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), border-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
 @supports (interpolate-size: allow-keywords) {
   details { interpolate-size: allow-keywords; }
   details::details-content { block-size: 0; overflow: clip; transition: block-size var(--r-semantic-motion-settle) var(--r-semantic-motion-standard), content-visibility var(--r-semantic-motion-settle) allow-discrete; }
@@ -213,7 +186,6 @@ main { view-transition-name: epass-page; }
 @keyframes epass-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 html[data-reduce-motion='true']::view-transition-new(*) { animation: none !important; }
 @media (prefers-reduced-motion: reduce) { ::view-transition-new(*) { animation: none !important; } }
-.epass-select-option { transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard); }
 .epass-notice { position: fixed; inset: auto max(16px, env(safe-area-inset-right)) auto auto; top: max(16px, env(safe-area-inset-top)); width: max-content; max-width: min(420px, calc(100vw - 32px)); margin: 0; z-index: 200; pointer-events: none; overflow-wrap: anywhere; box-shadow: var(--epass-elevation-overlay); opacity: 1; transition: opacity var(--r-semantic-motion-enter) var(--r-semantic-motion-entrance); }
 .epass-notice::backdrop { background: transparent; pointer-events: none; }
 .epass-notice[data-motion-state='exiting'] { opacity: 0; pointer-events: none; transition-duration: var(--r-semantic-motion-exit); transition-timing-function: var(--r-semantic-motion-exit-ease); }
@@ -221,19 +193,12 @@ html[data-reduce-motion='true']::view-transition-new(*) { animation: none !impor
 .epass-segments { border-bottom: 0; gap: 8px; }
 .epass-segments button { border: 1px solid var(--color-control); border-radius: var(--radius-control); }
 .epass-segments button[aria-pressed='true'] { border-color: var(--color-accent); background: var(--color-accent-subtle); }
-.epass-setting-row button:active:not(:disabled), table button:active:not(:disabled) { transform: none; }
 
 :root { --epass-elevation-overlay: 0 24px 80px color-mix(in srgb, var(--r-semantic-color-overlay) 24%, transparent); }
 
 /* Task pages share the same paper, type scale, spacing and control semantics. */
-.epass-password-checks { display: grid; gap: 8px; padding: 0; margin: 12px 0 0; list-style: none; font-size: 14px; line-height: 20px; color: var(--color-muted); }
-.epass-password-checks li { display: flex; align-items: flex-start; gap: 8px; }
-.epass-password-checks svg { flex: 0 0 16px; margin-top: 2px; }
-.epass-password-checks li[data-passed='true'] { color: var(--color-accent); }
-.epass-password-status { min-height: 24px; margin: 12px 0 8px; font-size: 14px; line-height: 24px; }
-.input-field[aria-invalid='true'] { border-color: var(--color-danger); }
 .epass-section-title { font: 400 24px/1.4 var(--font-editorial); color: var(--color-ink); }
-.epass-settings-section { display: grid; gap: 24px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); padding: 24px; }
+.epass-settings-section { display: grid; gap: 24px; background: var(--r-semantic-color-surface-group); border: 0; border-radius: var(--radius-panel); padding: 24px; }
 .epass-settings-section > button { justify-self: start; }
 .epass-toggle-row { display: flex; align-items: flex-start; gap: 24px; justify-content: space-between; padding: 20px; border: 1px solid var(--color-line); border-radius: var(--radius-control); background: var(--color-canvas); }
 .epass-compact-methods { display: flex; flex-wrap: wrap; gap: 0; width: fit-content; max-width: 100%; }
@@ -273,8 +238,6 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 /* Forma owns control and overlay appearance; Epass owns task composition. */
 .rm-theme { min-height: 100dvh; font: 16px/1.75 var(--font-sans); }
 .rm-field > label:empty { display: none; }
-.rm-field { gap: 8px; }
-.epass-auth-field .rm-field { display: contents; }
 .epass-auth-field .rm-field > label:empty { display: none; }
 .rm-check { align-items: center; }
 .rm-check input { flex-shrink: 0; }
@@ -292,16 +255,10 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 .epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-sans); font-weight: 500; }
 .forma-dialog { margin: auto; width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: var(--r-semantic-radius-dialog); }
 .epass-icon-danger { --rm-ink: var(--color-danger); --rm-control: var(--color-danger); }
-.rm-button[data-variant='danger']:disabled { --rm-on-danger: var(--color-danger); background: var(--color-danger-subtle); border-color: var(--color-danger); opacity: 1; }
 .forma-dialog > header h2 { font: 500 20px/1.5 var(--font-sans); }
 .forma-dialog > footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
 .forma-dialog.epass-dialog-navigation { width: min(336px, calc(100vw - 32px)); height: 100dvh; max-height: 100dvh; margin: 0 0 0 auto; border-radius: 20px 0 0 20px; }
-.epass-theme .rm-button { min-width: 44px; padding-inline: 10px; }
 .epass-methods .rm-button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; }
-.epass-segments .rm-button { border: 1px solid var(--color-control); border-radius: 8px; }
-.epass-methods .rm-button[aria-pressed='true'] { color: var(--color-accent) !important; }
-.epass-password-toggle.rm-button { min-width: 44px; padding: 0; }
-.epass-password-checks li[data-passed='true'] { color: var(--color-success); }
 @media (max-width: 640px) {
   .epass-brand { --brand-height: 48px; }
   .epass-brand--compact .epass-brand-short { display: none; }
@@ -320,3 +277,49 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 .epass-legal-check > span { padding-top: 10px; }
 .epass-legal-check .rm-check > span:last-child:empty { display: none; }
 .epass-brand-emblem > svg { margin-left: -10px; }
+
+/* Forma 1.3: product layout only; the SDK owns field outlines and control motion. */
+:root { --epass-page-gutter: 40px; --epass-topbar-height: 76px; }
+.input-field { width: 100%; }
+:where(a.btn-primary, a.btn-secondary) { display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:10px 15px;border-radius:8px;font:500 13px/1.4 var(--font-sans);text-decoration:none;background:var(--r-semantic-color-primary);color:var(--r-semantic-color-on-primary); }
+a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-semantic-color-ink); }
+.epass-shell { background:var(--r-semantic-color-canvas); }
+.epass-sidebar { padding-top:0;background:var(--r-semantic-color-surface-navigation);color:var(--r-semantic-color-on-navigation);border:0;overscroll-behavior-y:contain;scrollbar-width:none; }
+.epass-sidebar::-webkit-scrollbar { display:none; }
+.epass-sidebar > .epass-brand { min-height:76px; }
+:is(.epass-sidebar,.epass-dialog-navigation) .epass-nav-group,:is(.epass-sidebar,.epass-dialog-navigation) .epass-nav-item { color:var(--r-semantic-color-navigation-muted); }
+:is(.epass-sidebar,.epass-dialog-navigation) .epass-nav-item:hover { background:color-mix(in srgb,var(--r-semantic-color-on-navigation) 7%,transparent); }
+:is(.epass-sidebar,.epass-dialog-navigation) .epass-nav-item[aria-current='page'] { background:var(--r-semantic-color-navigation-active);color:var(--r-semantic-color-on-navigation-active);border:0; }
+.epass-topbar { position:sticky;top:0;z-index:30;height:var(--epass-topbar-height);min-height:var(--epass-topbar-height);flex-shrink:0;background:var(--r-semantic-color-surface-topbar);color:var(--r-semantic-color-on-topbar);border:0;padding-inline:max(var(--epass-page-gutter),calc((100% - 1480px)/2 + var(--epass-page-gutter))); }
+.epass-topbar .text-muted { color:var(--r-semantic-color-on-topbar-muted); }
+.epass-topbar .text-ink { color:var(--r-semantic-color-on-topbar); }
+.epass-workspace,.epass-user-main { max-width:1480px;padding-inline:var(--epass-page-gutter); }
+.epass-footer { padding-inline:max(var(--epass-page-gutter),calc((100% - 1480px)/2 + var(--epass-page-gutter))); }
+.epass-auth-header { min-height:76px;height:76px;padding-block:6px;background:var(--r-semantic-color-surface-topbar);border:0; }
+.epass-auth-brand { border:0; }
+.epass-auth-panel { background:var(--r-semantic-color-surface-group); }
+.epass-theme-toggle.rm-icon-button { min-width:44px;min-height:44px; }
+.epass-auth-field > .rm-field { min-width:0; }
+.epass-new-password { position:relative; }
+.epass-new-password .rm-input { padding-right:56px; }
+.epass-password-visibility.rm-button { position:absolute;right:2px;top:calc(13px * 1.4 + 8px);width:44px;height:44px;min-height:44px;padding:0; }
+.epass-table .rm-table-wrap { max-width:100%;overscroll-behavior-x:contain; }
+.epass-table .rm-table { min-width:760px; }
+.epass-table caption { text-align:start; }
+.epass-segments { padding:4px;gap:4px;background:var(--r-semantic-color-surface-inset);border-radius:12px; }
+.epass-segments .rm-button { border:0;border-radius:8px; }
+.epass-segments .rm-button[aria-pressed='true'] { background:var(--r-semantic-color-secondary-container);color:var(--r-semantic-color-on-secondary-container) !important; }
+.forma-dialog.epass-dialog-navigation { inset:76px 0 0 auto;margin:0;height:calc(100dvh - 76px);max-height:calc(100dvh - 76px);background:var(--r-semantic-color-surface-navigation);color:var(--r-semantic-color-on-navigation); }
+@media(max-width:1023px) { :root { --epass-page-gutter:24px; } }
+@media(max-width:640px) { :root { --epass-page-gutter:16px; } a.btn-primary,a.btn-secondary { min-height:44px; } }
+
+.forma-dialog { background:var(--r-semantic-color-surface-floating); }
+
+/* Root locking preserves the sticky topbar; internal tables/code keep scrollbars. */
+@media(min-width:1024px) { html { scrollbar-width:none; } html::-webkit-scrollbar { display:none; } }
+
+/* SDK 0.5 wraps button content to animate intrinsic width. Layout targets it. */
+.rm-theme .epass-user-identity.rm-button > .rm-button-content { display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:100%;white-space:normal;overflow-wrap:anywhere; }
+.epass-table td:first-child { min-width:220px; }
+
+:is(.epass-topbar,.epass-auth-header) .epass-theme-toggle { background:var(--r-semantic-color-topbar-control);color:var(--r-semantic-color-on-topbar) !important; }

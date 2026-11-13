@@ -41,6 +41,7 @@ dist/
 # Library package lockfiles are local resolver output. The server application
 # lockfile remains tracked for reproducible production builds.
 packages/rosm_passport_flutter/pubspec.lock
+packages/rosm_passport_flutter/vendor/rosemary_ui/pubspec.lock
 
 # Local runtime/artifacts
 .local/

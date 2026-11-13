@@ -1,3 +1,4 @@
+import 'package:rosm_passport_flutter/src/forma_controls.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -27,18 +28,18 @@ void main() {
       await tester.pumpAndSettle();
       await _tapVisible(tester, find.text('立即注册'));
       await _tapVisible(tester, find.text('接受并继续'));
-      expect(find.text('不少于 8 个字符'), findsOneWidget);
+      expect(find.text('8–32 个字符'), findsOneWidget);
       final action = find.byWidgetPredicate(
         (w) => w is RosemaryButton && w.label == '注册并继续  →',
       );
       expect(tester.widget<RosemaryButton>(action).onPressed, isNull);
       await tester.enterText(_field('设置密码'), 'aBcDeFgH');
       await tester.pump();
-      expect(find.text('字母、数字、符号中至少包含两种。'), findsOneWidget);
+      expect(find.text('字母、数字、英文符号中至少包含两类'), findsOneWidget);
       expect(tester.widget<RosemaryButton>(action).onPressed, isNull);
       await tester.enterText(_field('设置密码'), 'orchid-willow');
       await tester.pump();
-      expect(find.text('已满足密码要求。'), findsOneWidget);
+      expect(const RosmPasswordPolicy().evaluate('orchid-willow').ok, isTrue);
       expect(tester.widget<RosemaryButton>(action).onPressed, isNotNull);
       expect(requests.where((r) => r.url.path.endsWith('/register')), isEmpty);
       expect(tester.takeException(), isNull);
@@ -232,10 +233,7 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 Finder _field(String label) => find.descendant(
   of: find.byWidgetPredicate(
     (widget) =>
-        (widget is RosemaryInput && widget.label == label) ||
-        (widget is TextField &&
-            (widget.decoration?.labelText == label ||
-                widget.decoration?.hintText == label)),
+        widget is RosmEpassInput && widget.decoration.labelText == label,
   ),
   matching: find.byType(EditableText),
 );

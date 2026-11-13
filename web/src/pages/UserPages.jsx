@@ -113,7 +113,7 @@ function StepUpFields({ methods, excludedFactor, value, onChange, sendStepUpCode
         <FormaButton className="btn-secondary w-full" type="button" disabled={busy} onClick={() => void handleAction()}>{value.response ? '通行密钥已验证' : busy ? '等待系统验证...' : '使用通行密钥验证'}</FormaButton>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <FormaInput aria-label="身份验证码" autoComplete="one-time-code" className="input-field" inputMode="numeric" placeholder="输入验证码" value={value.code || ''} onChange={(event) => onChange({ ...value, method: selected, code: event.target.value.replace(/\D/g, '') })} />
+          <FormaInput aria-label="身份验证码" autoComplete="one-time-code" className="input-field" inputMode="numeric" placeholder="输入验证码" value={value.code || ''} onChange={(event) => onChange({ ...value, method: selected, code: event.target.value })} />
           {selected !== 'authenticator' ? <FormaButton className="btn-secondary" type="button" disabled={busy} onClick={() => void handleAction()}>{busy ? '发送中...' : '发送'}</FormaButton> : null}
         </div>
       )}
@@ -483,13 +483,11 @@ export function UserAccountPage({
           }
         >
           <div className="space-y-2">
-            <label htmlFor="epass-userpages-field-1" className="text-sm font-bold text-ink">新邮箱</label>
-            <FormaInput id="epass-userpages-field-1" className="input-field" type="email" value={bindForm.email} onChange={(event) => setBindForm((current) => ({ ...current, email: event.target.value }))} />
+            <FormaInput label="新邮箱" id="epass-userpages-field-1" className="input-field" type="email" value={bindForm.email} onChange={(event) => setBindForm((current) => ({ ...current, email: event.target.value }))} />
           </div>
           <StepUpFields methods={stepUpMethods} excludedFactor="email" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
-            <label htmlFor="epass-userpages-field-2" className="text-sm font-bold text-ink">邮箱验证码</label>
-            <FormaInput id="epass-userpages-field-2" className="input-field" value={bindForm.email_code} onChange={(event) => setBindForm((current) => ({ ...current, email_code: event.target.value }))} />
+            <FormaInput label="邮箱验证码" id="epass-userpages-field-2" className="input-field" value={bindForm.email_code} onChange={(event) => setBindForm((current) => ({ ...current, email_code: event.target.value }))} />
           </div>
           <p className="text-xs text-muted">发送成功后，这个邮箱会进入共享发码冷却；在倒计时结束前不能再次发送。</p>
           {bindError ? <p className="text-sm text-danger">{bindError}</p> : null}
@@ -516,13 +514,11 @@ export function UserAccountPage({
           }
         >
           <div className="space-y-2">
-            <label htmlFor="epass-userpages-field-3" className="text-sm font-bold text-ink">手机号</label>
-            <FormaInput id="epass-userpages-field-3" className="input-field" value={bindPhoneForm.phone_number} onChange={(event) => setBindPhoneForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))} />
+            <FormaInput label="手机号" id="epass-userpages-field-3" className="input-field" value={bindPhoneForm.phone_number} onChange={(event) => setBindPhoneForm((current) => ({ ...current, phone_number: event.target.value }))} />
           </div>
           <StepUpFields methods={stepUpMethods} excludedFactor="phone" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           <div className="space-y-2">
-            <label htmlFor="epass-userpages-field-4" className="text-sm font-bold text-ink">短信验证码</label>
-            <FormaInput id="epass-userpages-field-4" className="input-field" value={bindPhoneForm.verify_code} onChange={(event) => setBindPhoneForm((current) => ({ ...current, verify_code: event.target.value.replace(/\D/g, '') }))} />
+            <FormaInput label="短信验证码" id="epass-userpages-field-4" className="input-field" value={bindPhoneForm.verify_code} onChange={(event) => setBindPhoneForm((current) => ({ ...current, verify_code: event.target.value }))} />
           </div>
           {bindPhoneError ? <p className="text-sm text-danger">{bindPhoneError}</p> : null}
         </Modal>
@@ -640,7 +636,7 @@ export function UserAccountPage({
           <StepUpFields methods={stepUpMethods} excludedFactor="authenticator" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           {authenticatorSecret ? (
             <div className="space-y-4 rounded-panel border border-line bg-canvas p-4">
-              {authenticatorQrDataUrl ? <img src={authenticatorQrDataUrl} alt="Authenticator QR" className="aspect-square h-auto w-40 max-w-full rounded-control border border-line bg-surface p-2" /> : null}
+              {authenticatorQrDataUrl ? <img src={authenticatorQrDataUrl} alt="Authenticator QR" className="aspect-square h-auto w-40 max-w-full rounded-control bg-group p-2" /> : null}
               <div className="space-y-1 text-sm text-muted">
                 <p className="font-semibold text-ink">手动输入密钥</p>
                 <p className="break-all font-mono text-xs text-ink">{authenticatorSecret}</p>
@@ -649,8 +645,7 @@ export function UserAccountPage({
           ) : null}
           {authenticatorSecret ? (
             <div className="space-y-2">
-              <label htmlFor="epass-userpages-field-6" className="text-sm font-bold text-ink">Authenticator 动态验证码</label>
-              <FormaInput id="epass-userpages-field-6" className="input-field" inputMode="numeric" value={authenticatorForm.code} onChange={(event) => setAuthenticatorForm((current) => ({ ...current, code: event.target.value.replace(/\D/g, '') }))} />
+              <FormaInput label="Authenticator 动态验证码" id="epass-userpages-field-6" className="input-field" inputMode="numeric" value={authenticatorForm.code} onChange={(event) => setAuthenticatorForm((current) => ({ ...current, code: event.target.value }))} />
             </div>
           ) : null}
           {authenticatorError ? <p className="text-sm text-danger">{authenticatorError}</p> : null}

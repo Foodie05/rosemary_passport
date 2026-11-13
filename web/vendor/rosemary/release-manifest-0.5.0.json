@@ -1,0 +1,334 @@
+{
+  "version": "0.5.0",
+  "specification": "1.3.0",
+  "repo": "Foodie05/Rosemary-Design-System",
+  "head": "340d2f4531ea0f1e16d62537b02124e5823d8fa2",
+  "assembledUTC": "2026-11-13T12:57:25.462Z",
+  "canonicalSource": {
+    "android": "api36",
+    "flutter": "linux-web-android"
+  },
+  "runs": [
+    {
+      "workflow": "sdk-web.yml",
+      "id": 43427036888,
+      "attempt": 1,
+      "url": "https://github.com/Foodie05/Rosemary-Design-System/actions/runs/43427036888",
+      "head": "340d2f4531ea0f1e16d62537b02124e5823d8fa2",
+      "artifacts": [
+        {
+          "id": 14037477610,
+          "name": "rosemary-sdk-web-0.5.0",
+          "githubDigest": "sha256:ba2be9238c65d5aac48e23f4493dabc1c2a1665b3e4289ad0489d1e08b2bfc62",
+          "packages": [
+            {
+              "path": "react/rosemary-ui-react-0.5.0.tgz",
+              "sha256": "510648930e361e7bfd17059440116a0d5498cef9f98f01ef3ae6f6ccffe4c663"
+            },
+            {
+              "path": "shared/rosemary-ui-icons-0.5.0.tgz",
+              "sha256": "18e116859712535bf8ea115a289c95b8a38d06a375c925fc3a275a6689f1a68c"
+            },
+            {
+              "path": "shared/rosemary-ui-tokens-0.5.0.tgz",
+              "sha256": "d8e5a5b65de356a7f3672894d7e4ba0729de8b5eaca31ffdd451a8e63cb61818"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": "sdk-android.yml",
+      "id": 43427091421,
+      "attempt": 1,
+      "url": "https://github.com/Foodie05/Rosemary-Design-System/actions/runs/43427091421",
+      "head": "340d2f4531ea0f1e16d62537b02124e5823d8fa2",
+      "artifacts": [
+        {
+          "id": 14038352941,
+          "name": "rosemary-compose-0.5.0-api26",
+          "githubDigest": "sha256:729a036e9e4613b4c655365a9fcdc707bd5289e7993624905628979f45125361",
+          "packages": [
+            {
+              "path": ".sdk-artifacts/android/maven/design/rosemary/rosemary-compose/0.5.0/rosemary-compose-0.5.0-sources.jar",
+              "sha256": "c7c2b6cba8c011a9df05600812f1d3fec19a7cb1010480a68490ed64845564d8"
+            },
+            {
+              "path": ".sdk-artifacts/android/maven/design/rosemary/rosemary-compose/0.5.0/rosemary-compose-0.5.0.aar",
+              "sha256": "a1b308303ba563a5824d4773ad1bed95ce6a57dcddf06b8303a542590fdcc45d"
+            },
+            {
+              "path": ".sdk-artifacts/android/rosemary-compose-0.5.0-maven.zip",
+              "sha256": "d1b3c4a60f5d5810216adb24b54f97bb1582b55bb7590b90ac3fef32a2fd881c"
+            },
+            {
+              "path": ".sdk-artifacts/android/rosemary-compose-sample-0.5.0.apk",
+              "sha256": "11289020fe6d69c451767211fc684b750b564b6bbb899790a5bbefb28ca36123"
+            },
+            {
+              "path": ".sdk-build/android/rosemary-compose/outputs/aar/rosemary-compose-release.aar",
+              "sha256": "a1b308303ba563a5824d4773ad1bed95ce6a57dcddf06b8303a542590fdcc45d"
+            }
+          ]
+        },
+        {
+          "id": 14037873488,
+          "name": "rosemary-compose-0.5.0-api36",
+          "githubDigest": "sha256:8f30aed25f5c7f1da9e2ec46bc5476820b8c46e284fabcb68a729cb1ec69fc05",
+          "packages": [
+            {
+              "path": ".sdk-artifacts/android/maven/design/rosemary/rosemary-compose/0.5.0/rosemary-compose-0.5.0-sources.jar",
+              "sha256": "c7c2b6cba8c011a9df05600812f1d3fec19a7cb1010480a68490ed64845564d8"
+            },
+            {
+              "path": ".sdk-artifacts/android/maven/design/rosemary/rosemary-compose/0.5.0/rosemary-compose-0.5.0.aar",
+              "sha256": "a1b308303ba563a5824d4773ad1bed95ce6a57dcddf06b8303a542590fdcc45d"
+            },
+            {
+              "path": ".sdk-artifacts/android/rosemary-compose-0.5.0-maven.zip",
+              "sha256": "3d50331d151bdb0d632d18deabe3f9bc9f97baab53509f3ccd4a05f2e817514e"
+            },
+            {
+              "path": ".sdk-artifacts/android/rosemary-compose-sample-0.5.0.apk",
+              "sha256": "b6b594b72539c7862bc608bef3d99521b0fa79aba295a02474198660ee52f85c"
+            },
+            {
+              "path": ".sdk-build/android/rosemary-compose/outputs/aar/rosemary-compose-release.aar",
+              "sha256": "a1b308303ba563a5824d4773ad1bed95ce6a57dcddf06b8303a542590fdcc45d"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": "sdk-swiftui.yml",
+      "id": 43427096235,
+      "attempt": 1,
+      "url": "https://github.com/Foodie05/Rosemary-Design-System/actions/runs/43427096235",
+      "head": "340d2f4531ea0f1e16d62537b02124e5823d8fa2",
+      "artifacts": [
+        {
+          "id": 14039000204,
+          "name": "rosemary-swiftui-0.5.0",
+          "githubDigest": "sha256:d21085431b53b0db9dffd7bf9a01119fd5663585fa7522064a38629cc4e702cf",
+          "packages": [
+            {
+              "path": "RosemarySample-0.5.0-simulator.zip",
+              "sha256": "4c5c0f478e373543d60896f454663558eb75efdefea843e694489354c27e5c75"
+            },
+            {
+              "path": "RosemaryUI-0.5.0-source.tar.gz",
+              "sha256": "fdbf99221942f3600d44f938d12d84fc5c2cc8df315baf825d9553be826e3a87"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "workflow": "sdk-flutter.yml",
+      "id": 43427101618,
+      "attempt": 1,
+      "url": "https://github.com/Foodie05/Rosemary-Design-System/actions/runs/43427101618",
+      "head": "340d2f4531ea0f1e16d62537b02124e5823d8fa2",
+      "artifacts": [
+        {
+          "id": 14037874259,
+          "name": "rosemary-flutter-0.5.0-linux-web-android",
+          "githubDigest": "sha256:2a1df812a3a4d1555402c29feaac7b348ee9ae5c90c964928a2fdee092e6ec23",
+          "packages": [
+            {
+              "path": "rosemary-flutter-0.5.0-android.apk",
+              "sha256": "bc8cf29bfefa812ff00529441ea8c92e6aa78ebbb309d734761cc3f435d6914b"
+            },
+            {
+              "path": "rosemary-flutter-0.5.0-linux.tar.gz",
+              "sha256": "bd57b7e5f1103b4065f4a91609289901b9627b10acfc53c39b61371f245de6f0"
+            },
+            {
+              "path": "rosemary-flutter-0.5.0-web.zip",
+              "sha256": "e5d47d29ad8fced9507d526a0c0b98ba731844f52dc52cfc28076ac2ab0cb8b5"
+            },
+            {
+              "path": "rosemary-ui-0.5.0-source.tar.gz",
+              "sha256": "b179c3f464f60a26a5a9d0c819b09ac68bf0f7c5ee570bd0a74e12c8eb9ffd38"
+            }
+          ]
+        },
+        {
+          "id": 14037798986,
+          "name": "rosemary-flutter-0.5.0-macos-ios",
+          "githubDigest": "sha256:659ffd8a5d99b0a9ad510319a8347b5fb26f9ef221c6a68d5ca2b0584e6554f7",
+          "packages": [
+            {
+              "path": "rosemary-flutter-0.5.0-ios-simulator.zip",
+              "sha256": "222c2385cf023178d3191a43988ddfff45f640c055de1dbbe5509c996c5d07fb"
+            },
+            {
+              "path": "rosemary-flutter-0.5.0-macos.zip",
+              "sha256": "6c5982020aa1be5bbd776c47c9eae191ceb2abc34097f1c488d1c1ad575bbbb9"
+            },
+            {
+              "path": "rosemary-ui-0.5.0-source.tar.gz",
+              "sha256": "c0cc07a549aec4b1d0bb9fcf97683acce2199674beda00923b6ca7ec595ac322"
+            }
+          ]
+        },
+        {
+          "id": 14038567143,
+          "name": "rosemary-flutter-0.5.0-windows",
+          "githubDigest": "sha256:2d5be0eaaeb4a0981f50fff5a9c98bec2268fc20c7d19979bbb3a2c3b9cf5633",
+          "packages": [
+            {
+              "path": "rosemary-flutter-0.5.0-windows.zip",
+              "sha256": "cebef39f50b865ca35bd69c6a02e58ecd4b6c8563760aa360309212aa5509c91"
+            },
+            {
+              "path": "rosemary-ui-0.5.0-source.tar.gz",
+              "sha256": "57eb5a4e3c1c50e4e47b7538b439ddf3e8ee62e6424ff09478c0191d901d71df"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "name": "rosemary-ui-tokens-0.5.0.tgz",
+      "sha256": "d8e5a5b65de356a7f3672894d7e4ba0729de8b5eaca31ffdd451a8e63cb61818",
+      "artifactID": 14037477610,
+      "runID": 43427036888
+    },
+    {
+      "name": "rosemary-ui-icons-0.5.0.tgz",
+      "sha256": "18e116859712535bf8ea115a289c95b8a38d06a375c925fc3a275a6689f1a68c",
+      "artifactID": 14037477610,
+      "runID": 43427036888
+    },
+    {
+      "name": "rosemary-ui-react-0.5.0.tgz",
+      "sha256": "510648930e361e7bfd17059440116a0d5498cef9f98f01ef3ae6f6ccffe4c663",
+      "artifactID": 14037477610,
+      "runID": 43427036888
+    },
+    {
+      "name": "evidence-rosemary-sdk-web-0.5.0.zip",
+      "sha256": "ba2be9238c65d5aac48e23f4493dabc1c2a1665b3e4289ad0489d1e08b2bfc62",
+      "artifactID": 14037477610,
+      "runID": 43427036888
+    },
+    {
+      "name": "evidence-rosemary-compose-0.5.0-api26.zip",
+      "sha256": "729a036e9e4613b4c655365a9fcdc707bd5289e7993624905628979f45125361",
+      "artifactID": 14038352941,
+      "runID": 43427091421
+    },
+    {
+      "name": "rosemary-compose-0.5.0-maven.zip",
+      "sha256": "3d50331d151bdb0d632d18deabe3f9bc9f97baab53509f3ccd4a05f2e817514e",
+      "artifactID": 14037873488,
+      "runID": 43427091421
+    },
+    {
+      "name": "rosemary-compose-0.5.0.aar",
+      "sha256": "a1b308303ba563a5824d4773ad1bed95ce6a57dcddf06b8303a542590fdcc45d",
+      "artifactID": 14037873488,
+      "runID": 43427091421
+    },
+    {
+      "name": "rosemary-compose-0.5.0-sources.jar",
+      "sha256": "c7c2b6cba8c011a9df05600812f1d3fec19a7cb1010480a68490ed64845564d8",
+      "artifactID": 14037873488,
+      "runID": 43427091421
+    },
+    {
+      "name": "rosemary-compose-sample-0.5.0.apk",
+      "sha256": "b6b594b72539c7862bc608bef3d99521b0fa79aba295a02474198660ee52f85c",
+      "artifactID": 14037873488,
+      "runID": 43427091421
+    },
+    {
+      "name": "evidence-rosemary-compose-0.5.0-api36.zip",
+      "sha256": "8f30aed25f5c7f1da9e2ec46bc5476820b8c46e284fabcb68a729cb1ec69fc05",
+      "artifactID": 14037873488,
+      "runID": 43427091421
+    },
+    {
+      "name": "RosemaryUI-0.5.0-source.tar.gz",
+      "sha256": "fdbf99221942f3600d44f938d12d84fc5c2cc8df315baf825d9553be826e3a87",
+      "artifactID": 14039000204,
+      "runID": 43427096235
+    },
+    {
+      "name": "RosemarySample-0.5.0-simulator.zip",
+      "sha256": "4c5c0f478e373543d60896f454663558eb75efdefea843e694489354c27e5c75",
+      "artifactID": 14039000204,
+      "runID": 43427096235
+    },
+    {
+      "name": "evidence-rosemary-swiftui-0.5.0.zip",
+      "sha256": "d21085431b53b0db9dffd7bf9a01119fd5663585fa7522064a38629cc4e702cf",
+      "artifactID": 14039000204,
+      "runID": 43427096235
+    },
+    {
+      "name": "rosemary-ui-0.5.0-source.tar.gz",
+      "sha256": "b179c3f464f60a26a5a9d0c819b09ac68bf0f7c5ee570bd0a74e12c8eb9ffd38",
+      "artifactID": 14037874259,
+      "runID": 43427101618
+    },
+    {
+      "name": "rosemary-flutter-0.5.0-linux.tar.gz",
+      "sha256": "bd57b7e5f1103b4065f4a91609289901b9627b10acfc53c39b61371f245de6f0",
+      "artifactID": 14037874259,
+      "runID": 43427101618
+    },
+    {
+      "name": "rosemary-flutter-0.5.0-web.zip",
+      "sha256": "e5d47d29ad8fced9507d526a0c0b98ba731844f52dc52cfc28076ac2ab0cb8b5",
+      "artifactID": 14037874259,
+      "runID": 43427101618
+    },
+    {
+      "name": "rosemary-flutter-0.5.0-android.apk",
+      "sha256": "bc8cf29bfefa812ff00529441ea8c92e6aa78ebbb309d734761cc3f435d6914b",
+      "artifactID": 14037874259,
+      "runID": 43427101618
+    },
+    {
+      "name": "evidence-rosemary-flutter-0.5.0-linux-web-android.zip",
+      "sha256": "2a1df812a3a4d1555402c29feaac7b348ee9ae5c90c964928a2fdee092e6ec23",
+      "artifactID": 14037874259,
+      "runID": 43427101618
+    },
+    {
+      "name": "rosemary-flutter-0.5.0-macos.zip",
+      "sha256": "6c5982020aa1be5bbd776c47c9eae191ceb2abc34097f1c488d1c1ad575bbbb9",
+      "artifactID": 14037798986,
+      "runID": 43427101618
+    },
+    {
+      "name": "rosemary-flutter-0.5.0-ios-simulator.zip",
+      "sha256": "222c2385cf023178d3191a43988ddfff45f640c055de1dbbe5509c996c5d07fb",
+      "artifactID": 14037798986,
+      "runID": 43427101618
+    },
+    {
+      "name": "evidence-rosemary-flutter-0.5.0-macos-ios.zip",
+      "sha256": "659ffd8a5d99b0a9ad510319a8347b5fb26f9ef221c6a68d5ca2b0584e6554f7",
+      "artifactID": 14037798986,
+      "runID": 43427101618
+    },
+    {
+      "name": "rosemary-flutter-0.5.0-windows.zip",
+      "sha256": "cebef39f50b865ca35bd69c6a02e58ecd4b6c8563760aa360309212aa5509c91",
+      "artifactID": 14038567143,
+      "runID": 43427101618
+    },
+    {
+      "name": "evidence-rosemary-flutter-0.5.0-windows.zip",
+      "sha256": "2d5be0eaaeb4a0981f50fff5a9c98bec2268fc20c7d19979bbb3a2c3b9cf5633",
+      "artifactID": 14038567143,
+      "runID": 43427101618
+    }
+  ]
+}

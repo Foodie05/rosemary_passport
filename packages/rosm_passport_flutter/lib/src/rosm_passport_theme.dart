@@ -28,73 +28,54 @@ ThemeData buildRosmPassportTheme(
   final surface = dark
       ? RosmEpassDarkTokens.surface
       : RosmEpassLightTokens.surface;
-  final subtle = dark
-      ? RosmEpassDarkTokens.surfaceSubtle
-      : RosmEpassLightTokens.surfaceSubtle;
   final ink = dark ? RosmEpassDarkTokens.text : RosmEpassLightTokens.text;
   final muted = dark
       ? RosmEpassDarkTokens.textSecondary
       : RosmEpassLightTokens.textSecondary;
-  final border = dark
-      ? RosmEpassDarkTokens.border
-      : RosmEpassLightTokens.border;
   final control = dark
       ? RosmEpassDarkTokens.borderControl
       : RosmEpassLightTokens.borderControl;
-  final scheme =
-      ColorScheme.fromSeed(seedColor: primary, brightness: brightness).copyWith(
-        primary: primary,
-        onPrimary: dark
-            ? RosmEpassDarkTokens.onAccent
-            : RosmEpassLightTokens.onAccent,
-        primaryContainer: dark
-            ? RosmEpassDarkTokens.accentSubtle
-            : RosmEpassLightTokens.accentSubtle,
-        onPrimaryContainer: ink,
-        secondary: primary,
-        onSecondary: dark
-            ? RosmEpassDarkTokens.onAccent
-            : RosmEpassLightTokens.onAccent,
-        secondaryContainer: dark
-            ? RosmEpassDarkTokens.accentSubtle
-            : RosmEpassLightTokens.accentSubtle,
-        onSecondaryContainer: primary,
-        tertiary: dark
-            ? RosmEpassDarkTokens.warning
-            : RosmEpassLightTokens.warning,
-        tertiaryContainer: dark
-            ? RosmEpassDarkTokens.warningSubtle
-            : RosmEpassLightTokens.warningSubtle,
-        onTertiaryContainer: dark
-            ? RosmEpassDarkTokens.warning
-            : RosmEpassLightTokens.warning,
-        surface: canvas,
-        surfaceContainerLowest: surface,
-        surfaceContainerLow: surface,
-        surfaceContainer: subtle,
-        surfaceContainerHigh: subtle,
-        surfaceContainerHighest: subtle,
-        onSurface: ink,
-        onSurfaceVariant: muted,
-        outline: control,
-        outlineVariant: border,
-        error: dark ? RosmEpassDarkTokens.danger : RosmEpassLightTokens.danger,
-        errorContainer: dark
-            ? RosmEpassDarkTokens.dangerSubtle
-            : RosmEpassLightTokens.dangerSubtle,
-        onErrorContainer: dark
-            ? RosmEpassDarkTokens.danger
-            : RosmEpassLightTokens.danger,
-      );
+  final c = dark ? RosmEpassDarkTokens.colors : RosmEpassLightTokens.colors;
+  // Consume the canonical paired recipe; do not regenerate HCT on each platform.
+  final scheme = ColorScheme(
+    brightness: brightness,
+    primary: c.primary,
+    onPrimary: c.onPrimary,
+    primaryContainer: c.primarySoft,
+    onPrimaryContainer: c.ink,
+    secondary: c.primary,
+    onSecondary: c.onPrimary,
+    secondaryContainer: c.secondaryContainer,
+    onSecondaryContainer: c.onSecondaryContainer,
+    tertiary: c.onTertiaryContainer,
+    onTertiary: c.tertiaryContainer,
+    tertiaryContainer: c.tertiaryContainer,
+    onTertiaryContainer: c.onTertiaryContainer,
+    surface: c.surfaceGroup,
+    onSurface: c.ink,
+    onSurfaceVariant: c.muted,
+    surfaceContainerLowest: c.surface,
+    surfaceContainerLow: c.surfaceGroup,
+    surfaceContainer: c.surfaceInset,
+    surfaceContainerHigh: c.surfaceFloating,
+    surfaceContainerHighest: c.surfaceFloating,
+    outline: c.control,
+    outlineVariant: c.edgeSoft,
+    error: c.danger,
+    onError: c.onDanger,
+    errorContainer: c.dangerSoft,
+    onErrorContainer: c.danger,
+    inverseSurface: dark
+        ? RosmEpassLightTokens.colors.surfaceGroup
+        : RosmEpassDarkTokens.colors.surfaceGroup,
+    onInverseSurface: dark
+        ? RosmEpassLightTokens.colors.ink
+        : RosmEpassDarkTokens.colors.ink,
+  );
   final inherited = Theme.of(context);
   final duration = MediaQuery.disableAnimationsOf(context)
       ? Duration.zero
       : RosmEpassMotion.hover;
-  OutlineInputBorder outline(Color color, [double width = 1]) =>
-      OutlineInputBorder(
-        borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
-        borderSide: BorderSide(color: color, width: width),
-      );
   final textTheme = inherited.textTheme.apply(
     bodyColor: ink,
     displayColor: ink,
@@ -119,16 +100,17 @@ ThemeData buildRosmPassportTheme(
     iconTheme: IconThemeData(size: 20, color: muted),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: surface,
+      fillColor: c.fieldFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       labelStyle: TextStyle(color: muted, fontWeight: FontWeight.w500),
       floatingLabelStyle: TextStyle(color: primary),
       prefixIconColor: muted,
-      enabledBorder: outline(control),
-      focusedBorder: outline(primary, 2),
-      errorBorder: outline(scheme.error),
-      focusedErrorBorder: outline(scheme.error, 2),
-      disabledBorder: outline(border),
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      errorBorder: InputBorder.none,
+      focusedErrorBorder: InputBorder.none,
+      disabledBorder: InputBorder.none,
     ),
     checkboxTheme: CheckboxThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -138,12 +120,16 @@ ThemeData buildRosmPassportTheme(
       style: FilledButton.styleFrom(
         backgroundColor: primary,
         foregroundColor: scheme.onPrimary,
-        minimumSize: const Size(48, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
         ),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        textStyle: const TextStyle(
+          fontSize: 13,
+          height: 1.4,
+          fontWeight: FontWeight.w500,
+        ),
         elevation: 0,
       ).copyWith(animationDuration: duration),
     ),
@@ -152,12 +138,16 @@ ThemeData buildRosmPassportTheme(
         foregroundColor: ink,
         backgroundColor: surface,
         side: BorderSide(color: control),
-        minimumSize: const Size(48, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
         ),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        textStyle: const TextStyle(
+          fontSize: 13,
+          height: 1.4,
+          fontWeight: FontWeight.w500,
+        ),
       ).copyWith(animationDuration: duration),
     ),
   );
@@ -175,9 +165,10 @@ class RosmEpassTheme extends StatelessWidget {
       mode: data.brightness == Brightness.dark
           ? RosemaryThemeMode.dark
           : RosemaryThemeMode.light,
-      colors: data.brightness == Brightness.dark
-          ? RosmEpassDarkTokens.colors
-          : RosmEpassLightTokens.colors,
+      scheme: const RosemaryColorScheme(
+        light: RosmEpassLightTokens.colors,
+        dark: RosmEpassDarkTokens.colors,
+      ),
       highContrastColors:
           (data.brightness == Brightness.dark
                   ? RosmEpassDarkTokens.colors

@@ -20,4 +20,6 @@ function Fixture() {
   async function safely(action) { try { await action(); } catch (_) {} }
   return <main style={{padding: 24}}><p>本地测试 · 所有数据均为合成，无生产请求</p><AdminStatusManagement cooldowns={cooldowns} pagination={pagination} loadCooldowns={loadCooldowns} safely={safely} resetCooldown={() => { throw new Error('测试禁止修改记录'); }} /></main>;
 }
-createRoot(document.getElementById('root')).render(<MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter><Fixture /></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>);
+const fixtureRoot = import.meta.hot?.data.root ?? createRoot(document.getElementById('root'));
+if (import.meta.hot) import.meta.hot.data.root = fixtureRoot;
+fixtureRoot.render(<MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter><Fixture /></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>);

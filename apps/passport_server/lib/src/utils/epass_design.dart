@@ -24,7 +24,7 @@ a { color: inherit; }
 .logo, .brand-logo { padding: 8px; display: flex; }
 .logo img, .brand-logo img { width: 32px; height: 32px; object-fit: contain; }
 .brand-name, .brand strong { font: 400 24px/1.3 var(--r-semantic-font-editorial); }
-.main { display: flex; align-items: center; justify-content: center; padding: 48px; background: var(--r-semantic-color-surface); min-width: 0; }
+.main { display: flex; align-items: center; justify-content: center; padding: 48px; background: var(--r-semantic-color-surface-group); min-width: 0; }
 .panel-stack { width: 100%; max-width: 480px; }
 .panel, .card { width: 100%; max-width: 480px; }
 .panel h1, .card h2 { font: 500 40px/1.3 var(--r-semantic-font-body); text-wrap: balance; margin: 24px 0 16px; overflow-wrap: anywhere; }
@@ -40,10 +40,10 @@ a { color: inherit; }
 .permission-list li { padding: 16px 0; border-bottom: 1px solid var(--r-semantic-color-border); display: flex; align-items: center; gap: 12px; }
 .permission-list svg { width: 20px; height: 20px; flex-shrink: 0; }
 .actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px solid transparent; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 500; text-decoration: none; background: var(--r-semantic-color-accent); color: var(--r-semantic-color-on-accent); transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), transform var(--r-semantic-motion-press) var(--r-semantic-motion-standard); }
-.button:active:not([aria-disabled='true']) { transform: scale(.98); }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; border: 1px solid transparent; border-radius: 8px; padding: 10px 15px; font-size: 13px; line-height: 1.4; font-weight: 500; text-decoration: none; background: var(--r-semantic-color-accent); color: var(--r-semantic-color-on-accent); transition: background-color var(--r-semantic-motion-hover) var(--r-semantic-motion-standard), transform var(--r-semantic-motion-press) var(--r-semantic-motion-standard); }
+
 .button:hover { background: var(--r-semantic-color-accent-hover); }
-.button.secondary { background: var(--r-semantic-color-surface); color: var(--r-semantic-color-text); border-color: var(--r-semantic-color-border-control); }
+.button.secondary { background: var(--r-semantic-color-field-fill); color: var(--r-semantic-color-ink); border-color: transparent; }
 .button.secondary:hover { background: var(--r-semantic-color-surface-subtle); }
 .button[aria-disabled='true'] { opacity: .6; cursor: wait; }
 .account-center { display: block; text-align: center; margin-top: 32px; font-size: 14px; color: var(--r-semantic-color-text-secondary); text-underline-offset: 4px; }
@@ -54,6 +54,8 @@ a { color: inherit; }
 .epass-lockup > span > span { font-size: 19.2px; font-weight: 400; line-height: 1.15; }
 .epass-lockup strong { font-size: 35.84px; font-weight: 500; line-height: 1.05; }
 .epass-compact-brand { display: inline-flex; align-items: center; gap: 9px; color: var(--r-semantic-color-primary); font: 500 20px/1.05 var(--r-semantic-font-editorial); }
+@media (max-width: 600px), (pointer: coarse) { .button { min-height:44px; } }
+html[data-theme='dark'] .button:not(.secondary) { background-clip:padding-box; }
 @media (forced-colors: active) { .epass-lockup img { forced-color-adjust: none; } }
 html[data-reduce-motion='true'] * { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

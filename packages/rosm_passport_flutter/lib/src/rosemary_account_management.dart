@@ -908,26 +908,20 @@ class _PasswordSheet extends StatelessWidget {
   }
 }
 
-class _SheetBody extends StatelessWidget {
-  const _SheetBody({required this.child, this.error});
-
-  final Widget child;
+class _SheetBody extends InheritedWidget {
+  const _SheetBody({required super.child, this.error});
   final String? error;
+  static Widget? feedback(BuildContext context) {
+    final message = context
+        .dependOnInheritedWidgetOfExactType<_SheetBody>()
+        ?.error;
+    return message == null || message.isEmpty
+        ? null
+        : RosemaryAlert(message, tone: RosemaryTone.danger);
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final message = error;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (message != null && message.isNotEmpty) ...[
-          _AccountMessage(text: message),
-          const SizedBox(height: 12),
-        ],
-        child,
-      ],
-    );
-  }
+  bool updateShouldNotify(_SheetBody old) => old.error != error;
 }
 
 class _CodeSheetFields extends StatelessWidget {
@@ -1014,24 +1008,21 @@ class _CodeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: RosmEpassInput(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: label),
-          ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 98,
-          child: RosmEpassOutlinedButton(
+    final feedback = _SheetBody.feedback(context);
+    return RosmEpassInput(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
+      verification: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RosmEpassOutlinedButton(
             onPressed: busy || sendDisabled ? null : onSend,
             child: _BusyText(busy: busy, text: cooldownLabel),
           ),
-        ),
-      ],
+          if (feedback != null) feedback,
+        ],
+      ),
     );
   }
 }
@@ -1063,6 +1054,7 @@ class _AuthenticatorSheet extends StatelessWidget {
         const SizedBox(height: 12),
         RosmEpassInput(
           controller: currentPassword,
+          verification: current == null ? _SheetBody.feedback(context) : null,
           obscureText: true,
           decoration: const InputDecoration(labelText: '当前密码'),
         ),
@@ -1094,6 +1086,7 @@ class _AuthenticatorSheet extends StatelessWidget {
           const SizedBox(height: 12),
           RosmEpassInput(
             controller: code,
+            verification: _SheetBody.feedback(context),
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: '动态验证码'),
           ),
@@ -1199,16 +1192,7 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: child,
-    );
+    return RosemaryCard(child: child);
   }
 }
 
@@ -1220,29 +1204,9 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final background = active
-        ? colors.secondaryContainer
-        : colors.tertiaryContainer;
-    final foreground = active
-        ? colors.onSecondaryContainer
-        : colors.onTertiaryContainer;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: foreground,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+    return RosemaryBadge(
+      text,
+      tone: active ? RosemaryTone.success : RosemaryTone.warning,
     );
   }
 }
@@ -1274,16 +1238,7 @@ class _AccountMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.error.withAlpha(89)),
-      ),
-      child: Text(text, style: TextStyle(color: colors.onErrorContainer)),
-    );
+    return RosemaryAlert(text, tone: RosemaryTone.danger);
   }
 }
 
