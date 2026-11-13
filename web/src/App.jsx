@@ -2269,7 +2269,7 @@ function App() {
       />
       {legalPrompt}
       <AnimatePresence>{toast && (
-        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`rounded-control border border-line px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
+        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`rounded-control px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
           {toast.message}
         </Notice>
       )}</AnimatePresence>

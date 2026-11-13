@@ -63,7 +63,7 @@
 
 @layer components {
   .surface-panel { background: var(--r-semantic-color-surface-group); border: 0; border-radius: var(--radius-panel); }
-  .policy-tooltip { @apply pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-control px-3 py-2 text-xs leading-5 opacity-0; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); }
+  .policy-tooltip { @apply pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-control px-3 py-2 text-xs leading-5 opacity-0; border: 0; background: var(--color-surface); color: var(--color-ink); }
   .group:hover > .policy-tooltip, .group:focus-within > .policy-tooltip { opacity: 1; }
   .account-security-prompt, .account-security-prompt__panel { background: var(--color-surface); border-color: var(--color-line); }
   .account-security-prompt__header { background: var(--color-canvas); border-color: var(--color-line); }
@@ -230,8 +230,8 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 .epass-docs-contents a { display: block; padding: 8px 0; font-size: 14px; line-height: 24px; color: var(--color-muted); }
 .epass-docs-contents a:hover { color: var(--color-accent); text-decoration: underline; text-underline-offset: 4px; }
 .epass-docs-content h2[id] { scroll-margin-top: 96px; }
-.epass-banned { margin: 64px auto; padding: 40px; max-width: 640px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-panel); }
-@media (max-width: 1100px) { .epass-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .epass-stat:nth-child(2) { border-right: 0; } .epass-stat:nth-child(n+3) { border-top: 1px solid var(--color-line); } }
+.epass-banned { margin: 64px auto; padding: 40px; max-width: 640px; background: var(--color-surface); border: 0; border-radius: var(--radius-panel); }
+@media (max-width: 1100px) { .epass-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .epass-stat:nth-child(2) { border-right: 0; }  }
 @media (max-width: 600px) { .epass-stat { padding: 20px 12px; } .epass-stat strong { font-size: 32px; } .epass-settings-section { padding: 20px; } .epass-banned { margin: 32px auto; padding: 24px; } }
 
 
@@ -309,7 +309,7 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-segments { padding:4px;gap:4px;background:var(--r-semantic-color-surface-inset);border-radius:12px; }
 .epass-segments .rm-button { border:0;border-radius:8px; }
 .epass-segments .rm-button[aria-pressed='true'] { background:var(--r-semantic-color-secondary-container);color:var(--r-semantic-color-on-secondary-container) !important; }
-.forma-dialog.epass-dialog-navigation { inset:76px 0 0 auto;margin:0;height:calc(100dvh - 76px);max-height:calc(100dvh - 76px);background:var(--r-semantic-color-surface-navigation);color:var(--r-semantic-color-on-navigation); }
+.forma-dialog.epass-dialog-navigation { inset:76px auto 0 0;border-radius:0 20px 20px 0;margin:0;height:calc(100dvh - 76px);max-height:calc(100dvh - 76px);background:var(--r-semantic-color-surface-navigation);color:var(--r-semantic-color-on-navigation); }
 @media(max-width:1023px) { :root { --epass-page-gutter:24px; } }
 @media(max-width:640px) { :root { --epass-page-gutter:16px; } a.btn-primary,a.btn-secondary { min-height:44px; } }
 
@@ -323,3 +323,24 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-table td:first-child { min-width:220px; }
 
 :is(.epass-topbar,.epass-auth-header) .epass-theme-toggle { background:var(--r-semantic-color-topbar-control);color:var(--r-semantic-color-on-topbar) !important; }
+
+/* Product presentation: tonal grouping and zebra rows replace decorative rules. */
+.epass-table .rm-table-wrap { border:0; }
+.epass-table .rm-table :is(caption,thead,tbody,tr,th,td) { border:0; }
+.epass-table .rm-table th { background:var(--r-semantic-color-surface-inset); }
+.epass-table .rm-table tbody tr:nth-child(odd) { background:var(--r-semantic-color-surface-group); }
+.epass-table .rm-table tbody tr:nth-child(even) { background:var(--r-semantic-color-surface-inset); }
+.epass-table .rm-badge { border-color:transparent; }
+.epass-page-heading,.epass-account-profile,.epass-settings-list,.epass-setting-row { border:0; }
+.epass-settings-list { display:grid;gap:8px; }
+.epass-setting-row { padding:24px;border-radius:12px;background:var(--r-semantic-color-surface-group); }
+.epass-setting-row:nth-child(even),.epass-client-row:nth-child(even) { background:var(--r-semantic-color-surface-inset); }
+.epass-client-row:nth-child(odd) { background:var(--r-semantic-color-surface-group); }
+.epass-stat-strip { border:0;border-radius:12px;overflow:hidden; }
+.epass-stat { border:0;background:var(--r-semantic-color-surface-group); }
+.epass-stat:nth-child(even) { background:var(--r-semantic-color-surface-inset); }
+.epass-toggle-row { border:0;background:var(--r-semantic-color-surface-inset); }
+.epass-disclosure,.epass-docs-contents { border:0;border-radius:12px;padding:16px;background:var(--r-semantic-color-surface-inset); }
+.epass-docs-content .surface-panel,.epass-docs-nav { border:0; }
+
+.forma-dialog.epass-dialog-navigation:dir(rtl) { inset:76px 0 0 auto;border-radius:20px 0 0 20px; }

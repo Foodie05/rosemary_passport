@@ -99,7 +99,7 @@ function StepUpFields({ methods, excludedFactor, value, onChange, sendStepUpCode
 
   if (!available.length) return <p className="text-sm text-danger">当前没有可用的其他验证方式，请先绑定一种恢复因素。</p>;
   return (
-    <div className="space-y-3 rounded-panel border border-line bg-canvas p-4">
+    <div className="space-y-3 rounded-panel bg-inset p-4">
       <label className="text-sm font-bold text-ink">账户二次验证</label>
       <RosemarySelect
         label="账户二次验证方式"
@@ -458,7 +458,7 @@ export function UserAccountPage({
           </section>
         </div>
         <aside className="space-y-6">
-          <div className="rounded-panel border border-line p-6"><Shield size={20} className="mb-4 text-accent" aria-hidden="true" /><h2 className="font-semibold">安全提示</h2><p className="mt-3 text-sm text-muted">{mustBindEmail ? '请先绑定邮箱，以便接收验证码和恢复账户。' : '保持恢复方式可用，避免更换设备后无法登录。'}</p><p className="mt-3 text-sm text-muted">修改安全设置时，需要使用其他已绑定方式验证身份。</p></div>
+          <div className="rounded-panel bg-group p-6"><Shield size={20} className="mb-4 text-accent" aria-hidden="true" /><h2 className="font-semibold">安全提示</h2><p className="mt-3 text-sm text-muted">{mustBindEmail ? '请先绑定邮箱，以便接收验证码和恢复账户。' : '保持恢复方式可用，避免更换设备后无法登录。'}</p><p className="mt-3 text-sm text-muted">修改安全设置时，需要使用其他已绑定方式验证身份。</p></div>
           <p className="text-xs text-muted">账户角色 · {(session.user?.roles || []).join(' · ') || '普通用户'}</p>
         </aside>
       </div>
@@ -538,7 +538,7 @@ export function UserAccountPage({
             </FormaButton>
           }
         >
-          <div className="rounded-panel border border-line bg-canvas p-4 text-sm text-muted">
+          <div className="rounded-panel bg-inset p-4 text-sm text-muted">
             可使用当前邮箱、手机、Authenticator 或通行密钥中任意一种完成校验。
           </div>
           <StepUpFields methods={stepUpMethods} excludedFactor="password" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
@@ -561,7 +561,7 @@ export function UserAccountPage({
             </FormaButton>
           }
         >
-          <div className="rounded-panel border border-line bg-canvas p-4 text-sm text-muted">
+          <div className="rounded-panel bg-inset p-4 text-sm text-muted">
             最多可连接 5 个系统通行密钥。连接时会调用浏览器和操作系统提供的 WebAuthn 服务，通过指纹、人脸或设备凭据完成注册。
           </div>
           <div className="space-y-3">
@@ -571,10 +571,10 @@ export function UserAccountPage({
             </div>
             <div className="space-y-2">
               {passkeyLoading ? (
-                <div className="rounded-panel border border-line bg-canvas p-4 text-sm text-muted">读取中...</div>
+                <div className="rounded-panel bg-inset p-4 text-sm text-muted">读取中...</div>
               ) : passkeyCredentials.length ? (
                 passkeyCredentials.map((credential) => (
-                  <div key={credential.credential_id} className="flex flex-col items-stretch gap-4 rounded-panel border border-line bg-canvas p-4 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between">
+                  <div key={credential.credential_id} className="flex flex-col items-stretch gap-4 rounded-panel bg-inset p-4 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-ink">
                         {credential.device_type === 'platform' ? '本机设备通行密钥' : '外部设备通行密钥'}
@@ -596,7 +596,7 @@ export function UserAccountPage({
                   </div>
                 ))
               ) : (
-                <div className="rounded-panel border border-dashed border-line bg-canvas p-4 text-sm text-muted">
+                <div className="rounded-panel bg-inset p-4 text-sm text-muted">
                   当前还没有已连接的系统通行密钥。
                 </div>
               )}
@@ -630,12 +630,12 @@ export function UserAccountPage({
             </>
           }
         >
-          <div className="rounded-panel border border-line bg-canvas p-4 text-sm text-muted">
+          <div className="rounded-panel bg-inset p-4 text-sm text-muted">
             新验证器动态码只证明新配置可用；账户校验必须使用验证器以外的因素。
           </div>
           <StepUpFields methods={stepUpMethods} excludedFactor="authenticator" value={stepUp} onChange={setStepUp} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} />
           {authenticatorSecret ? (
-            <div className="space-y-4 rounded-panel border border-line bg-canvas p-4">
+            <div className="space-y-4 rounded-panel bg-inset p-4">
               {authenticatorQrDataUrl ? <img src={authenticatorQrDataUrl} alt="Authenticator QR" className="aspect-square h-auto w-40 max-w-full rounded-control bg-group p-2" /> : null}
               <div className="space-y-1 text-sm text-muted">
                 <p className="font-semibold text-ink">手动输入密钥</p>

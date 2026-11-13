@@ -133,7 +133,7 @@ function FactorListItem({ title, subtitle, onClick }) {
     <FormaButton
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between rounded-panel border border-line bg-surface px-5 py-4 text-left transition-colors hover:border-control hover:bg-canvas"
+      className="flex w-full items-center justify-between rounded-panel bg-surface px-5 py-4 text-left transition-colors hover:bg-canvas"
     >
       <div className="space-y-1">
         <p className="text-base font-bold text-ink">{title}</p>
@@ -604,7 +604,7 @@ export function LoginPage({
                 <FormaButton
                   type="button"
                   onClick={switchAccount}
-                  className="shrink-0 rounded-control border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted  transition-colors hover:border-control hover:bg-canvas hover:text-ink"
+                  className="shrink-0 rounded-control bg-surface px-3 py-2 text-sm font-semibold text-muted  transition-colors hover:bg-canvas hover:text-ink"
                 >
                   切换账号
                 </FormaButton>
@@ -769,7 +769,7 @@ export function RegisterPage({
               />
             )}
             {verificationComplete ? (
-              <div className="rounded-panel border border-line bg-canvas px-4 py-3 text-sm font-bold text-ink">
+              <div className="rounded-panel bg-canvas px-4 py-3 text-sm font-bold text-ink">
                 验证码已通过，请填写昵称和密码完成注册。
               </div>
             ) : (

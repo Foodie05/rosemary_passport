@@ -126,7 +126,7 @@ function SectionHeader({ title, description, actions }) {
 }
 
 function SettingsShell({ icon: Icon, title, description, children, onSubmit, actions }) {
-  return <div className="max-w-6xl space-y-8"><SectionHeader title={title} description={description} /><form onSubmit={onSubmit} className="epass-settings-form space-y-8">{children}{actions && <div className="flex flex-wrap justify-end gap-3 border-t border-line pt-6">{actions}</div>}</form></div>;
+  return <div className="max-w-6xl space-y-8"><SectionHeader title={title} description={description} /><form onSubmit={onSubmit} className="epass-settings-form space-y-8">{children}{actions && <div className="flex flex-wrap justify-end gap-3 pt-6">{actions}</div>}</form></div>;
 }
 
 function ConfigField({ label, hint, defaultValue, children }) {
@@ -190,7 +190,7 @@ function ProviderListSection({
       <div className="flex flex-wrap gap-2">
         {providers.length ? (
           providers.map((provider) => (
-            <span key={provider} className="inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink">
+            <span key={provider} className="inline-flex max-w-full items-center gap-2 rounded-full bg-canvas px-3 py-1.5 text-sm font-medium text-ink">
               <span className="min-w-0 break-all">{provider}</span>
               <FormaButton
                 type="button"
@@ -707,7 +707,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
 { id: 'actions', header: '操作', render: record => { const key = `${record.scope}\u0000${record.subject}`; return <><FormaButton type="button" className="btn-secondary flex items-center gap-2 px-3 py-2" disabled={resetting === key} onClick={() => void handleReset(record)}><RotateCcw size={15} />{resetting === key ? '重置中…' : '一键重置'}</FormaButton></>; } }
 ]} empty={<div role={loadState === 'error' ? 'alert' : 'status'}>{loadState === 'loading' ? '正在加载冷却记录…' : loadState === 'error' ? '冷却记录加载失败，请点击刷新重试。' : '暂无符合条件的验证码冷却记录'}</div>} />
         </div>
-        <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>{loadState === 'ready' ? <>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</> : loadState === 'loading' ? '正在加载冷却记录…' : '加载失败，记录数量暂不可用。'}</p>
           <Pagination page={pagination.page} pageCount={Math.max(1, pagination.total_pages)} disabled={loadState !== 'ready'} onPageChange={page => void safely(() => refresh(page), '冷却状态加载失败')} label="冷却记录分页" />
         </div>
@@ -736,7 +736,7 @@ export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publi
           <SelectionContent value={type} index={type === 'terms' ? 0 : 1} className="space-y-6"><ConfigField label="协议标题"><FormaInput className="input-field" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></ConfigField><ConfigField label="协议正文"><FormaTextarea className="input-field min-h-[520px] text-sm leading-7" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /></ConfigField></SelectionContent>
           <div className="mt-5 flex flex-wrap justify-end gap-3"><FormaButton type="button" className="btn-secondary" onClick={() => window.open(`/legal/${type}`, '_blank', 'noopener,noreferrer')}>预览当前发布版</FormaButton><FormaButton type="button" className="btn-primary" onClick={() => void safely(() => saveDraft({ type, ...form }), '草稿保存失败')}>保存下一版草稿</FormaButton>{draft ? <FormaButton type="button" className="btn-secondary" onClick={() => void safely(async () => { const approved = await confirm({ title: `发布协议版本 ${draft.version}`, message: '发布后将立即成为当前版本，历史版本不可覆盖，所有用户下次登录时需要重新明确同意。', confirmLabel: '确认发布', tone: 'warning' }); if (!approved) return; await publishDocument(draft.id); }, '协议发布失败')}>发布版本 {draft.version}</FormaButton> : null}</div>
         </div>
-        <aside className="surface-panel h-fit rounded-panel p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{!selected.length && <p className="text-sm text-muted">暂无版本记录。保存草稿后会显示在这里。</p>}{selected.map((item) => <FormaButton key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-control border border-line p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-success' : 'text-warning')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-muted">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></FormaButton>)}</div></aside>
+        <aside className="surface-panel h-fit rounded-panel p-5"><h2 className="flex items-center gap-2 font-bold"><FileText size={18} />版本历史</h2><div className="mt-4 space-y-3">{!selected.length && <p className="text-sm text-muted">暂无版本记录。保存草稿后会显示在这里。</p>}{selected.map((item) => <FormaButton key={item.id} type="button" onClick={() => setForm({ title: item.title, content: item.content })} className="w-full rounded-control p-3 text-left"><div className="flex justify-between"><span className="font-bold">版本 {item.version}</span><span className={cn('text-xs font-bold', item.status === 'published' ? 'text-success' : 'text-warning')}>{item.status === 'published' ? '已发布' : '草稿'}</span></div><p className="mt-1 text-xs text-muted">{item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : '-'}</p></FormaButton>)}</div></aside>
       </div>
     </div>
   );
@@ -846,7 +846,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                   </> }
 ]} empty={'暂无用户数据'} />
         </div>
-        <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 位用户</p>
           <Pagination page={pagination.page} pageCount={Math.max(1, pagination.total_pages)} onPageChange={page => void safely(() => loadUsers({page, search}), '用户数据加载失败')} label="用户分页" />
         </div>
@@ -961,9 +961,9 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
             ].map(([label, value]) => <div key={label} className="rounded-control bg-canvas p-3"><p className="text-xs font-bold text-muted">{label}</p><p className="mt-1 break-all font-semibold text-ink">{value}</p></div>)}
           </div>
           {viewingUser.account_status === 'banned' ? (
-            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><FormaButton type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</FormaButton></div>
+            <div className="mt-5 rounded-panel bg-danger-subtle p-4"><p className="text-sm text-danger">封禁原因：{viewingUser.banned_reason || '-'}</p><FormaButton type="button" className="mt-4 inline-flex items-center gap-2 rounded-control bg-success-subtle px-4 py-2 font-bold text-success" onClick={() => void safely(async () => { await updateUserStatus(viewingUser.id, 'active'); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '解封失败')}><UserCheck size={17} />解封账户</FormaButton></div>
           ) : (
-            <div className="mt-5 rounded-panel border border-danger bg-danger-subtle p-4"><FormaTextarea label="封禁原因" id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} variant="danger" className="mt-3" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
+            <div className="mt-5 rounded-panel bg-danger-subtle p-4"><FormaTextarea label="封禁原因" id="epass-adminpages-field-1" value={banReason} onChange={(event) => setBanReason(event.target.value)} className="input-field mt-2 min-h-24" placeholder="请记录可审计的封禁原因（至少 3 个字）" /><FormaButton type="button" disabled={banReason.trim().length < 3} variant="danger" className="mt-3" onClick={() => void safely(async () => { const approved = await confirm({ title: '封禁账户并撤销会话', message: '封禁将立即撤销该用户的全部 Access Token 和 Refresh Token，用户会立即失去访问权限。', confirmLabel: '确认封禁', tone: 'danger' }); if (!approved) return; await updateUserStatus(viewingUser.id, 'banned', banReason.trim()); setViewingUser(await loadUser(viewingUser.id)); await loadUsers({ page: pagination.page || 1, search }); }, '封禁失败')}><Ban size={17} />封禁并撤销会话</FormaButton></div>
           )}
         </Modal>
       )}</AnimatePresence>
@@ -1109,9 +1109,9 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
     <div className="max-w-6xl space-y-8">
       <SectionHeader title="OIDC 接入" description="管理接入 Rosemary Epass 的应用及其授权权限。" actions={<><Link to="/docs/oidc" className="btn-secondary"><BookOpen size={20} />接入文档</Link><FormaButton className="btn-primary" type="button" onClick={openCreateModal}>添加应用</FormaButton></>} />
       <section className="surface-panel rounded-panel overflow-hidden">
-        <div className="border-b border-line px-6 py-5"><h2 className="epass-section-title">已接入应用 <span className="text-base font-sans text-muted">{oidcClients.length}</span></h2></div>
+        <div className="px-6 py-5"><h2 className="epass-section-title">已接入应用 <span className="text-base font-sans text-muted">{oidcClients.length}</span></h2></div>
         {!oidcClients.length && <div className="px-6 py-12"><h3 className="text-lg font-medium">尚未接入应用</h3><p className="mt-2 text-sm leading-6 text-muted">添加应用，配置回调地址与权限后即可使用 Rosemary Epass 认证。</p></div>}
-        <div className="divide-y divide-line">
+        <div className="epass-client-list">
             {oidcClients.map((client) => (
               <div
                 key={client.client_id}
@@ -1226,7 +1226,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
 
           {validationErrors.redirect_uris && <p className="text-sm text-danger" role="alert">{validationErrors.redirect_uris}</p>}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-panel border border-line bg-canvas p-4">
+            <div className="rounded-panel bg-canvas p-4">
               <div className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
                 <span>启用 Web</span>
                 <RosemaryCheckbox checked={Boolean(oidcForm.enable_web)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_web: checked }))} ariaLabel="启用 Web" />
@@ -1236,7 +1236,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               {visibleError('web_redirect_uris') && <p id={`${errorId}-web`} className="mt-2 text-sm leading-6 text-danger" role="alert">{validationErrors.web_redirect_uris}</p>}
             </div>
 
-            <div className="rounded-panel border border-line bg-canvas p-4">
+            <div className="rounded-panel bg-canvas p-4">
               <div className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
                 <span>启用 App</span>
                 <RosemaryCheckbox checked={Boolean(oidcForm.enable_app)} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, enable_app: checked }))} ariaLabel="启用 App" />
@@ -1255,7 +1255,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
 
           <div className="space-y-6">
             <ConfigField label="Scopes">
-              <div className="grid grid-cols-1 gap-2 rounded-panel border border-line bg-canvas p-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 rounded-panel bg-canvas p-3 sm:grid-cols-2">
                 {OIDC_SCOPE_OPTIONS.map((scope) => (
                   <RosemaryCheckbox
                       key={scope.value}
@@ -1275,7 +1275,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
               <ConfigField label="Grant Types">
                 <FormaTextarea rows="3" className="input-field" value={oidcForm.grant_types} onChange={(event) => setOidcForm((current) => ({ ...current, grant_types: event.target.value }))} />
               </ConfigField>
-              <div className="rounded-panel border border-line bg-canvas p-4">
+              <div className="rounded-panel bg-canvas p-4">
                 <p className="text-sm font-bold text-ink">Client Secret</p>
                 <p className="mt-2 text-xs leading-5 text-muted">
                   {editingClientId
@@ -1291,7 +1291,7 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-5 rounded-panel border border-line bg-canvas p-4">
+          <div className="flex flex-wrap gap-5 rounded-panel bg-canvas p-4">
             <RosemaryCheckbox checked={oidcForm.is_official} onCheckedChange={(checked) => setOidcForm((current) => ({ ...current, is_official: checked }))}>
               官方应用
             </RosemaryCheckbox>
@@ -1327,10 +1327,10 @@ export function AdminOIDCConfig({ discovery, oidcSettings, loadDiscovery, oidcCl
           )}
         >
           <div className="space-y-4">
-            <div className="rounded-panel border border-warning bg-warning-subtle px-4 py-3 text-sm leading-6 text-warning">
+            <div className="rounded-panel bg-warning-subtle px-4 py-3 text-sm leading-6 text-warning">
               这是应用 <strong>{oneTimeSecret.clientId}</strong> 的新密钥。服务端只保存哈希，关闭后无法再次查看；请立即复制到接入方服务器的密钥管理系统。
             </div>
-            <code className="block break-all rounded-panel border border-line bg-subtle p-4 font-mono text-sm leading-6 text-ink" data-sensitive="true">
+            <code className="block break-all rounded-panel bg-subtle p-4 font-mono text-sm leading-6 text-ink" data-sensitive="true">
               {oneTimeSecret.value}
             </code>
             <p className="text-xs leading-5 text-muted">生产环境请仅通过 HTTPS 管理页面操作。复制成功后，此页面中的明文会立即销毁。</p>
@@ -1838,7 +1838,7 @@ POST ${tokenEndpoint}
           <InfoRow label="安全校验" value="校验 state、nonce、issuer、aud、过期时间与回调 URI" />
           <InfoRow label="业务会话" value="由接入方服务器签发自己的 App session" />
         </div>
-        <div className="rounded-panel border border-line bg-canvas p-5">
+        <div className="rounded-panel bg-canvas p-5">
           <p className="text-sm font-bold text-ink">接入方服务器必须实现的契约</p>
           <div className="mt-3 space-y-2 text-sm leading-7 text-muted">
             <p><InlineCode>serverHandoffEndpoint</InlineCode> 不是传统浏览器 OIDC callback。传统 callback 接收 query 里的 <InlineCode>code/state</InlineCode>；SDK complete endpoint 接收 App 发来的 JSON POST。</p>

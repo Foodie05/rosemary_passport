@@ -23,3 +23,12 @@ outline = outline.replace('RosemaryFieldOutline', 'RosmFieldOutline')
 adapter = (root / 'packages/rosm_passport_flutter/lib/src/forma_field_outline.dart').read_text()
 assert adapter[adapter.index("import 'package:flutter/widgets.dart';"):] == outline, 'editor outline diverges from official geometry/timing'
 print(f'Official Flutter release: {len(files)} files verified; editor outline unchanged')
+
+with tarfile.open(root / 'web/vendor/rosemary/rosemary-ui-react-0.5.0.tgz') as source:
+    overlay = source.extractfile('package/dist/overlays.js').read().decode().split('export function Dialog(props)')[0]
+overlay = overlay.replace('import { cloneElement, useEffect, useId, useRef, useState } from "react";', 'import { useEffect, useId, useRef } from "react";')
+overlay = overlay.replace('import { Button, IconButton } from "./primitives.js";\nimport { useRosemaryTheme, useRosemaryStrings } from "./theme.js";', 'import { IconButton, useRosemaryTheme, useRosemaryStrings } from "@rosemary-ui/react";')
+overlay = overlay.replace('function Modal({', 'export function StartDrawer({').replace('drawer = false,', 'drawer = true,').replace('const sign = direction === "rtl" ? -1 : 1;', 'const sign = direction === "rtl" ? 1 : -1;')
+adapter = (root / 'web/src/components/StartDrawer.js').read_text()
+assert adapter[adapter.index('import { jsx as _jsx'):] == overlay, 'start drawer diverges from the verified modal implementation'
+print('Start drawer preserves official lifecycle and uses the inline-start motion sign')
