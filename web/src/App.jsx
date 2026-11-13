@@ -834,7 +834,6 @@ function App() {
     const data = await api('/api/v1/admin/settings', { auth: true });
     setSystemSettings(data.settings || {});
     const smtp = data.settings?.smtp || {};
-    const registration = data.settings?.registration || {};
     const security = data.settings?.security || {};
     setSystemForm({
       ...SECURITY_TOGGLE_DEFAULTS,
@@ -856,7 +855,6 @@ function App() {
       smtp_password: smtp.password || '',
       smtp_password_confirm: smtp.password || '',
       smtp_secure: Boolean(smtp.secure),
-      registration_email_verify: registration.require_email_verification !== false,
       phone_verification_enabled: security.phone_verification_enabled !== false,
       phone_sms_access_key_id: security.phone_sms_access_key_id || '',
       phone_sms_access_key_secret: '',
@@ -1911,9 +1909,6 @@ function App() {
             phone_sms_template_code: systemForm.phone_sms_template_code || '',
             phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
           },
-          registration: {
-            require_email_verification: Boolean(systemForm.registration_email_verify),
-          },
           smtp: {
             host: systemForm.smtp_host || '',
             port: Number(systemForm.smtp_port || 587),
@@ -1953,9 +1948,6 @@ function App() {
             phone_sms_template_code: systemForm.phone_sms_template_code || '',
             phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
           },
-          registration: {
-            require_email_verification: Boolean(systemForm.registration_email_verify),
-          },
           smtp: {
             host: systemForm.smtp_host || '',
             port: Number(systemForm.smtp_port || 587),
@@ -1993,9 +1985,6 @@ function App() {
             aliyun_captcha_scene_id: sceneId,
             aliyun_captcha_access_key_id: systemForm.aliyun_captcha_access_key_id || '',
             aliyun_captcha_access_key_secret: systemForm.aliyun_captcha_access_key_secret || '',
-          },
-          registration: {
-            require_email_verification: Boolean(systemForm.registration_email_verify),
           },
         },
       });

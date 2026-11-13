@@ -31,6 +31,9 @@ pnpm-debug.log*
 .packages
 .pub/
 .pub-cache/
+.tmp-home/
+__pycache__/
+*.pyc
 .flutter-plugins
 .flutter-plugins-dependencies
 build/

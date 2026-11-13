@@ -311,9 +311,7 @@ export function AdminServiceConfig({
                 <FormaInput type="password" className="input-field" autoComplete="new-password" placeholder={systemForm.aliyun_captcha_access_key_secret_configured ? '已配置，留空则保持不变' : 'RAM AccessKey Secret'} value={systemForm.aliyun_captcha_access_key_secret || ''} onChange={(event) => setSystemForm((current) => ({ ...current, aliyun_captcha_access_key_secret: event.target.value }))} />
               </ConfigField>
             </div>
-            <RosemaryCheckbox checked={Boolean(systemForm.registration_email_verify)} onCheckedChange={(checked) => setSystemForm((current) => ({ ...current, registration_email_verify: checked }))}>
-              注册必须验证邮箱
-            </RosemaryCheckbox>
+            <p className="text-sm text-muted">邮箱注册须验证邮箱。</p>
           </div>
           <FormaButton className="btn-secondary" type="button" onClick={testAliyunCaptchaConnection}>验证阿里云验证码</FormaButton>
         </section>
