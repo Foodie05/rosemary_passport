@@ -629,9 +629,20 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
   const [subjectType, setSubjectType] = useState('all');
   const [activeOnly, setActiveOnly] = useState(false);
   const [resetting, setResetting] = useState('');
+  const [loadState, setLoadState] = useState('loading');
   const [now, setNow] = useState(Date.now());
 
-  const refresh = (page = 1) => loadCooldowns({ page, search, subjectType, activeOnly });
+  const refresh = async (page = 1) => {
+    setLoadState('loading');
+    try {
+      const result = await loadCooldowns({ page, search, subjectType, activeOnly });
+      setLoadState('ready');
+      return result;
+    } catch (error) {
+      setLoadState('error');
+      throw error;
+    }
+  };
   useEffect(() => { void safely(() => refresh(1), '冷却状态加载失败'); }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -663,7 +674,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
       <SectionHeader
         title="状态管理"
         description="查看验证码发放与校验产生的冷却、尝试窗口和来源 IP；包括尚未注册的邮箱与手机号。"
-        actions={<FormaButton type="button" className="btn-secondary flex items-center gap-2" onClick={() => void safely(() => refresh(pagination.page || 1), '冷却状态刷新失败')}><RefreshCw size={17} />刷新</FormaButton>}
+        actions={<FormaButton type="button" className="btn-secondary flex items-center gap-2" disabled={loadState === 'loading'} onClick={() => void safely(() => refresh(pagination.page || 1), '冷却状态刷新失败')}><RefreshCw size={17} />刷新</FormaButton>}
       />
 
       <h2 className="epass-section-title">冷却管理</h2>
@@ -680,7 +691,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
             ))}
           </SelectionGroup>
           <RosemaryCheckbox checked={activeOnly} onCheckedChange={setActiveOnly} ariaLabel="仅显示冷却中">仅显示冷却中</RosemaryCheckbox>
-          <FormaButton type="button" className="btn-primary" onClick={() => void safely(() => refresh(1), '冷却状态加载失败')}>应用筛选</FormaButton>
+          <FormaButton type="button" className="btn-primary" disabled={loadState === 'loading'} onClick={() => void safely(() => refresh(1), '冷却状态加载失败')}>应用筛选</FormaButton>
         </div>
         <p className="flex items-center gap-2 text-xs leading-5 text-muted"><Wifi size={15} />主体与来源 IP 仅在管理员页面显示；重置行为会进入脱敏审计链。</p>
       </div>
@@ -692,7 +703,7 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
               {['类型', '主体 / IP', '尝试次数', '计数窗口开始', '最后更新', '冷却截止', '剩余时间', '操作'].map((label) => <th scope="col" key={label} className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-muted">{label}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-line">
-              {cooldowns.map((record) => {
+              {loadState === 'ready' && cooldowns.map((record) => {
                 const key = `${record.scope}\u0000${record.subject}`;
                 const active = record.blocked_until && new Date(record.blocked_until).getTime() > now;
                 return (
@@ -708,15 +719,17 @@ export function AdminStatusManagement({ cooldowns, pagination, loadCooldowns, re
                   </tr>
                 );
               })}
-              {!cooldowns.length ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-muted"><Activity className="mx-auto mb-3" size={30} />暂无符合条件的验证码冷却记录</td></tr> : null}
+              {loadState === 'loading' ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-muted" role="status">正在加载冷却记录…</td></tr> : null}
+              {loadState === 'error' ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-danger" role="alert">冷却记录加载失败，请点击刷新重试。</td></tr> : null}
+              {loadState === 'ready' && !cooldowns.length ? <tr><td colSpan="8" className="px-6 py-12 text-center text-sm text-muted"><Activity className="mx-auto mb-3" size={30} />暂无符合条件的验证码冷却记录</td></tr> : null}
             </tbody>
           </table>
         </div>
         <div className="flex flex-col gap-3 border-t border-line p-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</p>
+          <p>{loadState === 'ready' ? <>第 {pagination.page} 页 / 共 {pagination.total_pages || 1} 页，累计 {pagination.total} 条记录</> : loadState === 'loading' ? '正在加载冷却记录…' : '加载失败，记录数量暂不可用。'}</p>
           <div className="flex gap-2">
-            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</FormaButton>
-            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => refresh(pagination.page + 1), '冷却状态加载失败')}>下一页</FormaButton>
+            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={loadState !== 'ready' || pagination.page <= 1} onClick={() => void safely(() => refresh(pagination.page - 1), '冷却状态加载失败')}>上一页</FormaButton>
+            <FormaButton type="button" className="btn-secondary px-4 py-2" disabled={loadState !== 'ready' || pagination.total_pages === 0 || pagination.page >= pagination.total_pages} onClick={() => void safely(() => refresh(pagination.page + 1), '冷却状态加载失败')}>下一页</FormaButton>
           </div>
         </div>
       </div>
