@@ -574,7 +574,7 @@ export function LoginPage({
       <div className="epass-auth-grid">
         <BrandSection />
 
-        <div className="epass-auth-panel">
+        <div className="epass-auth-panel epass-login-panel">
           <div className="epass-login-content mx-auto w-full max-w-md">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-4">

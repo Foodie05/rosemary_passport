@@ -367,6 +367,7 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 
 /* Login: a single shared code method and coordinated panel/height transitions. */
 .epass-login-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.epass-auth-panel.epass-login-panel { justify-content:flex-start; }
 .epass-login-content { display:flex;flex-direction:column;gap:24px; }
 .epass-login-options { display:grid;gap:8px; }
 .epass-sliding-content { position:relative;overflow:hidden;min-width:0; }
