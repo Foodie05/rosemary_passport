@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:rosm_passport_flutter/rosm_passport_flutter.dart';
+import 'package:rosemary_ui/rosemary_ui.dart';
 
 void main() {
   tearDown(() {
@@ -58,6 +59,34 @@ void main() {
       }
     }
   }
+
+  testWidgets(
+    'sign-in card fits content and remains vertically centered across tabs',
+    (tester) async {
+      tester.view.physicalSize = const Size(600, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpSignIn(tester, RosmPassportThemeMode.light);
+      await tester.pumpAndSettle();
+      final card = find.byType(RosemaryCard);
+      final initial = tester.getRect(card);
+      expect(initial.center.dy, closeTo(700, 1));
+      expect(initial.height, lessThan(1300));
+      tester
+          .widget<RosemaryTabs>(find.byType(RosemaryTabs))
+          .onChanged('password');
+      await tester.pumpAndSettle();
+      final password = tester.getRect(card);
+      expect(password.center.dy, closeTo(700, 1));
+      expect(password.height, greaterThan(initial.height));
+      tester.widget<RosemaryTabs>(find.byType(RosemaryTabs)).onChanged('code');
+      await tester.pumpAndSettle();
+      expect(tester.getRect(card).height, closeTo(initial.height, 1));
+      expect(tester.getRect(card).center.dy, closeTo(700, 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('system mode follows the platform dark appearance', (
     tester,

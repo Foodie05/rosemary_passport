@@ -47,6 +47,60 @@ void main() {
     },
   );
 
+  for (final entry in {
+    '+86 138-0013-8000': '/api/v1/auth/send-phone-login-code',
+    'preview@example.invalid': '/api/v1/auth/send-email-login-code',
+  }.entries) {
+    testWidgets(
+      'combined native code login routes ${entry.value} in a narrow viewport',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final requests = <http.Request>[];
+        var captchas = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: RosmPassportSignInPage(
+              client: _client(requests, Completer<http.Response>()),
+              config: RosmPassportSignInConfig(
+                requestCaptchaToken: () async {
+                  captchas++;
+                  return 'fixture-captcha';
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('手机'), findsNothing);
+        expect(_field('手机号或邮箱'), findsOneWidget);
+        await tester.enterText(_field('手机号或邮箱'), 'invalid');
+        await _tapVisible(tester, find.text('发送登录验证码  →'));
+        expect(captchas, 0);
+        expect(find.text('是否接受使用条款与隐私政策？'), findsNothing);
+        await tester.enterText(_field('手机号或邮箱'), entry.key);
+        await _tapVisible(tester, find.byType(RosemaryCheckbox));
+        await _tapVisible(tester, find.text('发送登录验证码  →'));
+        final request = requests.last;
+        expect(request.url.path, entry.value);
+        final body = jsonDecode(request.body);
+        expect(
+          body[entry.value.contains('phone') ? 'phone_number' : 'email'],
+          entry.value.contains('phone') ? '13800138000' : entry.key,
+        );
+        expect(captchas, 1);
+        expect(_field('验证码'), findsOneWidget);
+        await _tapVisible(tester, find.text('更改手机号或邮箱'));
+        expect(_field('验证码'), findsNothing);
+        expect(_field('手机号或邮箱'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
   for (final mode in ['phone', 'email', 'password', 'register', 'recovery']) {
     testWidgets(
       '$mode blocks before captcha/HTTP, dismisses on decline and resumes once on acceptance',

@@ -89,7 +89,7 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
-const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/codex/forma-13-sdk-050/packages/rosm_passport_flutter';
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.11.0/packages/rosm_passport_flutter';
 const DASHBOARD_PERIODS = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
@@ -1418,7 +1418,7 @@ function OidcDocsContent({ discovery, oidcSettings }) {
     '  rosm_passport_flutter:',
     '    git:',
     '      url: https://github.com/Foodie05/rosemary_passport.git',
-    '      ref: codex/forma-13-sdk-050',
+    '      ref: v0.11.0',
     '      path: packages/rosm_passport_flutter',
     '```',
     '',
@@ -1445,7 +1445,7 @@ final result = await showRosmPassportSignIn(
 final appSession = result?.serverPayload;`,
     '```',
     '',
-    'SDK 内置 UI 支持验证码登录、手机号登录、密码登录、密码二次验证、忘记密码、通行密钥登录、邮箱注册和最终授权确认。注册默认开启；如果某个应用不允许新用户注册，可以设置 `enableRegistration: false`。',
+    'SDK 内置 UI 支持手机号/邮箱合并验证码登录、密码登录、密码二次验证、忘记密码、邮箱注册和最终授权确认；原生通行密钥需由接入方提供平台实现。注册默认开启；如果某个应用不允许新用户注册，可以设置 `enableRegistration: false`。',
     '',
     'SDK 对应用侧暴露 Dart 类型和方法，例如 `RosmPassportSignInConfig`、`RosmPassportUiResult`、`RosmAuthorizationStart`、`RosmAuthResult`、`RosmUserInfo`、`RosmTokenSet`。JSON 请求和响应只在 SDK 内部处理。',
     '',
@@ -1734,13 +1734,13 @@ Scopes:
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-dependencies" tabIndex={-1} className="text-lg font-bold text-ink">2. 添加 SDK 依赖</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">v0.11.0 使用官方 Rosemary Forma 1.3.0 Flutter SDK 0.5.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；当前适配版通过下方 Git 分支接入；待发布标签后可切换至固定标签。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">v0.11.0 使用官方 Rosemary Forma 1.3.0 Flutter SDK 0.5.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；通过下方固定 Git 标签接入，包含此前版本的累计更新。</p>
         </div>
         <CodeBlock>{`dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: codex/forma-13-sdk-050
+      ref: v0.11.0
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
@@ -1890,7 +1890,7 @@ final validation = const RosmPasswordPolicy().evaluate(
           <InfoRow label="运行环境" value="Flutter 3.44.8+ / Dart 3.12.2+" />
           <InfoRow label="设计 SDK" value="rosemary_ui 0.5.0，固定官方发布源码" />
           <InfoRow label="版本状态" value="官方设计库仍为 Prototype；人工辅助技术验收尚未完成" />
-          <InfoRow label="通行密钥" value="当前 Flutter SDK 不包含原生 Passkey API；网站的 WebAuthn 能力独立提供" />
+          <InfoRow label="通行密钥" value="内置界面不包含原生通行密钥 UI；自定义界面可接入平台凭据提供方与 SDK 二次验证 API" />
         </div>
       </div>
 

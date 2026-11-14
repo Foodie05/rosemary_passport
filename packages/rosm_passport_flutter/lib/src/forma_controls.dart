@@ -109,14 +109,6 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
     final value = widget.controller.text;
     final requirements = widget.requirements.isNotEmpty
         ? widget.requirements
-        : label.contains('邮箱') && !label.contains('或')
-        ? [
-            RosemaryFieldRequirement(
-              'email',
-              '使用完整邮箱地址，例如 name@example.com',
-              (value) => RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value),
-            ),
-          ]
         : label.contains('验证码') || label.contains('动态码')
         ? [
             RosemaryFieldRequirement(
@@ -126,6 +118,17 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
             ),
           ]
         : const <RosemaryFieldRequirement>[];
+    final active =
+        validation.armed &&
+        value.isNotEmpty &&
+        widget.controller.value.composing.isCollapsed;
+    final emailInvalid =
+        active &&
+        label.contains('邮箱') &&
+        !label.contains('或') &&
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);
+    final errorText =
+        widget.decoration.errorText ?? (emailInvalid ? '邮箱地址格式不正确。' : null);
     if (hints == null &&
         widget.textInputAction == null &&
         widget.decoration.suffixIcon == null &&
@@ -139,7 +142,7 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
         password: widget.obscureText,
         keyboardType: widget.keyboardType,
         focusNode: node,
-        error: widget.decoration.errorText,
+        error: errorText,
         requirements: requirements,
         verification: widget.verification,
         minLines: widget.minLines ?? 1,
@@ -155,12 +158,8 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
       );
     }
     final c = RosemaryThemeData.of(context);
-    final active =
-        validation.armed &&
-        value.isNotEmpty &&
-        widget.controller.value.composing.isCollapsed;
     final invalid =
-        widget.decoration.errorText != null ||
+        errorText != null ||
         (active && requirements.any((rule) => !rule.check(value)));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -245,12 +244,8 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
             padding: const EdgeInsets.only(top: 8),
             child: widget.verification,
           ),
-        if (widget.decoration.errorText != null)
-          RosemaryText(
-            widget.decoration.errorText!,
-            role: 'small',
-            color: c.danger,
-          ),
+        if (errorText != null)
+          RosemaryText(errorText, role: 'small', color: c.danger),
       ],
     );
   }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'step_up.dart';
 import 'password_policy.dart';
 import 'pkce.dart';
 import 'rosm_aliyun_captcha.dart';
@@ -196,15 +197,36 @@ class RosmPassportClient {
     return config.isConfigured ? config : null;
   }
 
+  /// Sends a code to an existing bound factor, excluding the factor being changed.
+  Future<RosmOperationResult> sendAccountStepUpCode({
+    required String method,
+    required String excludedFactor,
+  }) async {
+    final json = await _postJson('/api/v1/me/step-up/send-code', {
+      'method': method,
+      'excluded_factor': excludedFactor,
+    });
+    return RosmOperationResult.fromJson(json);
+  }
+
+  /// Custom UIs may pass these options to their own trusted passkey provider.
+  Future<Map<String, dynamic>> accountStepUpPasskeyOptions({
+    required String excludedFactor,
+  }) => _postJson('/api/v1/me/step-up/webauthn-options', {
+    'excluded_factor': excludedFactor,
+  });
+
   Future<RosmOperationResult> updateAccount({
     String? nickname,
     String? currentPassword,
     String? newEmail,
     String? newPassword,
+    RosmStepUpProof? verification,
   }) async {
     if (newPassword != null)
       const RosmPasswordPolicy().requireValid(newPassword);
     final json = await _patchJson('/api/v1/me', {
+      if (verification != null) 'verification': verification.toJson(),
       if (nickname != null) 'nickname': nickname,
       if (currentPassword != null) 'current_password': currentPassword,
       if (newEmail != null) 'email': newEmail,
@@ -215,7 +237,7 @@ class RosmPassportClient {
 
   Future<RosmOperationResult> sendBindEmailCode({
     required String email,
-    required String currentPassword,
+    String currentPassword = '',
     String? captchaToken,
   }) async {
     final json = await _postJson('/api/v1/me/send-bind-email-code', {
@@ -228,10 +250,12 @@ class RosmPassportClient {
 
   Future<RosmOperationResult> bindEmail({
     required String email,
-    required String currentPassword,
+    String currentPassword = '',
     required String emailCode,
+    RosmStepUpProof? verification,
   }) async {
     final json = await _postJson('/api/v1/me/bind-email', {
+      if (verification != null) 'verification': verification.toJson(),
       'email': email,
       'current_password': currentPassword,
       'email_code': emailCode,
@@ -241,7 +265,7 @@ class RosmPassportClient {
 
   Future<RosmOperationResult> sendBindPhoneCode({
     required String phoneNumber,
-    required String currentPassword,
+    String currentPassword = '',
     String? captchaToken,
   }) async {
     final json = await _postJson('/api/v1/me/send-bind-phone-code', {
@@ -254,10 +278,12 @@ class RosmPassportClient {
 
   Future<RosmOperationResult> bindPhone({
     required String phoneNumber,
-    required String currentPassword,
+    String currentPassword = '',
     required String verifyCode,
+    RosmStepUpProof? verification,
   }) async {
     final json = await _postJson('/api/v1/me/bind-phone', {
+      if (verification != null) 'verification': verification.toJson(),
       'phone_number': phoneNumber,
       'current_password': currentPassword,
       'verify_code': verifyCode,
@@ -276,10 +302,12 @@ class RosmPassportClient {
 
   Future<RosmOperationResult> resetOwnPassword({
     required String newPassword,
-    required String emailCode,
+    String emailCode = '',
+    RosmStepUpProof? verification,
   }) async {
     const RosmPasswordPolicy().requireValid(newPassword);
     final json = await _postJson('/api/v1/me/reset-password', {
+      if (verification != null) 'verification': verification.toJson(),
       'new_password': newPassword,
       'email_code': emailCode,
     });
@@ -287,7 +315,7 @@ class RosmPassportClient {
   }
 
   Future<RosmAuthenticatorSetup> beginAuthenticatorSetup({
-    required String currentPassword,
+    String currentPassword = '',
   }) async {
     final json = await _postJson('/api/v1/me/authenticator/setup', {
       'current_password': currentPassword,
@@ -296,11 +324,13 @@ class RosmPassportClient {
   }
 
   Future<RosmOperationResult> verifyAuthenticatorSetup({
-    required String currentPassword,
+    String currentPassword = '',
     required String secret,
     required String code,
+    RosmStepUpProof? verification,
   }) async {
     final json = await _postJson('/api/v1/me/authenticator/verify', {
+      if (verification != null) 'verification': verification.toJson(),
       'current_password': currentPassword,
       'secret': secret,
       'code': code,

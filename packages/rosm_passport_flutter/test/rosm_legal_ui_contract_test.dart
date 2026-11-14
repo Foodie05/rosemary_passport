@@ -20,6 +20,6 @@ void main() {
 
     expect(readme, contains('currentLegalDocuments()'));
     expect(readme, contains('legalAcceptance: legalDocuments.acceptance'));
-    expect(readme, contains('ref: codex/forma-13-sdk-050'));
+    expect(readme, contains('ref: v0.11.0'));
   });
 }

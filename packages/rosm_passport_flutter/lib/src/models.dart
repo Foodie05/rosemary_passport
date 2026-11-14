@@ -302,6 +302,9 @@ class RosmSecurityState {
     this.adminMfaRequired = false,
     this.hasAuthenticator = false,
     this.hasPhone = false,
+    this.hasPassword = true,
+    this.hasPasskey = false,
+    this.stepUpMethods = const [],
   });
 
   factory RosmSecurityState.fromJson(Map<String, dynamic> json) =>
@@ -311,6 +314,9 @@ class RosmSecurityState {
   final bool adminMfaRequired;
   final bool hasAuthenticator;
   final bool hasPhone;
+  final bool hasPassword;
+  final bool hasPasskey;
+  final List<String> stepUpMethods;
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, createToJson: false)
