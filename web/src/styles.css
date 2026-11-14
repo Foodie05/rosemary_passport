@@ -355,13 +355,13 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 /* Authentication is one inset rounded module, with aligned unframed utilities. */
 .epass-auth { --auth-inset:clamp(24px,4vw,56px); }
 .epass-auth-tools,.epass-auth-body,.epass-auth > .epass-footer { width:calc(100% - var(--epass-page-gutter) * 2);max-width:1480px;margin-inline:auto; }
-.epass-auth-tools { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px var(--auth-inset) 0; }
+.epass-auth-tools { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px 0 0 var(--auth-inset); }
 .epass-auth-tools .epass-brand { --brand-height:44px; }
 .epass-auth-body { display:flex;flex:1;min-width:0;margin-block:24px; }
 .epass-auth-grid { flex:1;min-width:0;min-height:0;background:transparent; }
 .epass-auth-brand { padding:var(--auth-inset);background:transparent; }
 .epass-auth-panel { min-width:0;padding:var(--auth-inset);border-radius:20px;background:var(--r-semantic-color-surface-group); }
 .epass-auth-panel > div { max-width:none; }
-.epass-auth > .epass-footer { border:0;padding:0 var(--auth-inset) 24px; }
+.epass-auth > .epass-footer { border:0;padding:0 0 24px var(--auth-inset); }
 .epass-auth > .epass-footer nav { justify-content:flex-end;margin-inline-start:auto;gap:16px; }
 @media(max-width:479px) { .epass-auth .epass-methods { grid-template-columns:repeat(2,minmax(0,1fr)); } }
