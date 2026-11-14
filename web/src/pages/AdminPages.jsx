@@ -1,3 +1,4 @@
+import {CopyButton} from '../components/CopyButton';
 import {RolePicker} from '../components/RolePicker';
 import {StepUpFields} from '../components/StepUpFields';
 import {roleMfaMethods, roleProofReady} from '../lib/admin-role-change';
@@ -227,11 +228,10 @@ function InlineCode({ children }) {
 }
 
 function CodeBlock({ children }) {
-  return (
-    <pre className="overflow-x-auto rounded-panel border border-accent bg-subtle p-4 text-sm leading-6 text-ink">
-      <code>{children}</code>
-    </pre>
-  );
+  return <div className="epass-code-block">
+    <div className="epass-code-toolbar"><CopyButton text={String(children)} /></div>
+    <pre><code>{children}</code></pre>
+  </div>;
 }
 
 function InfoRow({ label, value }) {
@@ -1348,7 +1348,6 @@ function OidcDocsContent({ discovery, oidcSettings }) {
   const revocationEndpoint = oidcSettings?.revocation_endpoint || discovery?.revocation_endpoint || '';
   const accessTokenTtl = oidcSettings?.access_token_ttl_seconds || '';
   const refreshTokenTtl = oidcSettings?.refresh_token_ttl_seconds || '';
-  const [copying, setCopying] = useState(false);
 
   const docsMarkdown = [
     '# OIDC 接入文档',
@@ -1524,25 +1523,6 @@ Authorization: Bearer ACCESS_TOKEN`,
     '',
   ].join('\n');
 
-  async function copyDocsAsMarkdown() {
-    if (copying) return;
-    setCopying(true);
-    try {
-      await navigator.clipboard.writeText(docsMarkdown);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = docsMarkdown;
-      textarea.setAttribute('readonly', 'true');
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    } finally {
-      setCopying(false);
-    }
-  }
 
   return (
     <div className="epass-doc-body">
@@ -1552,9 +1532,7 @@ Authorization: Bearer ACCESS_TOKEN`,
         description="通过 OIDC 接入 Rosemary Epass，完成登录、授权与会话管理。"
         actions={(
           <>
-            <FormaButton type="button" className="btn-secondary" onClick={() => void copyDocsAsMarkdown()} disabled={copying}>
-              {copying ? '复制中...' : '复制为 MD'}
-            </FormaButton>
+            <CopyButton text={docsMarkdown} label="复制为 MD">复制为 MD</CopyButton>
             <Link to="/docs/flutter-sdk" className="btn-primary">
               Flutter SDK 接入
             </Link>

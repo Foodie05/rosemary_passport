@@ -23,6 +23,7 @@ const previewUsers=[session.user,
  {id:'epass-04',email:'long.account.address.for.layout.verification@example.com',phone_number:'+86 139 0013 9000',nickname:'一个用于验证长昵称换行与联系方式对齐的示例用户',roles:['user']},
  {id:'epass-05',email:'',phone_number:'+86 137 0013 7000',nickname:'',roles:['user']},
 ];
+const copyCheck = new URLSearchParams(location.search).has('copycheck');
 const view = new URLSearchParams(location.search).get('view') || 'account';
 function Preview(){
  const [previewRows,setPreviewRows]=useState(previewUsers);
@@ -37,7 +38,7 @@ function Preview(){
  const [systemForm,setSystemForm]=useState({registration_email_verify:true});
  const [oidcForm,setOidcForm]=useState({client_id:'',display_name:'',redirect_uris:'',scopes:['openid','profile'],is_official:false,is_active:true});
  const account = <UserAccountPage session={session} mustBindEmail={false} updateNicknameSilently={noop} listWebAuthnCredentials={async()=>({credentials:[],max_count:5})} sendStepUpCode={noop} />;
- return <MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[view==='account'?'/account':`/admin/${view}`]}><RouteEffects/><Routes>
+ return <MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[view==='account'?'/account':`/admin/${view}`]}><RouteEffects/>{copyCheck && <textarea aria-label="复制验收粘贴区" style={{position:'fixed',bottom:8,right:8,zIndex:99,width:240,height:72}}/>}<Routes>
  <Route path="/admin/register" element={<RegisterPage registerForm={registerForm} setRegisterForm={setRegisterForm} registerMethod={registerMethod} setRegisterMethod={setRegisterMethod} loading={false} registerCodeSending={false} registerCodeCooldownRemaining={0} submitRegister={e=>e.preventDefault()} submitRegisterCode={noop} captchaConfigured={false} legalAccepted={legalAccepted} setLegalAccepted={setLegalAccepted} legalDocuments={{terms:{version:1},privacy:{version:1}}} />}/>
  <Route path="/admin/docs" element={<AdminOidcDocsPage discovery={{issuer:'https://auth.example.com'}} oidcSettings={{}}/>}/>
  <Route path="/admin/flutter" element={<AdminFlutterSdkDocsPage discovery={{issuer:'https://auth.example.com'}} oidcSettings={{}}/>}/>

@@ -359,7 +359,7 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-auth-body { display:flex;flex:1;min-width:0;margin-block:24px; }
 .epass-auth-grid { flex:1;min-width:0;min-height:0;background:transparent; }
 .epass-auth-brand { padding:var(--auth-inset);background:transparent; }
-.epass-auth-panel { min-width:0;padding:var(--auth-inset);border-radius:20px;background:var(--r-semantic-color-surface-group); }
+.epass-auth-panel { align-self:center;min-width:0;padding:var(--auth-inset);border-radius:20px;background:var(--r-semantic-color-surface-group); }
 .epass-auth-panel > div { max-width:none; }
 .epass-auth > .epass-footer { border:0;padding:0 var(--auth-inset) 24px; }
 .epass-auth > .epass-footer nav { justify-content:flex-end;margin-inline-start:auto;gap:16px; }
@@ -373,3 +373,12 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-sliding-content { position:relative;overflow:hidden;min-width:0; }
 .epass-slide-ghost { position:absolute;inset:0 0 auto;pointer-events:none; }
 @media(max-width:479px) { .epass-auth .epass-login-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+/* SDK button focus remains intact for Tab; pointer selection only uses the indicator. */
+.rm-theme .epass-methods[data-pointer-focus] .rm-button:focus { outline:none; }
+.epass-code-block { position:relative;min-width:0;border:0;border-radius:12px;background:var(--r-semantic-color-surface-inset); }
+.epass-code-toolbar { display:flex;justify-content:flex-end;padding:8px 8px 0; }
+.epass-code-block pre { margin:0;border:0;padding:8px 16px 16px;overflow:auto;max-width:100%;font-size:14px;line-height:1.7;color:var(--r-semantic-color-ink); }
+.epass-copy-control { display:inline-flex;position:relative;align-items:center;gap:8px; }
+.epass-copy-control[data-copied] { color:var(--r-semantic-color-success); }
+.epass-copy-error { font-size:12px;color:var(--r-semantic-color-danger); }

@@ -1,4 +1,4 @@
-import { Component, createRef, useLayoutEffect, useRef, useState } from 'react';
+import { Component, createRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useReducedMotion } from './MotionPreferences';
 
 // Resolve the published CSS tokens so presentation has a single source of truth.
@@ -10,6 +10,12 @@ export function motionDuration(name) { return parseFloat(motionToken(name)) || 0
 export function SelectionGroup({ value, label, className = '', indicator: showIndicator = true, children }) {
   const ref = useRef(null);
   const [indicator, setIndicator] = useState(null);
+  const [pointerFocus, setPointerFocus] = useState(false);
+  useEffect(() => {
+    const keyboard = event => { if (event.key === 'Tab') setPointerFocus(false); };
+    window.addEventListener('keydown', keyboard, true);
+    return () => window.removeEventListener('keydown', keyboard, true);
+  }, []);
   useLayoutEffect(() => {
     if (!showIndicator) return;
     const element = ref.current;
@@ -23,7 +29,7 @@ export function SelectionGroup({ value, label, className = '', indicator: showIn
     [...element.children].forEach((child) => { if (child.tagName === 'BUTTON') observer.observe(child); });
     return () => observer.disconnect();
   }, [value, showIndicator]);
-  return <div ref={ref} className={`epass-methods ${className}`} role="group" aria-label={label}>
+  return <div ref={ref} className={`epass-methods ${className}`} data-pointer-focus={pointerFocus || undefined} onPointerDownCapture={() => setPointerFocus(true)} role="group" aria-label={label}>
     {children}
     {showIndicator && indicator && <span className="epass-selection-indicator" aria-hidden="true" style={indicator} />}
   </div>;
@@ -103,7 +109,7 @@ class SlidingPanel extends Component {
         input.checked = original.checked;
       }
     });
-    return { clone, height:this.host.current.getBoundingClientRect().height, transform:getComputedStyle(live).transform, hadFocus:live.contains(document.activeElement), direction:this.props.index < previous.index ? -1 : 1 };
+    return { clone, height:this.host.current.getBoundingClientRect().height, transform:getComputedStyle(live).transform, opacity:getComputedStyle(live).opacity, hadFocus:live.contains(document.activeElement), direction:this.props.index < previous.index ? -1 : 1 };
   }
 
   componentDidUpdate(previous, state, snapshot) {
@@ -124,8 +130,8 @@ class SlidingPanel extends Component {
     const serial = ++this.serial;
     this.height = nextHeight;
     this.animations = [
-      ghost.animate([{transform:snapshot.transform}, {transform:`translateX(${-snapshot.direction * width}px)`}], {duration,easing,fill:'both'}),
-      live.animate([{transform:`translateX(${snapshot.direction * width}px)`},{transform:'translateX(0px)'}], {duration,easing}),
+      ghost.animate([{transform:snapshot.transform,opacity:snapshot.opacity}, {transform:`translateX(${-snapshot.direction * width}px)`,opacity:0}], {duration,easing,fill:'both'}),
+      live.animate([{transform:`translateX(${snapshot.direction * width}px)`,opacity:0},{transform:'translateX(0px)',opacity:1}], {duration,easing}),
       host.animate([{height:`${snapshot.height}px`},{height:`${nextHeight}px`}], {duration,easing:'linear'}),
     ];
     Promise.allSettled(this.animations.map(animation => animation.finished)).then(() => {
