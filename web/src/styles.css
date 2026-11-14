@@ -362,6 +362,6 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-auth-brand { padding:var(--auth-inset);background:transparent; }
 .epass-auth-panel { min-width:0;padding:var(--auth-inset);border-radius:20px;background:var(--r-semantic-color-surface-group); }
 .epass-auth-panel > div { max-width:none; }
-.epass-auth > .epass-footer { border:0;padding:0 0 24px var(--auth-inset); }
+.epass-auth > .epass-footer { border:0;padding:0 var(--auth-inset) 24px; }
 .epass-auth > .epass-footer nav { justify-content:flex-end;margin-inline-start:auto;gap:16px; }
 @media(max-width:479px) { .epass-auth .epass-methods { grid-template-columns:repeat(2,minmax(0,1fr)); } }
