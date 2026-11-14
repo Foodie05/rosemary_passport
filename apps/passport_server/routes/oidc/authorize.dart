@@ -301,10 +301,13 @@ Response authorizationConsentPage(
   final brandLogoUrl = Uri.parse(
     context.read<AppConfig>().webBaseUrl,
   ).resolve('/brand/rosemary.png').toString();
+  final webBaseUrl = _escapeHtml(
+    context.read<AppConfig>().webBaseUrl.replaceAll(RegExp(r'/+$'), ''),
+  );
   final escapedTitle = _escapeHtml('是否授权登录 $clientDisplayName？');
   final badgeLabel = isOfficial ? '官方应用' : '第三方应用';
   final escapedBadgeLabel = _escapeHtml(badgeLabel);
-  // Official @rosemary-ui/icons 0.4.0 check.svg; explicit size also supports
+  // Official @rosemary-ui/icons 0.5.0 check.svg; explicit size also supports
   // browsers that do not infer an inline SVG's height inside a flex container.
   final officialIcon = isOfficial
       ? '''<span class="trust-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>'''
@@ -344,39 +347,35 @@ Response authorizationConsentPage(
     <style>$epassDocumentStyles</style>
   </head>
   <body>
+    ${epassDocumentTools(_escapeHtml(brandLogoUrl), webBaseUrl)}
     <div class="shell">
       <section class="brand-side">
         <div class="brand-wrap">
           <div class="brand-copy">
-            <p class="eyebrow">Rosemary Epass 授权确认</p>
             <h2>你的账户，<br />由你决定如何连接。</h2>
-            <p>查看应用申请的信息，确认后继续登录。</p>
           </div>
-          <div class="brand-foot">ROSEMARY EPASS</div>
+          <div class="brand-emblem" aria-hidden="true">$epassConsentEmblem</div>
         </div>
       </section>
-      <main class="main">
-        <div class="panel-stack">
-          <section class="panel">
+      <main id="auth-main" class="main" tabindex="-1">
+          <section class="panel" aria-labelledby="consent-title">
             <div class="panel-top">
-              ${epassBrandMarkup(brandLogoUrl, compact: true)}
+              <div class="trust-badge">$officialIcon<span>$escapedBadgeLabel</span></div>
               <a class="switch-account" href="${_escapeHtml(switchAccountUrl)}">切换账号</a>
             </div>
-          <div class="trust-badge">
-            $officialIcon<span>$escapedBadgeLabel</span>
-          </div>
-          <h1>$escapedTitle</h1>
+          <h1 id="consent-title">$escapedTitle</h1>
           ${scopeLines.isEmpty ? '<p class="subtitle">该应用将使用 Rosemary Epass 验证你的登录状态。</p>' : '<p class="permission-head">此应用将获得以下信息：</p><ul class="permission-list">$scopeListHtml</ul>'}
           <div class="actions">
             <a class="button secondary" href="${_escapeHtml(cancelUrl)}">取消</a>
             <a id="approve-button" class="button primary" href="${_escapeHtml(approveUrl)}">$epassLoadingMarkup<span id="approve-label">确认</span></a>
           </div>
+          <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">账户中心</a>
           </section>
-          <a class="account-center" href="${_escapeHtml(accountCenterUrl)}">Rosemary Epass 账号中心 <span aria-hidden="true">→</span></a>
-        </div>
       </main>
     </div>
+    ${epassDocumentFooter(webBaseUrl)}
     <script>
+      $epassDocumentThemeScript
       (function() {
         var approveButton = document.getElementById('approve-button');
         if (!approveButton) return;
