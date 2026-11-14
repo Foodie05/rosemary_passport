@@ -121,9 +121,7 @@ function LoadingButtonText({ loading, loadingText, idleText, icon: Icon }) {
 
 function BrandSection() {
   return <aside className="epass-auth-brand" aria-label="关于 Rosemary Epass">
-    <span className="epass-eyebrow">YOUR ROSEMARY ACCOUNT</span>
-    <h2>一个账户，<br />连接 Rosemary 服务。</h2>
-    <p>登录并管理你的账户与安全设置。</p>
+    <h2>登陆通行证<br />畅行所有Rosemary平台</h2>
     <BrandDrawing />
   </aside>;
 }
