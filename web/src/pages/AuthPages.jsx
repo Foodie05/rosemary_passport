@@ -1,10 +1,11 @@
 import { FormaButton, FormaInput, FormaLoading } from '../components/Forma';
 import { Link, useNavigate } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
-import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
+import { SlidingSelectionContent, SelectionGroup, SelectionContent } from '../design/SelectionMotion';
 import { useEffect, useId, useState } from 'react';
 import { NewPasswordField } from '../components/NewPasswordField';
 import { evaluatePassword } from '../lib/password-policy';
+import { resolveCodeLoginIdentifier, isAuthorizationLogin } from '../lib/login-identity';
 import { Dialog } from '../components/Dialog';
 import { Brand, BrandDrawing, SiteFooter } from '../components/Brand';
 import {
@@ -33,36 +34,27 @@ import {
 function AuthPageFrame({ children }) {
   return <div className="epass-auth">
     <a href="#auth-main" className="epass-skip">跳到主要内容</a>
-    <header className="epass-auth-header"><Brand /><ThemeToggle /></header>
+    <div className="epass-auth-tools"><Brand /><ThemeToggle /></div>
     <main id="auth-main" className="epass-auth-body" tabIndex={-1}>{children}</main>
     <SiteFooter />
   </div>;
 }
 
-function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onChange, ...inputProps }) {
+function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onChange, verification, ...inputProps }) {
   const id = useId();
   const [visible, setVisible] = useState(false);
   const password = type === 'password';
-  const autoComplete = password ? (label.includes('新') || label.includes('设置') ? 'new-password' : 'current-password') : label.includes('验证码') || label.includes('动态码') ? 'one-time-code' : label.includes('邮箱') ? 'email' : label.includes('手机') ? 'tel' : undefined;
-  return <div className="epass-auth-field">
-    <label htmlFor={id}>{label}</label>
-    <div className="relative">
-      <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={20} aria-hidden="true" />
-      <FormaInput id={id} name={inputProps.name || autoComplete || id} type={password && visible ? 'text' : type} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={onChange} className={`input-field pl-12 ${password ? 'pr-12' : ''}`} {...inputProps} />
-      {password && <FormaButton type="button" className="epass-password-toggle" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</FormaButton>}
-    </div>
+  const autoComplete = password ? 'current-password' : label.includes('验证码') || label.includes('动态码') ? 'one-time-code' : label.includes('邮箱') ? 'email' : label.includes('手机') ? 'tel' : undefined;
+  return <div className={`epass-auth-field ${password ? 'epass-new-password' : ''}`}>
+    <FormaInput id={id} label={label} name={inputProps.name || autoComplete || id} type={password && visible ? 'text' : type} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={onChange} className={`input-field ${password ? 'pr-12' : ''}`} validateEmail={!password && (type === 'email' || label === '邮箱地址')} verification={verification} {...inputProps} />
+    {password && <FormaButton type="button" className="epass-password-visibility" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</FormaButton>}
   </div>;
 }
 
-function CodeInputWithAction({ icon: Icon, label, placeholder, value, onChange, actionLabel, onAction, actionDisabled }) {
-  const id = useId();
-  return <div className="epass-auth-field">
-    <label htmlFor={id}>{label}</label>
-    <div className="flex flex-wrap gap-2">
-      <div className="relative min-w-0 flex-1 basis-32"><Icon size={20} aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" /><FormaInput id={id} name="verification-code" autoComplete="one-time-code" inputMode="numeric" type="text" placeholder={placeholder} value={value} onChange={onChange} className="input-field pl-12" /></div>
-      <FormaButton type="button" className="btn-secondary" onClick={onAction} disabled={actionDisabled}>{actionLabel}</FormaButton>
-    </div>
-  </div>;
+function CodeInputWithAction({ label, placeholder, value, onChange, actionLabel, onAction, actionDisabled }) {
+  return <FormaInput label={label} name="verification-code" autoComplete="one-time-code" inputMode="numeric" type="text" placeholder={placeholder} value={value} onChange={onChange} className="input-field"
+    requirements={[{id:'code-length', label:'输入 6 位数字验证码', check:value => /^\d{6}$/.test(value)}]}
+    verification={<FormaButton type="button" variant="secondary" onClick={onAction} disabled={actionDisabled}>{actionLabel}</FormaButton>} />;
 }
 
 function RememberMeCheckbox({ checked, onChange }) {
@@ -75,21 +67,21 @@ function RememberMeCheckbox({ checked, onChange }) {
 
 function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
   return (
-    <div className="epass-legal-check flex items-start gap-2.5 px-1 text-sm leading-6 text-muted">
-      <RosemaryCheckbox
-        checked={checked}
-        onCheckedChange={onChange}
-        disabled={disabled}
-        ariaLabel="同意使用条款与隐私政策"
-      />
+    <RosemaryCheckbox
+      className="epass-legal-check px-1 text-sm leading-6 text-muted"
+      checked={checked}
+      onCheckedChange={onChange}
+      disabled={disabled}
+      ariaLabel="同意使用条款与隐私政策"
+    >
       <span>
-        我已阅读并同意
+        <span>我已阅读并同意</span>
         <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-ink underline underline-offset-4">《使用条款》</Link>
-        与
+        <span>与</span>
         <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-ink underline underline-offset-4">《隐私政策》</Link>
-        {documents?.terms && documents?.privacy ? `（版本 ${documents.terms.version}/${documents.privacy.version}）` : ''}
+        {documents?.terms && documents?.privacy ? <span>{`（版本 ${documents.terms.version}/${documents.privacy.version}）`}</span> : null}
       </span>
-    </div>
+    </RosemaryCheckbox>
   );
 }
 
@@ -105,10 +97,9 @@ function AccountCenterLink({ requestLegalAcceptance }) {
   return (
     <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
       to="/account"
-      className="mx-auto flex w-fit items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-muted transition-colors hover:bg-subtle hover:text-ink"
+      className="ml-auto px-1 py-1 text-sm font-semibold text-muted hover:text-ink"
     >
       账户中心
-      <ArrowRight size={15} aria-hidden="true" />
     </AuthActionLink>
   );
 }
@@ -129,9 +120,7 @@ function LoadingButtonText({ loading, loadingText, idleText, icon: Icon }) {
 
 function BrandSection() {
   return <aside className="epass-auth-brand" aria-label="关于 Rosemary Epass">
-    <span className="epass-eyebrow">YOUR ROSEMARY ACCOUNT</span>
-    <h2>一个账户，<br />连接 Rosemary 服务。</h2>
-    <p>登录并管理你的账户与安全设置。</p>
+    <h2>登陆通行证<br />畅行所有Rosemary平台</h2>
     <BrandDrawing />
   </aside>;
 }
@@ -141,7 +130,7 @@ function FactorListItem({ title, subtitle, onClick }) {
     <FormaButton
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between rounded-panel border border-line bg-surface px-5 py-4 text-left transition-colors hover:border-control hover:bg-canvas"
+      className="flex w-full items-center justify-between rounded-panel bg-surface px-5 py-4 text-left transition-colors hover:bg-canvas"
     >
       <div className="space-y-1">
         <p className="text-base font-bold text-ink">{title}</p>
@@ -189,7 +178,11 @@ export function LoginPage({
   requestLegalAcceptance,
   legalDocuments,
   authNext = '',
+  currentUser = null,
 }) {
+  const [identifierError, setIdentifierError] = useState('');
+  const loginTab = ['phone_code', 'email_code'].includes(loginMethod) ? 'code' : loginMethod;
+  const loginTabs = [['code', '验证码'], ['webauthn', '通行密钥'], ['password', '密码']];
   const [webauthnLoading, setWebauthnLoading] = useState(false);
   const [webauthnError, setWebauthnError] = useState('');
 
@@ -204,17 +197,24 @@ export function LoginPage({
     setWebauthnError('');
   }, [loginMethod, loginForm.email]);
 
-  function switchTab(nextMethod) {
+  function switchTab(tab) {
+    const identity = resolveCodeLoginIdentifier(loginForm.identifier);
+    const nextMethod = tab === 'code' ? (identity?.method || (loginForm.identifier?.includes('@') ? 'email_code' : 'phone_code')) : tab;
     if (nextMethod === loginMethod && loginStep === 'credentials') {
       return;
     }
     setLoginMethod(nextMethod);
+    if (tab === 'code') setLoginForm(current => ({...current,
+      email:nextMethod === 'email_code' ? (identity?.identifier || current.identifier?.trim() || '') : '',
+      phone_number:nextMethod === 'phone_code' ? (identity?.identifier || current.identifier?.trim() || '') : '',
+    }));
     setLoginStep('credentials');
     setSelectedPasswordFactor('');
   }
 
   function switchAccount() {
     setLoginForm({
+      identifier: '',
       email: '',
       phone_number: '',
       password: '',
@@ -259,10 +259,10 @@ export function LoginPage({
             <CodeInputWithAction icon={ShieldCheck} label="邮箱验证码" value={loginForm.email_code} onChange={(event) => setLoginForm((current) => ({ ...current, email_code: event.target.value }))} actionLabel={loginCodeSending ? '发送中...' : '重新发送'} onAction={() => void selectDirectLoginStepUpFactor('email_code')} actionDisabled={loginCodeSending} />
           ) : null}
           {view.selectedPasswordFactor === 'phone_code' ? (
-            <CodeInputWithAction icon={ShieldCheck} label="手机验证码" value={loginForm.phone_code} onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value.replace(/\D/g, '') }))} actionLabel={loginCodeSending ? '发送中...' : '重新发送'} onAction={() => void selectDirectLoginStepUpFactor('phone_code')} actionDisabled={loginCodeSending} />
+            <CodeInputWithAction icon={ShieldCheck} label="手机验证码" value={loginForm.phone_code} onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value }))} actionLabel={loginCodeSending ? '发送中...' : '重新发送'} onAction={() => void selectDirectLoginStepUpFactor('phone_code')} actionDisabled={loginCodeSending} />
           ) : null}
           {view.selectedPasswordFactor === 'authenticator' ? (
-            <AuthInput icon={ShieldCheck} label="Authenticator 动态验证码" value={loginForm.authenticator_code} onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value.replace(/\D/g, '') }))} />
+            <AuthInput icon={ShieldCheck} label="Authenticator 动态验证码" value={loginForm.authenticator_code} onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value }))} />
           ) : null}
           {view.selectedPasswordFactor === 'webauthn' ? (
             <FormaButton
@@ -301,23 +301,31 @@ export function LoginPage({
       );
     }
 
+    if (['phone_code', 'email_code'].includes(view.method) && view.step === 'credentials') {
+      return <form className="space-y-6" onSubmit={event => {
+        if (!resolveCodeLoginIdentifier(loginForm.identifier)) {
+          event.preventDefault();
+          setIdentifierError('请输入有效的手机号或邮箱地址。');
+          return;
+        }
+        return (view.method === 'email_code' ? prepareEmailCodeLogin : preparePhoneCodeLogin)(event);
+      }}>
+        <AuthInput label="手机号或邮箱" autoComplete="username" placeholder="手机号或邮箱地址" value={loginForm.identifier || ''} error={identifierError}
+          onChange={event => {
+            const raw = event.target.value;
+            const identity = resolveCodeLoginIdentifier(raw);
+            const method = identity?.method || (raw.includes('@') ? 'email_code' : 'phone_code');
+            setIdentifierError('');
+            setLoginMethod(method);
+            setLoginForm(current => ({...current,identifier:raw,email:method === 'email_code' ? (identity?.identifier || raw.trim()) : '',phone_number:method === 'phone_code' ? (identity?.identifier || raw.trim()) : '',email_code:'',phone_code:''}));
+          }} />
+        <FormaButton type="submit" disabled={loading || loginCodeSending} className="btn-primary flex w-full items-center justify-center gap-2">
+          <LoadingButtonText loading={loading || loginCodeSending} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
+        </FormaButton>
+      </form>;
+    }
+
     if (view.method === 'phone_code') {
-      if (view.step === 'credentials') {
-        return (
-          <form className="space-y-6" onSubmit={preparePhoneCodeLogin}>
-            <AuthInput
-              icon={Smartphone}
-              label="手机号"
-              placeholder="13800138000"
-              value={loginForm.phone_number}
-              onChange={(event) => setLoginForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
-            />
-            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
-              <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
-            </FormaButton>
-          </form>
-        );
-      }
 
       return (
         <form className="space-y-6" onSubmit={completePhoneCodeLogin}>
@@ -326,7 +334,7 @@ export function LoginPage({
             label="手机验证码"
             placeholder="6位验证码"
             value={loginForm.phone_code}
-            onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value.replace(/\D/g, '') }))}
+            onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value }))}
             actionLabel={loginCodeSending ? '发送中...' : loginCodeCooldownRemaining > 0 ? `${loginCodeCooldownRemaining} 秒后重发` : '发送验证码'}
             onAction={() => void resendPhoneCodeLogin()}
             actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
@@ -334,28 +342,12 @@ export function LoginPage({
           <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
           </FormaButton>
+          <FormaButton type="button" className="w-full" onClick={() => setLoginStep('credentials')}>更改手机号或邮箱</FormaButton>
         </form>
       );
     }
 
     if (view.method === 'email_code') {
-      if (view.step === 'credentials') {
-        return (
-          <form className="space-y-6" onSubmit={prepareEmailCodeLogin}>
-            <AuthInput
-              icon={Mail}
-              label="邮箱地址"
-              placeholder="name@example.com"
-              value={loginForm.email}
-              onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
-            />
-
-            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
-              <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
-            </FormaButton>
-          </form>
-        );
-      }
 
       return (
         <form className="space-y-6" onSubmit={completeEmailCodeLogin}>
@@ -372,20 +364,7 @@ export function LoginPage({
           <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
           </FormaButton>
-          <FormaButton
-            type="button"
-            onClick={() => {
-              if (selectedPasswordFactor) {
-                setSelectedPasswordFactor('');
-              } else {
-                setLoginStep('credentials');
-              }
-            }}
-            className="flex w-full items-center justify-center gap-2 text-sm font-bold text-muted transition-colors hover:text-ink"
-          >
-            <ChevronLeft size={18} />
-            {selectedPasswordFactor ? '返回验证方式' : '返回上一步'}
-          </FormaButton>
+          <FormaButton type="button" className="w-full" onClick={() => setLoginStep('credentials')}>更改手机号或邮箱</FormaButton>
         </form>
       );
     }
@@ -514,7 +493,7 @@ export function LoginPage({
               label="Authenticator 动态验证码"
               placeholder="6位动态验证码"
               value={loginForm.authenticator_code}
-              onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value.replace(/\D/g, '') }))}
+              onChange={(event) => setLoginForm((current) => ({ ...current, authenticator_code: event.target.value }))}
             />
             <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
               <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
@@ -529,7 +508,7 @@ export function LoginPage({
               label="手机验证码"
               placeholder="6位验证码"
               value={loginForm.phone_code}
-              onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value.replace(/\D/g, '') }))}
+              onChange={(event) => setLoginForm((current) => ({ ...current, phone_code: event.target.value }))}
               actionLabel={loginCodeSending ? '发送中...' : loginCodeCooldownRemaining > 0 ? `${loginCodeCooldownRemaining} 秒后重发` : '发送验证码'}
               onAction={() => void resendPasswordPhoneCode()}
               actionDisabled={loginCodeSending || loginCodeCooldownRemaining > 0}
@@ -595,46 +574,42 @@ export function LoginPage({
       <div className="epass-auth-grid">
         <BrandSection />
 
-        <div className="epass-auth-panel">
-          <div className="mx-auto w-full max-w-md space-y-8">
+        <div className="epass-auth-panel epass-login-panel">
+          <div className="epass-login-content mx-auto w-full max-w-md">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
                   <h1 className="text-3xl font-bold text-ink">登录</h1>
                   <p className="text-muted">
-                    {loginMethod === 'phone_code'
-                      ? '请输入手机号并使用短信验证码完成登录。'
-                      : loginStep === 'credentials'
-                        ? '选择一种方式，登录 Rosemary Epass。'
-                        : '请完成身份验证，继续登录。'}
+                    {loginStep === 'credentials' ? '选择一种方式，登录 Rosemary Epass。' : '请完成身份验证，继续登录。'}
                   </p>
                 </div>
-                <FormaButton
+                {currentUser && <FormaButton
                   type="button"
                   onClick={switchAccount}
-                  className="shrink-0 rounded-control border border-line bg-surface px-3 py-2 text-sm font-semibold text-muted  transition-colors hover:border-control hover:bg-canvas hover:text-ink"
+                  className="shrink-0 rounded-control bg-surface px-3 py-2 text-sm font-semibold text-muted  transition-colors hover:bg-canvas hover:text-ink"
                 >
                   切换账号
-                </FormaButton>
+                </FormaButton>}
               </div>
-              <SelectionGroup value={loginMethod} label="登录方式">
-                {[['phone_code', '手机'], ['email_code', '邮箱'], ['webauthn', '通行密钥'], ['password', '密码']].map(([method, label]) => <FormaButton key={method} type="button" aria-pressed={loginMethod === method} onClick={() => switchTab(method)}>{label}</FormaButton>)}
+              <SelectionGroup value={loginTab} label="登录方式" className="epass-login-tabs">
+                {loginTabs.map(([method, label]) => <FormaButton key={method} type="button" aria-pressed={loginTab === method} disabled={loading || loginCodeSending || webauthnLoading} onClick={() => switchTab(method)}>{label}</FormaButton>)}
               </SelectionGroup>
             </div>
 
             <div className="relative py-1">
 
-                <SelectionContent value={`${loginMethod}:${loginStep}:${selectedPasswordFactor}`} index={['phone_code', 'email_code', 'webauthn', 'password'].indexOf(loginMethod)} className="auth-current-step">
+                <SlidingSelectionContent value={`${loginTab}:${loginStep}:${selectedPasswordFactor}`} index={loginTabs.findIndex(([method]) => method === loginTab)} className="auth-current-step">
                   {renderPanel({
                     method: loginMethod,
                     step: loginStep,
                     selectedPasswordFactor,
                   })}
-                </SelectionContent>
+                </SlidingSelectionContent>
 
             </div>
 
-            <div className="space-y-4">
+            <div className="epass-login-options">
               <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} disabled={loading || loginCodeSending || webauthnLoading} />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
@@ -647,18 +622,13 @@ export function LoginPage({
                 </p>
               </div>
 
-              <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
-                to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
-                className="group flex w-full items-center justify-between gap-3 px-1 py-1 text-left"
-              >
-                <span className="min-w-0 text-sm">
-                  <span className="font-bold text-ink transition-colors group-hover:text-ink">忘记密码？</span>
-                  <span className="ml-2 text-muted">使用已绑定的验证方式重置密码</span>
-                </span>
-                <ArrowRight size={17} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </AuthActionLink>
-
-              <AccountCenterLink requestLegalAcceptance={requestLegalAcceptance} />
+              <div className="flex items-center justify-between gap-4">
+                <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
+                  to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
+                  className="px-1 py-1 text-sm font-bold text-ink hover:underline"
+                >忘记密码？</AuthActionLink>
+                {isAuthorizationLogin(authNext) && <AccountCenterLink requestLegalAcceptance={requestLegalAcceptance} />}
+              </div>
             </div>
           </div>
         </div>
@@ -762,6 +732,7 @@ export function RegisterPage({
                 placeholder="name@example.com"
                 value={registerForm.email}
                 disabled={verificationComplete}
+                verification={<div className="space-y-2" aria-label="人机验证"><p className="text-sm text-muted">人机验证</p>{captchaConfigured ? <><div id="aliyun-register-captcha" ref={captchaRef} className="min-h-10" /><p className="text-sm text-muted">发送验证码前需要先完成一次人机验证。</p></> : <p className="text-sm text-muted">当前不可用</p>}</div>}
                 onChange={(event) => setRegisterForm((current) => ({ ...current, email: event.target.value }))}
               />
             ) : (
@@ -771,49 +742,25 @@ export function RegisterPage({
                 placeholder="13800138000"
                 value={registerForm.phone_number}
                 disabled={verificationComplete}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, phone_number: event.target.value.replace(/[^\d+]/g, '') }))}
+                verification={<div className="space-y-2" aria-label="人机验证"><p className="text-sm text-muted">人机验证</p>{captchaConfigured ? <><div id="aliyun-register-captcha" ref={captchaRef} className="min-h-10" /><p className="text-sm text-muted">发送验证码前需要先完成一次人机验证。</p></> : <p className="text-sm text-muted">当前不可用</p>}</div>}
+                onChange={(event) => setRegisterForm((current) => ({ ...current, phone_number: event.target.value }))}
               />
             )}
             {verificationComplete ? (
-              <div className="rounded-panel border border-line bg-canvas px-4 py-3 text-sm font-bold text-ink">
+              <div className="rounded-panel bg-canvas px-4 py-3 text-sm font-bold text-ink">
                 验证码已通过，请填写昵称和密码完成注册。
               </div>
             ) : (
-            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-[minmax(0,1fr)_auto]">
-              <AuthInput
-                icon={ShieldCheck}
-                label={registerMethod === 'email' ? '邮箱验证码' : '短信验证码'}
-                placeholder="输入验证码"
-                value={registerMethod === 'email' ? registerForm.email_code : registerForm.phone_code}
-                onChange={(event) => setRegisterForm((current) => ({ ...current, [registerMethod === 'email' ? 'email_code' : 'phone_code']: event.target.value }))}
-              />
-              <FormaButton type="button" onClick={() => void submitRegisterCode()} className="btn-secondary whitespace-nowrap px-4 min-[400px]:mt-[30px]" disabled={registerCodeDisabled}>
-                <LoadingButtonText
-                  loading={registerCodeSending}
-                  loadingText="发送中..."
-                  idleText={registerCodeCooldownRemaining > 0 ? `${registerCodeCooldownRemaining} 秒后重发` : '发送验证码'}
-                />
-              </FormaButton>
-            </div>
+            <CodeInputWithAction
+              label={registerMethod === 'email' ? '邮箱验证码' : '短信验证码'} placeholder="输入验证码"
+              value={registerMethod === 'email' ? registerForm.email_code : registerForm.phone_code}
+              onChange={event => setRegisterForm(current => ({...current, [registerMethod === 'email' ? 'email_code' : 'phone_code']:event.target.value}))}
+              actionLabel={registerCodeSending ? '发送中…' : registerCodeCooldownRemaining > 0 ? `${registerCodeCooldownRemaining} 秒后重发` : '发送验证码'}
+              onAction={() => void submitRegisterCode()} actionDisabled={registerCodeDisabled} />
             )}
             <NewPasswordField value={registerForm.password} personalInfo={[registerForm.nickname, registerForm.email, registerForm.phone_number]} onChange={(event) => setRegisterForm((current) => ({ ...current, password: event.target.value }))} />
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted">
-                <ShieldCheck size={14} />
-                人机验证
-              </div>
-              <div className="rounded-panel border border-line bg-canvas p-4">
-                {captchaConfigured ? (
-                  <div className="space-y-3">
-                    <div id="aliyun-register-captcha" ref={captchaRef} className="min-h-10" />
-                    <p className="text-xs text-muted">发送验证码前需要先完成一次人机验证。</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted">当前不可用</p>
-                )}
-              </div>
-            </div>
+
 
             <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} disabled={loading || registerCodeSending} />
 
@@ -1048,8 +995,8 @@ export function PostRegisterBindingPrompt({
     <FormaButton type="button" className="btn-secondary" onClick={onSkip} disabled={sending || saving}>跳过</FormaButton>
     <FormaButton type="button" className="btn-primary" onClick={() => void handleConfirm()} disabled={saving || !codeSent || !code.trim() || !account.trim()}><LoadingButtonText loading={saving} loadingText="验证并绑定中…" idleText="验证并添加" /></FormaButton>
   </>}><div className="space-y-5"><p className="text-sm text-muted">添加另一种联系方式，用于登录和恢复账户。</p>
-    <AuthInput icon={bindingPhone ? Smartphone : Mail} label={bindingPhone ? '手机号码' : '邮箱地址'} type={bindingPhone ? 'tel' : 'email'} placeholder={bindingPhone ? '13800138000' : 'name@example.com'} value={account} onChange={(event) => setAccount(bindingPhone ? event.target.value.replace(/[^\d+]/g, '') : event.target.value)} />
-    <CodeInputWithAction icon={ShieldCheck} label={bindingPhone ? '短信验证码' : '邮箱验证码'} placeholder="输入验证码" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} onAction={() => void handleSendCode()} actionDisabled={sending || cooldown > 0 || !account.trim()} actionLabel={sending ? '发送中…' : cooldown > 0 ? `${cooldown} 秒后重发` : '发送验证码'} />
+    <AuthInput icon={bindingPhone ? Smartphone : Mail} label={bindingPhone ? '手机号码' : '邮箱地址'} type={bindingPhone ? 'tel' : 'email'} placeholder={bindingPhone ? '13800138000' : 'name@example.com'} value={account} onChange={(event) => setAccount(event.target.value)} />
+    <CodeInputWithAction icon={ShieldCheck} label={bindingPhone ? '短信验证码' : '邮箱验证码'} placeholder="输入验证码" value={code} onChange={(event) => setCode(event.target.value)} onAction={() => void handleSendCode()} actionDisabled={sending || cooldown > 0 || !account.trim()} actionLabel={sending ? '发送中…' : cooldown > 0 ? `${cooldown} 秒后重发` : '发送验证码'} />
     {error && <p className="rounded-control bg-danger-subtle p-3 text-sm text-danger" role="alert">{error}</p>}
   </div></Dialog>}</AnimatePresence>;
 }

@@ -167,7 +167,7 @@ void main() {
       (await service.updateAccount(
         userId: user.id,
         currentPassword: 'wrong',
-        newPassword: 'A secure historical-compatible passphrase',
+        newPassword: 'New-account-passphrase-2026!',
       )).code,
       'invalid_password',
     );
@@ -232,7 +232,7 @@ void main() {
       final result = await service.updateAccount(
         userId: admin.id,
         currentPassword: 'password',
-        newPassword: 'A secure historical-compatible passphrase',
+        newPassword: 'New-account-passphrase-2026!',
       );
       expect(result.updatedEmail, isFalse);
       expect(result.updatedPassword, isTrue);
@@ -563,7 +563,7 @@ void main() {
       expect(
         (await service.resetPassword(
           userId: 'missing',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
           emailCode: '123456',
         )).code,
         'not_found',
@@ -615,7 +615,7 @@ void main() {
       expect(
         (await service.resetPassword(
           userId: user.id,
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
           emailCode: 'wrong',
         )).code,
         'invalid_code',
@@ -634,7 +634,7 @@ void main() {
       expect(
         (await service.resetPassword(
           userId: user.id,
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
           emailCode: '123456',
         )).ok,
         isTrue,

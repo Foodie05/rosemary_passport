@@ -1,6 +1,6 @@
 name: rosm_passport_flutter
 description: Flutter SDK for native Rosemary Epass sign-in with OIDC and PKCE.
-version: 0.10.0
+version: 0.11.0
 publish_to: none
 
 environment:
@@ -9,10 +9,7 @@ environment:
 
 dependencies:
   rosemary_ui:
-    git:
-      url: https://github.com/Foodie05/Rosemary-Design-System.git
-      ref: 311a81de1651ba049d3acd476725390de38aacc2
-      path: platforms/flutter/rosemary_ui
+    path: vendor/rosemary_ui
   crypto: ^3.0.3
   flutter:
     sdk: flutter

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:rosemary_ui/rosemary_ui.dart';
 
 import 'models.dart';
+import 'step_up.dart';
+import 'account_step_up.dart';
 import 'epass_motion.dart';
 import 'new_password_field.dart';
 import 'password_policy.dart';
@@ -334,7 +336,26 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
     });
   }
 
+  List<String> get _stepUpMethods {
+    final security = _account?.security;
+    if (security == null) return const [];
+    if (security.stepUpMethods.isNotEmpty) return security.stepUpMethods;
+    return [
+      if (security.hasPassword) 'password',
+      if (!security.mustBindEmail) 'email_code',
+      if (security.hasPhone) 'phone_code',
+      if (security.hasAuthenticator) 'authenticator',
+    ];
+  }
+
+  RosmStepUpProof _requireProof(RosmStepUpProof? value) {
+    if (value == null)
+      throw const RosmApiException('verification_required', '请完成一种已绑定的身份验证。');
+    return value;
+  }
+
   Future<void> _openEmailDialog() async {
+    RosmStepUpProof? proof;
     _email.text = _account?.user.email ?? '';
     _currentPassword.clear();
     _code.clear();
@@ -347,6 +368,14 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
             return _SheetBody(
               error: _error,
               child: _EmailSheet(
+                verification: RosmAccountStepUp(
+                  client: widget.client,
+                  methods: _stepUpMethods,
+                  excludedFactor: 'email',
+                  enabled: !_busy,
+                  resetToken: _error,
+                  onChanged: (value) => proof = value,
+                ),
                 email: _email,
                 currentPassword: _currentPassword,
                 code: _code,
@@ -366,6 +395,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                 }),
                 onSubmit: () => _runInSheet(setSheetState, () async {
                   await widget.client.bindEmail(
+                    verification: _requireProof(proof),
                     email: _email.text.trim(),
                     currentPassword: _currentPassword.text,
                     emailCode: _code.text.trim(),
@@ -384,6 +414,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   }
 
   Future<void> _openPhoneDialog() async {
+    RosmStepUpProof? proof;
     _phone.text = _account?.user.phoneNumber ?? '';
     _currentPassword.clear();
     _code.clear();
@@ -396,6 +427,14 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
             return _SheetBody(
               error: _error,
               child: _PhoneSheet(
+                verification: RosmAccountStepUp(
+                  client: widget.client,
+                  methods: _stepUpMethods,
+                  excludedFactor: 'phone',
+                  enabled: !_busy,
+                  resetToken: _error,
+                  onChanged: (value) => proof = value,
+                ),
                 phone: _phone,
                 currentPassword: _currentPassword,
                 code: _code,
@@ -415,6 +454,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                 }),
                 onSubmit: () => _runInSheet(setSheetState, () async {
                   await widget.client.bindPhone(
+                    verification: _requireProof(proof),
                     phoneNumber: _phone.text.trim(),
                     currentPassword: _currentPassword.text,
                     verifyCode: _code.text.trim(),
@@ -433,6 +473,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   }
 
   Future<void> _openPasswordDialog() async {
+    RosmStepUpProof? proof;
     _newPassword.clear();
     _code.clear();
     try {
@@ -444,6 +485,14 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
             return _SheetBody(
               error: _error,
               child: _PasswordSheet(
+                verification: RosmAccountStepUp(
+                  client: widget.client,
+                  methods: _stepUpMethods,
+                  excludedFactor: 'password',
+                  enabled: !_busy,
+                  resetToken: _error,
+                  onChanged: (value) => proof = value,
+                ),
                 newPassword: _newPassword,
                 code: _code,
                 email: _account?.user.email ?? '-',
@@ -461,6 +510,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                 }),
                 onSubmit: () => _runInSheet(setSheetState, () async {
                   await widget.client.resetOwnPassword(
+                    verification: _requireProof(proof),
                     newPassword: _newPassword.text,
                     emailCode: _code.text.trim(),
                   );
@@ -477,6 +527,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
   }
 
   Future<void> _openAuthenticatorDialog() async {
+    RosmStepUpProof? proof;
     _currentPassword.clear();
     _authenticatorCode.clear();
     _authenticatorSetup = null;
@@ -487,6 +538,14 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
           return _SheetBody(
             error: _error,
             child: _AuthenticatorSheet(
+              verification: RosmAccountStepUp(
+                client: widget.client,
+                methods: _stepUpMethods,
+                excludedFactor: 'authenticator',
+                enabled: !_busy,
+                resetToken: _error,
+                onChanged: (value) => proof = value,
+              ),
               currentPassword: _currentPassword,
               code: _authenticatorCode,
               setup: _authenticatorSetup,
@@ -501,6 +560,7 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                 final setup = _authenticatorSetup;
                 if (setup == null) return;
                 await widget.client.verifyAuthenticatorSetup(
+                  verification: _requireProof(proof),
                   currentPassword: _currentPassword.text,
                   secret: setup.secret,
                   code: _authenticatorCode.text.trim(),
@@ -650,41 +710,64 @@ class _RosmPassportAccountPageState extends State<RosmPassportAccountPage> {
                     onSaveNickname: _saveNickname,
                   ),
                   const SizedBox(height: 18),
-                  _SectionTitle(icon: Icons.lock_outline_rounded, text: '基础操作'),
-                  _ActionTile(
-                    icon: Icons.mail_outline_rounded,
-                    title: '邮箱',
-                    subtitle: account.user.email,
-                    trailing: '修改',
-                    onTap: _busy ? null : _openEmailDialog,
+                  _SectionTitle(
+                    icon: Icons.lock_outline_rounded,
+                    text: '登录与验证',
                   ),
-                  _ActionTile(
-                    icon: Icons.phone_iphone_rounded,
-                    title: '手机号',
-                    subtitle: account.user.phoneNumber?.isNotEmpty == true
-                        ? account.user.phoneNumber!
-                        : '未绑定',
-                    trailing: '绑定',
-                    onTap: _busy ? null : _openPhoneDialog,
-                  ),
-                  _ActionTile(
-                    icon: Icons.password_rounded,
-                    title: '密码',
-                    subtitle: '通过当前邮箱验证码重置密码',
-                    trailing: '重置',
-                    onTap: _busy ? null : _openPasswordDialog,
+                  _AccountCard(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ActionTile(
+                          icon: Icons.password_rounded,
+                          title: '密码',
+                          subtitle: '验证身份后设置新密码',
+                          trailing: '重置',
+                          onTap: _busy ? null : _openPasswordDialog,
+                        ),
+                        _ActionTile(
+                          icon: Icons.shield_outlined,
+                          title: 'Authenticator 验证器',
+                          subtitle: account.security.hasAuthenticator
+                              ? '已连接'
+                              : '未设置',
+                          trailing: account.security.hasAuthenticator
+                              ? '更新'
+                              : '设置',
+                          onTap: _busy ? null : _openAuthenticatorDialog,
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 18),
                   _SectionTitle(
-                    icon: Icons.verified_user_outlined,
-                    text: '多因素验证',
+                    icon: Icons.mail_outline_rounded,
+                    text: '联系与恢复',
                   ),
-                  _ActionTile(
-                    icon: Icons.shield_outlined,
-                    title: 'Authenticator 验证器',
-                    subtitle: account.security.hasAuthenticator ? '已连接' : '未设置',
-                    trailing: account.security.hasAuthenticator ? '更新' : '设置',
-                    onTap: _busy ? null : _openAuthenticatorDialog,
+                  _AccountCard(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ActionTile(
+                          icon: Icons.mail_outline_rounded,
+                          title: '邮箱',
+                          subtitle: account.user.email.isEmpty
+                              ? '未绑定'
+                              : account.user.email,
+                          trailing: '修改',
+                          onTap: _busy ? null : _openEmailDialog,
+                        ),
+                        _ActionTile(
+                          icon: Icons.phone_iphone_rounded,
+                          title: '手机号',
+                          subtitle: account.user.phoneNumber?.isNotEmpty == true
+                              ? account.user.phoneNumber!
+                              : '未绑定',
+                          trailing: '绑定',
+                          onTap: _busy ? null : _openPhoneDialog,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -733,12 +816,32 @@ class _ProfileCard extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: RosmEpassInput(
-                  controller: nickname,
-                  enabled: !busy,
-                  decoration: const InputDecoration(labelText: '昵称'),
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => onSaveNickname(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    RosmEpassInput(
+                      controller: nickname,
+                      enabled: !busy,
+                      decoration: const InputDecoration(labelText: '昵称'),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => onSaveNickname(),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      account.user.email.isNotEmpty
+                          ? account.user.email
+                          : account.user.phoneNumber ?? '未绑定联系方式',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'UID · ${account.user.id}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -780,6 +883,7 @@ class _EmailSheet extends StatelessWidget {
     required this.sendDisabled,
     required this.onSend,
     required this.onSubmit,
+    this.verification,
   });
 
   final TextEditingController email;
@@ -791,9 +895,12 @@ class _EmailSheet extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onSubmit;
 
+  final Widget? verification;
+
   @override
   Widget build(BuildContext context) {
     return _CodeSheetFields(
+      verification: verification,
       primary: email,
       primaryLabel: '新邮箱',
       currentPassword: currentPassword,
@@ -819,6 +926,7 @@ class _PhoneSheet extends StatelessWidget {
     required this.sendDisabled,
     required this.onSend,
     required this.onSubmit,
+    this.verification,
   });
 
   final TextEditingController phone;
@@ -830,9 +938,12 @@ class _PhoneSheet extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onSubmit;
 
+  final Widget? verification;
+
   @override
   Widget build(BuildContext context) {
     return _CodeSheetFields(
+      verification: verification,
       primary: phone,
       primaryLabel: '手机号',
       currentPassword: currentPassword,
@@ -859,6 +970,7 @@ class _PasswordSheet extends StatelessWidget {
     required this.sendDisabled,
     required this.onSend,
     required this.onSubmit,
+    this.verification,
   });
 
   final TextEditingController newPassword;
@@ -870,6 +982,8 @@ class _PasswordSheet extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onSubmit;
 
+  final Widget? verification;
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<TextEditingValue>(
@@ -877,7 +991,7 @@ class _PasswordSheet extends StatelessWidget {
       builder: (context, value, _) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('验证码会发送到当前邮箱：$email'),
+          if (verification == null) Text('验证码会发送到当前邮箱：$email'),
           const SizedBox(height: 12),
           RosmNewPasswordField(
             controller: newPassword,
@@ -885,14 +999,17 @@ class _PasswordSheet extends StatelessWidget {
             enabled: !busy,
           ),
           const SizedBox(height: 12),
-          _CodeRow(
-            controller: code,
-            label: '邮箱验证码',
-            busy: busy,
-            cooldownLabel: cooldownLabel,
-            sendDisabled: sendDisabled,
-            onSend: onSend,
-          ),
+          if (verification != null)
+            verification!
+          else
+            _CodeRow(
+              controller: code,
+              label: '邮箱验证码',
+              busy: busy,
+              cooldownLabel: cooldownLabel,
+              sendDisabled: sendDisabled,
+              onSend: onSend,
+            ),
           const SizedBox(height: 18),
           RosemaryButton(
             onPressed:
@@ -908,26 +1025,20 @@ class _PasswordSheet extends StatelessWidget {
   }
 }
 
-class _SheetBody extends StatelessWidget {
-  const _SheetBody({required this.child, this.error});
-
-  final Widget child;
+class _SheetBody extends InheritedWidget {
+  const _SheetBody({required super.child, this.error});
   final String? error;
+  static Widget? feedback(BuildContext context) {
+    final message = context
+        .dependOnInheritedWidgetOfExactType<_SheetBody>()
+        ?.error;
+    return message == null || message.isEmpty
+        ? null
+        : RosemaryAlert(message, tone: RosemaryTone.danger);
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final message = error;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (message != null && message.isNotEmpty) ...[
-          _AccountMessage(text: message),
-          const SizedBox(height: 12),
-        ],
-        child,
-      ],
-    );
-  }
+  bool updateShouldNotify(_SheetBody old) => old.error != error;
 }
 
 class _CodeSheetFields extends StatelessWidget {
@@ -944,6 +1055,7 @@ class _CodeSheetFields extends StatelessWidget {
     required this.onSubmit,
     required this.submitLabel,
     this.keyboardType,
+    this.verification,
   });
 
   final TextEditingController primary;
@@ -959,6 +1071,8 @@ class _CodeSheetFields extends StatelessWidget {
   final String submitLabel;
   final TextInputType? keyboardType;
 
+  final Widget? verification;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -970,11 +1084,12 @@ class _CodeSheetFields extends StatelessWidget {
           decoration: InputDecoration(labelText: primaryLabel),
         ),
         const SizedBox(height: 12),
-        RosmEpassInput(
-          controller: currentPassword,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: '当前密码'),
-        ),
+        verification ??
+            RosmEpassInput(
+              controller: currentPassword,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: '当前密码'),
+            ),
         const SizedBox(height: 12),
         _CodeRow(
           controller: code,
@@ -1014,24 +1129,21 @@ class _CodeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: RosmEpassInput(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: label),
-          ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 98,
-          child: RosmEpassOutlinedButton(
+    final feedback = _SheetBody.feedback(context);
+    return RosmEpassInput(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
+      verification: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RosmEpassOutlinedButton(
             onPressed: busy || sendDisabled ? null : onSend,
             child: _BusyText(busy: busy, text: cooldownLabel),
           ),
-        ),
-      ],
+          if (feedback != null) feedback,
+        ],
+      ),
     );
   }
 }
@@ -1044,6 +1156,7 @@ class _AuthenticatorSheet extends StatelessWidget {
     required this.busy,
     required this.onBegin,
     required this.onSubmit,
+    this.verification,
   });
 
   final TextEditingController currentPassword;
@@ -1053,19 +1166,25 @@ class _AuthenticatorSheet extends StatelessWidget {
   final VoidCallback onBegin;
   final VoidCallback onSubmit;
 
+  final Widget? verification;
+
   @override
   Widget build(BuildContext context) {
     final current = setup;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('验证当前密码后，将生成可添加到 Authenticator 应用的密钥。'),
+        const Text('生成密钥后，使用其他已绑定方式验证并完成设置。'),
         const SizedBox(height: 12),
-        RosmEpassInput(
-          controller: currentPassword,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: '当前密码'),
-        ),
+        verification ??
+            RosmEpassInput(
+              controller: currentPassword,
+              verification: current == null
+                  ? _SheetBody.feedback(context)
+                  : null,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: '当前密码'),
+            ),
         const SizedBox(height: 12),
         if (current == null)
           RosemaryButton(
@@ -1094,6 +1213,7 @@ class _AuthenticatorSheet extends StatelessWidget {
           const SizedBox(height: 12),
           RosmEpassInput(
             controller: code,
+            verification: _SheetBody.feedback(context),
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: '动态验证码'),
           ),
@@ -1128,36 +1248,34 @@ class _ActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: _AccountCard(
-        child: InkWell(
-          onTap: onTap,
-          child: Row(
-            children: [
-              RosmEpassIcon(icon, color: colors.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                  ],
-                ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            RosmEpassIcon(icon, color: colors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: colors.onSurfaceVariant),
+                  ),
+                ],
               ),
-              Text(trailing, style: TextStyle(color: colors.primary)),
-              const RosmEpassIcon(Icons.chevron_right_rounded),
-            ],
-          ),
+            ),
+            Text(trailing, style: TextStyle(color: colors.primary)),
+            const RosmEpassIcon(Icons.chevron_right_rounded),
+          ],
         ),
       ),
     );
@@ -1199,16 +1317,7 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: child,
-    );
+    return RosemaryCard(child: child);
   }
 }
 
@@ -1220,29 +1329,9 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final background = active
-        ? colors.secondaryContainer
-        : colors.tertiaryContainer;
-    final foreground = active
-        ? colors.onSecondaryContainer
-        : colors.onTertiaryContainer;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: foreground,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+    return RosemaryBadge(
+      text,
+      tone: active ? RosemaryTone.success : RosemaryTone.warning,
     );
   }
 }
@@ -1274,16 +1363,7 @@ class _AccountMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.error.withAlpha(89)),
-      ),
-      child: Text(text, style: TextStyle(color: colors.onErrorContainer)),
-    );
+    return RosemaryAlert(text, tone: RosemaryTone.danger);
   }
 }
 

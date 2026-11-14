@@ -23,15 +23,22 @@ const previewUsers=[session.user,
  {id:'epass-04',email:'long.account.address.for.layout.verification@example.com',phone_number:'+86 139 0013 9000',nickname:'一个用于验证长昵称换行与联系方式对齐的示例用户',roles:['user']},
  {id:'epass-05',email:'',phone_number:'+86 137 0013 7000',nickname:'',roles:['user']},
 ];
+const copyCheck = new URLSearchParams(location.search).has('copycheck');
 const view = new URLSearchParams(location.search).get('view') || 'account';
 function Preview(){
+ const [previewRows,setPreviewRows]=useState(previewUsers);
+ const [roleUpdates,setRoleUpdates]=useState(0);
+ async function updateFixtureRoles(id,roles,proof) {
+   if(!['email_code','phone_code','authenticator'].includes(proof.method)||proof.code!=='123456')throw new Error('合成验证码错误，请使用验收码。');
+   setPreviewRows(rows=>rows.map(user=>user.id===id?{...user,roles}:user));setRoleUpdates(count=>count+1);return {};
+ }
  const [registerForm,setRegisterForm]=useState({nickname:'',email:'',phone_number:'',email_code:'',phone_code:'',password:''});
  const [registerMethod,setRegisterMethod]=useState('email');
  const [legalAccepted,setLegalAccepted]=useState(false);
  const [systemForm,setSystemForm]=useState({registration_email_verify:true});
  const [oidcForm,setOidcForm]=useState({client_id:'',display_name:'',redirect_uris:'',scopes:['openid','profile'],is_official:false,is_active:true});
  const account = <UserAccountPage session={session} mustBindEmail={false} updateNicknameSilently={noop} listWebAuthnCredentials={async()=>({credentials:[],max_count:5})} sendStepUpCode={noop} />;
- return <MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[view==='account'?'/account':`/admin/${view}`]}><RouteEffects/><Routes>
+ return <MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[view==='account'?'/account':`/admin/${view}`]}><RouteEffects/>{copyCheck && <textarea aria-label="复制验收粘贴区" style={{position:'fixed',bottom:8,right:8,zIndex:99,width:240,height:72}}/>}<Routes>
  <Route path="/admin/register" element={<RegisterPage registerForm={registerForm} setRegisterForm={setRegisterForm} registerMethod={registerMethod} setRegisterMethod={setRegisterMethod} loading={false} registerCodeSending={false} registerCodeCooldownRemaining={0} submitRegister={e=>e.preventDefault()} submitRegisterCode={noop} captchaConfigured={false} legalAccepted={legalAccepted} setLegalAccepted={setLegalAccepted} legalDocuments={{terms:{version:1},privacy:{version:1}}} />}/>
  <Route path="/admin/docs" element={<AdminOidcDocsPage discovery={{issuer:'https://auth.example.com'}} oidcSettings={{}}/>}/>
  <Route path="/admin/flutter" element={<AdminFlutterSdkDocsPage discovery={{issuer:'https://auth.example.com'}} oidcSettings={{}}/>}/>
@@ -42,11 +49,13 @@ function Preview(){
  <Route path="status" element={<AdminStatusManagement cooldowns={[]} pagination={{page:1,total_pages:1,total:0}} loadCooldowns={noop} resetCooldown={noop} safely={safely}/>}/>
  <Route path="legal" element={<AdminLegalDocuments documents={[]} loadDocuments={noop} saveDraft={noop} publishDocument={noop} safely={safely}/>}/>
  <Route path="dashboard" element={<AdminDashboard data={dashboard} loadDashboard={noop} safely={safely}/>}/>
- <Route path="users" element={<AdminUsers users={previewUsers} pagination={{page:1,total_pages:1,total:previewUsers.length}} loadUsers={noop} loadUser={async()=>session.user} safely={safely}/>}/>
+ <Route path="users" element={<><p className="mb-4 text-sm text-muted" data-role-updates={roleUpdates}>本地合成数据 · MFA 验收码 123456 · 已应用 {roleUpdates} 次</p><AdminUsers users={previewRows} supportedRoles={['user','admin']} stepUpMethods={session.security.step_up_methods} sendStepUpCode={async()=>({retry_after:60})} beginStepUpPasskey={async()=>{throw new Error('验收不调用真实通行密钥。');}} updateUserRoles={updateFixtureRoles} pagination={{page:1,total_pages:1,total:previewUsers.length}} loadUsers={noop} loadUser={async()=>session.user} safely={safely}/></>}/>
  <Route path="account" element={account}/>
  <Route path="service" element={<AdminServiceConfig systemForm={systemForm} setSystemForm={setSystemForm} saveServiceConfig={e=>e.preventDefault()}/>}/>
  <Route path="security" element={<AdminSecurityPolicy systemForm={systemForm} setSystemForm={setSystemForm} saveSecurityPolicy={e=>e.preventDefault()} />}/>
  <Route path="oidc" element={<AdminOIDCConfig discovery={{}} oidcClients={[{client_id:'com.example.reader',display_name:'示例阅读应用',is_active:true,redirect_uris:['https://example.com/auth/callback']}]} oidcForm={oidcForm} setOidcForm={setOidcForm} loadDiscovery={noop} loadOidcClients={noop} safely={safely}/>}/>
  </Route></Routes></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>;
 }
-createRoot(document.getElementById('root')).render(<Preview/>);
+const fixtureRoot = import.meta.hot?.data.root ?? createRoot(document.getElementById('root'));
+if (import.meta.hot) import.meta.hot.data.root = fixtureRoot;
+fixtureRoot.render(<Preview/>);

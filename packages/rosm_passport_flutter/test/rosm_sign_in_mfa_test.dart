@@ -1,3 +1,4 @@
+import 'package:rosm_passport_flutter/src/forma_controls.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -27,24 +28,78 @@ void main() {
       await tester.pumpAndSettle();
       await _tapVisible(tester, find.text('立即注册'));
       await _tapVisible(tester, find.text('接受并继续'));
-      expect(find.text('不少于 8 个字符'), findsOneWidget);
+      expect(find.text('8–32 个字符'), findsOneWidget);
       final action = find.byWidgetPredicate(
         (w) => w is RosemaryButton && w.label == '注册并继续  →',
       );
       expect(tester.widget<RosemaryButton>(action).onPressed, isNull);
       await tester.enterText(_field('设置密码'), 'aBcDeFgH');
       await tester.pump();
-      expect(find.text('字母、数字、符号中至少包含两种。'), findsOneWidget);
+      expect(find.text('字母、数字、英文符号中至少包含两类'), findsOneWidget);
       expect(tester.widget<RosemaryButton>(action).onPressed, isNull);
       await tester.enterText(_field('设置密码'), 'orchid-willow');
       await tester.pump();
-      expect(find.text('已满足密码要求。'), findsOneWidget);
+      expect(const RosmPasswordPolicy().evaluate('orchid-willow').ok, isTrue);
       expect(tester.widget<RosemaryButton>(action).onPressed, isNotNull);
       expect(requests.where((r) => r.url.path.endsWith('/register')), isEmpty);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  for (final entry in {
+    '+86 138-0013-8000': '/api/v1/auth/send-phone-login-code',
+    'preview@example.invalid': '/api/v1/auth/send-email-login-code',
+  }.entries) {
+    testWidgets(
+      'combined native code login routes ${entry.value} in a narrow viewport',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final requests = <http.Request>[];
+        var captchas = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: RosmPassportSignInPage(
+              client: _client(requests, Completer<http.Response>()),
+              config: RosmPassportSignInConfig(
+                requestCaptchaToken: () async {
+                  captchas++;
+                  return 'fixture-captcha';
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('手机'), findsNothing);
+        expect(_field('手机号或邮箱'), findsOneWidget);
+        await tester.enterText(_field('手机号或邮箱'), 'invalid');
+        await _tapVisible(tester, find.text('发送登录验证码  →'));
+        expect(captchas, 0);
+        expect(find.text('是否接受使用条款与隐私政策？'), findsNothing);
+        await tester.enterText(_field('手机号或邮箱'), entry.key);
+        await _tapVisible(tester, find.byType(RosemaryCheckbox));
+        await _tapVisible(tester, find.text('发送登录验证码  →'));
+        final request = requests.last;
+        expect(request.url.path, entry.value);
+        final body = jsonDecode(request.body);
+        expect(
+          body[entry.value.contains('phone') ? 'phone_number' : 'email'],
+          entry.value.contains('phone') ? '13800138000' : entry.key,
+        );
+        expect(captchas, 1);
+        expect(_field('验证码'), findsOneWidget);
+        await _tapVisible(tester, find.text('更改手机号或邮箱'));
+        expect(_field('验证码'), findsNothing);
+        expect(_field('手机号或邮箱'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
 
   for (final mode in ['phone', 'email', 'password', 'register', 'recovery']) {
     testWidgets(
@@ -232,10 +287,7 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 Finder _field(String label) => find.descendant(
   of: find.byWidgetPredicate(
     (widget) =>
-        (widget is RosemaryInput && widget.label == label) ||
-        (widget is TextField &&
-            (widget.decoration?.labelText == label ||
-                widget.decoration?.hintText == label)),
+        widget is RosmEpassInput && widget.decoration.labelText == label,
   ),
   matching: find.byType(EditableText),
 );

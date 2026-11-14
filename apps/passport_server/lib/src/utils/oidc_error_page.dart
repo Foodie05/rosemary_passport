@@ -49,6 +49,9 @@ Response _authorizationErrorPage(
       context.read<AppConfig>().webBaseUrl,
     ).resolve('/brand/rosemary.png').toString(),
   );
+  final webBaseUrl = const HtmlEscape().convert(
+    context.read<AppConfig>().webBaseUrl.replaceAll(RegExp(r'/+$'), ''),
+  );
   return Response(
     statusCode: statusCode,
     headers: const {
@@ -85,20 +88,19 @@ Response _authorizationErrorPage(
     <style>$epassDocumentStyles</style>
   </head>
   <body class="epass-error">
+    ${epassDocumentTools(brandLogoUrl, webBaseUrl)}
     <div class="shell">
       <section class="brand">
         <div class="brand-content">
-          ${epassBrandMarkup(brandLogoUrl)}
           <div class="brand-copy">
             <h1>登录暂时无法继续</h1>
             <p>Rosemary Epass 已拦下这次授权请求，避免在应用配置异常时把您带入不安全或不完整的登录流程。</p>
           </div>
-          <div class="brand-foot">ROSEMARY EPASS</div>
+          <div class="brand-emblem" aria-hidden="true">$epassConsentEmblem</div>
         </div>
       </section>
-      <main class="main">
+      <main id="auth-main" class="main" tabindex="-1">
         <section class="card">
-          <p class="eyebrow">OIDC 授权提示</p>
           <div class="badge">
             <span class="badge-dot"></span>
             Rosemary Epass 安全拦截
@@ -111,6 +113,8 @@ Response _authorizationErrorPage(
         </section>
       </main>
     </div>
+    ${epassDocumentFooter(webBaseUrl)}
+    <script>$epassDocumentThemeScript</script>
   </body>
 </html>
 ''',

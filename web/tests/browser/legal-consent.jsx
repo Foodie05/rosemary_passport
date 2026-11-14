@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../src/theme';
-import { MotionPreferences } from '../../src/design/MotionPreferences';
+import { MotionPreferences, MotionToggle } from '../../src/design/MotionPreferences';
 import { RosemaryDialogProvider } from '../../src/components/ui';
 import App from '../../src/App';
 import '../../src/styles.css';
@@ -12,8 +12,12 @@ const requests = [];
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 window.fetch = async (url, options = {}) => {
   const path = new URL(url, location.origin).pathname;
-  requests.push({ path, method: options.method || 'GET' });
-  document.querySelector('#requests').textContent = JSON.stringify(requests, null, 2);
+  const body = options.body ? JSON.parse(options.body) : {};
+  delete body.password;
+  delete body.authenticator_code;
+  requests.push({ path, method: options.method || 'GET', body });
+  const requestLog = document.querySelector('#requests');
+  if (requestLog) requestLog.textContent = JSON.stringify(requests, null, 2);
   if (path === '/api/v1/public/config') return json({});
   if (path === '/api/v1/legal/documents') return json({terms:{version:11,title:'验收示例条款（无效力）',content:'仅用于测试'},privacy:{version:12,title:'验收示例政策（无效力）',content:'仅用于测试'}});
   if (path === '/api/v1/auth/password-factors') return json({ factors: ['authenticator', 'email_code'], direct_login: false });
@@ -22,9 +26,25 @@ window.fetch = async (url, options = {}) => {
   return json({ error: 'fixture_no_session', message: '验收环境无登录会话' }, 401);
 };
 const params = new URLSearchParams(location.search);
-const route = params.get('view') === 'recovery' ? '/forgot-password' : '/login';
+const route = params.has('oidc') ? '/login?next='+encodeURIComponent('/oidc/continue?client_id=fixture&state=synthetic') : params.get('view') === 'recovery' ? '/forgot-password' : params.get('view') === 'register' ? '/register' : '/login';
 const info = document.createElement('aside');
 info.style = 'position:fixed;bottom:0;left:0;z-index:60;max-width:300px;max-height:140px;overflow:auto;background:#fff;color:#242e29;padding:8px;font-size:11px';
 info.innerHTML = '<strong>本地验收 · 所有协议及请求均为模拟</strong><pre id="requests"></pre>';
-document.body.append(info);
-createRoot(document.getElementById('root')).render(<MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[route]}><App /></MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>);
+if (!params.has('clean')) document.body.append(info);
+const fixtureRoot = import.meta.hot?.data.root ?? createRoot(document.getElementById('root'));
+if (import.meta.hot) import.meta.hot.data.root = fixtureRoot;
+fixtureRoot.render(<MotionPreferences><ThemeProvider><RosemaryDialogProvider><MemoryRouter initialEntries={[route]}><App />{params.has('checks') && <div style={{position:'fixed',bottom:8,left:8,zIndex:99,background:'white'}}><MotionToggle /></div>}</MemoryRouter></RosemaryDialogProvider></ThemeProvider></MotionPreferences>);
+
+if (params.has('checks')) {
+  const checks = document.createElement('aside');
+  checks.style = 'position:fixed;top:0;left:0;z-index:99;background:white;color:black;max-height:240px;max-width:640px;overflow:auto';
+  const run = document.createElement('button'), report = document.createElement('pre');
+  run.textContent = '运行登录验收'; report.id = 'login-check-report';
+  run.onclick = async () => {
+    run.disabled = true;
+    try { const {runLoginChecks} = await import('./login-checks');report.textContent=JSON.stringify(await runLoginChecks(requests),null,2); }
+    catch (error) {report.textContent=JSON.stringify({passed:false,error:error.stack});}
+    finally {run.disabled=false;}
+  };
+  checks.append(run,report);document.body.append(checks);
+}

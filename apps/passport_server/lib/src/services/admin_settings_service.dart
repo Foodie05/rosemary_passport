@@ -67,7 +67,9 @@ class AdminSettingsService {
         'phone_sms_scheme_name': (security['phone_sms_scheme_name'] ?? '')
             .toString(),
       },
-      'registration': registration,
+      // RegistrationService always requires verified email proof. Legacy stored
+      // flags must not advertise an unsupported verification bypass.
+      'registration': {...registration, 'require_email_verification': true},
       'oidc': {
         'issuer': _config.serverBaseUrl,
         'authorization_endpoint': '${_config.serverBaseUrl}/oidc/authorize',
@@ -164,6 +166,7 @@ class AdminSettingsService {
         ...Map<String, dynamic>.from(
           payload['registration'] as Map<String, dynamic>,
         ),
+        'require_email_verification': true,
       });
     }
   }

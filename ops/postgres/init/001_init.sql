@@ -264,7 +264,7 @@ insert into email_templates(name, subject, html, text)
 values (
   'register_verification',
   'Rosemary Epass 验证码',
-  '<div style="padding:32px;background:#F6F5EF;color:#242E29;font:16px/1.75 system-ui,sans-serif"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="{{brand_logo_url}}" width="64" height="64" alt="" style="display:block;object-fit:contain"></td><td style="padding-left:16px;font-family:Georgia,serif"><span style="font-size:19.2px;line-height:1.15">Rosemary</span><br><strong style="font-size:35.84px;line-height:1.05;font-weight:500">Epass</strong></td></tr></table><h1 style="font-size:28px;line-height:1.3;font-weight:500;margin:32px 0 16px">验证你的身份</h1><p>验证码：<strong style="color:#315747;font-size:28px;letter-spacing:4px">{{code}}</strong></p><p style="color:#58645D">5 分钟内有效。请勿向他人透露。</p></div>',
+  '<div style="padding:32px;background:#F8FAF6;color:#191C1A;font:16px/1.75 system-ui,sans-serif"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="{{brand_logo_url}}" width="64" height="64" alt="" style="display:block;object-fit:contain"></td><td style="padding-left:16px;font-family:Georgia,serif"><span style="font-size:19.2px;line-height:1.15">Rosemary</span><br><strong style="font-size:35.84px;line-height:1.05;font-weight:500">Epass</strong></td></tr></table><h1 style="font-size:28px;line-height:1.3;font-weight:500;margin:32px 0 16px">验证你的身份</h1><p>验证码：<strong style="color:#25644D;font-size:28px;letter-spacing:4px">{{code}}</strong></p><p style="color:#444845">5 分钟内有效。请勿向他人透露。</p></div>',
   'Rosemary Epass 验证码: {{code}}，有效期5分钟。'
 )
 on conflict (name) do nothing;
@@ -273,7 +273,7 @@ insert into email_templates(name, subject, html, text)
 values (
   'admin_login_verification',
   'Rosemary Epass 管理员登录验证码',
-  '<div style="padding:32px;background:#F6F5EF;color:#242E29;font:16px/1.75 system-ui,sans-serif"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="{{brand_logo_url}}" width="64" height="64" alt="" style="display:block;object-fit:contain"></td><td style="padding-left:16px;font-family:Georgia,serif"><span style="font-size:19.2px;line-height:1.15">Rosemary</span><br><strong style="font-size:35.84px;line-height:1.05;font-weight:500">Epass</strong></td></tr></table><h1 style="font-size:28px;line-height:1.3;font-weight:500;margin:32px 0 16px">验证你的身份</h1><p>验证码：<strong style="color:#315747;font-size:28px;letter-spacing:4px">{{code}}</strong></p><p style="color:#58645D">5 分钟内有效。请勿向他人透露。</p></div>',
+  '<div style="padding:32px;background:#F8FAF6;color:#191C1A;font:16px/1.75 system-ui,sans-serif"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="{{brand_logo_url}}" width="64" height="64" alt="" style="display:block;object-fit:contain"></td><td style="padding-left:16px;font-family:Georgia,serif"><span style="font-size:19.2px;line-height:1.15">Rosemary</span><br><strong style="font-size:35.84px;line-height:1.05;font-weight:500">Epass</strong></td></tr></table><h1 style="font-size:28px;line-height:1.3;font-weight:500;margin:32px 0 16px">验证你的身份</h1><p>验证码：<strong style="color:#25644D;font-size:28px;letter-spacing:4px">{{code}}</strong></p><p style="color:#444845">5 分钟内有效。请勿向他人透露。</p></div>',
   'Rosemary Epass 管理员登录验证码: {{code}}，有效期5分钟，请勿泄露。'
 )
 on conflict (name) do nothing;
@@ -282,7 +282,7 @@ insert into email_templates(name, subject, html, text)
 values (
   'login_verification',
   'Rosemary Epass 登录验证码',
-  '<div style="padding:32px;background:#F6F5EF;color:#242E29;font:16px/1.75 system-ui,sans-serif"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="{{brand_logo_url}}" width="64" height="64" alt="" style="display:block;object-fit:contain"></td><td style="padding-left:16px;font-family:Georgia,serif"><span style="font-size:19.2px;line-height:1.15">Rosemary</span><br><strong style="font-size:35.84px;line-height:1.05;font-weight:500">Epass</strong></td></tr></table><h1 style="font-size:28px;line-height:1.3;font-weight:500;margin:32px 0 16px">验证你的身份</h1><p>验证码：<strong style="color:#315747;font-size:28px;letter-spacing:4px">{{code}}</strong></p><p style="color:#58645D">5 分钟内有效。请勿向他人透露。</p></div>',
+  '<div style="padding:32px;background:#F8FAF6;color:#191C1A;font:16px/1.75 system-ui,sans-serif"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td><img src="{{brand_logo_url}}" width="64" height="64" alt="" style="display:block;object-fit:contain"></td><td style="padding-left:16px;font-family:Georgia,serif"><span style="font-size:19.2px;line-height:1.15">Rosemary</span><br><strong style="font-size:35.84px;line-height:1.05;font-weight:500">Epass</strong></td></tr></table><h1 style="font-size:28px;line-height:1.3;font-weight:500;margin:32px 0 16px">验证你的身份</h1><p>验证码：<strong style="color:#25644D;font-size:28px;letter-spacing:4px">{{code}}</strong></p><p style="color:#444845">5 分钟内有效。请勿向他人透露。</p></div>',
   'Rosemary Epass 登录验证码: {{code}}，有效期5分钟，请勿泄露。'
 )
 on conflict (name) do nothing;

@@ -1,3 +1,10 @@
+const LEGACY_VALIDATION_MESSAGES = {
+  'confidential redirect_uris must use https or loopback http origins.': '机密客户端的回调地址必须使用 HTTPS 或本机回环 HTTP，不能使用自定义 scheme。',
+  'public redirect_uris must use https, loopback http, or a mobile custom scheme such as com.example.app:/oidc/callback.': '回调地址须使用 HTTPS、本机回环 HTTP 或 App 自定义 scheme。',
+  'client_id and redirect_uris are required.': '请填写 Client ID 和至少一个回调地址。',
+  'client id and redirect_uris are required.': '请填写 Client ID 和至少一个回调地址。',
+};
+
 const ERROR_MESSAGES = {
   captcha_failed: '人机验证未通过，请重新验证后再试。',
   conflict: '提交的信息与现有数据冲突，请检查后重试。',
@@ -32,11 +39,17 @@ function isSafeChineseMessage(value) {
 /** Returns an error text that is safe to show to end users. */
 export function getUserErrorMessage(error, fallback = '操作未完成，请稍后重试。') {
   const code = String(error?.code || '').trim();
+  const serverMessage = String(error?.serverMessage || error?.message || '').trim();
+  // Validation feedback can explain the user's input. Authentication and server
+  // errors keep their fixed messages, including non-enumerating login failures.
+  if (code === 'invalid_request') {
+    if (Object.hasOwn(LEGACY_VALIDATION_MESSAGES, serverMessage)) return LEGACY_VALIDATION_MESSAGES[serverMessage];
+    if (isSafeChineseMessage(serverMessage)) return serverMessage;
+  }
   if (ERROR_MESSAGES[code]) {
     return ERROR_MESSAGES[code];
   }
 
-  const serverMessage = String(error?.serverMessage || error?.message || '').trim();
   return isSafeChineseMessage(serverMessage) ? serverMessage : fallback;
 }
 

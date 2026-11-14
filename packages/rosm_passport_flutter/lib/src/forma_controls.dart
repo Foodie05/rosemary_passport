@@ -1,10 +1,12 @@
+import 'dart:ui' show SemanticsValidationResult;
+import 'forma_field_outline.dart';
 import 'package:flutter/material.dart';
 import 'package:rosemary_ui/rosemary_ui.dart';
 import 'rosm_passport_theme.dart';
 import 'epass_brand.dart';
 
-/// Binds legacy controller callbacks to Forma's controlled input contract.
-class RosmEpassInput extends StatelessWidget {
+/// Uses official controlled fields; adapts only native controller/autofill hooks.
+class RosmEpassInput extends StatefulWidget {
   const RosmEpassInput({
     super.key,
     required this.controller,
@@ -20,6 +22,8 @@ class RosmEpassInput extends StatelessWidget {
     this.maxLines = 1,
     this.minLines = 1,
     this.autofillHints,
+    this.requirements = const [],
+    this.verification,
   });
   final TextEditingController controller;
   final InputDecoration decoration;
@@ -31,51 +35,196 @@ class RosmEpassInput extends StatelessWidget {
   final TextInputAction? textInputAction;
   final int? maxLines, minLines;
   final Iterable<String>? autofillHints;
+  final List<RosemaryFieldRequirement> requirements;
+  final Widget? verification;
   @override
-  Widget build(
-    BuildContext context,
-  ) => ValueListenableBuilder<TextEditingValue>(
-    valueListenable: controller,
-    builder: (context, value, _) {
-      final label = decoration.labelText ?? '';
-      final hints =
-          autofillHints ??
-          (obscureText
-              ? const [AutofillHints.password]
-              : label.contains('验证码')
-              ? const [AutofillHints.oneTimeCode]
-              : keyboardType == TextInputType.emailAddress
-              ? const [AutofillHints.email]
-              : keyboardType == TextInputType.phone
-              ? const [AutofillHints.telephoneNumberNational]
-              : null);
-      // Official 0.4.0 does not expose autofill or IME actions. Keep a native
-      // editor for these capabilities, with the same top label and tokens.
-      if (hints != null || textInputAction != null) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            RosemaryText(label, role: 'small'),
-            const SizedBox(height: 4),
-            TextField(
-              controller: controller,
-              focusNode: focusNode,
-              enabled: enabled,
-              readOnly: readOnly,
-              obscureText: obscureText,
+  State<RosmEpassInput> createState() => _RosmEpassInputState();
+}
+
+class _RosmEpassInputState extends State<RosmEpassInput> {
+  late FocusNode node;
+  final validation = RosemaryFieldValidationState();
+  @override
+  void initState() {
+    super.initState();
+    node = widget.focusNode ?? FocusNode();
+    node.addListener(_focus);
+    widget.controller.addListener(_edit);
+  }
+
+  void _edit() {
+    validation.edit(widget.controller.text);
+    if (mounted) setState(() {});
+  }
+
+  void _focus() {
+    if (node.hasFocus)
+      validation.focus();
+    else
+      validation.blur(
+        widget.controller.text,
+        composing: !widget.controller.value.composing.isCollapsed,
+      );
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(RosmEpassInput old) {
+    super.didUpdateWidget(old);
+    if (old.controller != widget.controller) {
+      old.controller.removeListener(_edit);
+      widget.controller.addListener(_edit);
+      validation.edit(widget.controller.text);
+    }
+    if (old.focusNode != widget.focusNode) {
+      node.removeListener(_focus);
+      if (old.focusNode == null) node.dispose();
+      node = widget.focusNode ?? FocusNode();
+      node.addListener(_focus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_edit);
+    node.removeListener(_focus);
+    if (widget.focusNode == null) node.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.decoration.labelText ?? '';
+    final hints =
+        widget.autofillHints ??
+        (widget.obscureText
+            ? const [AutofillHints.password]
+            : label.contains('验证码')
+            ? const [AutofillHints.oneTimeCode]
+            : widget.keyboardType == TextInputType.emailAddress
+            ? const [AutofillHints.email]
+            : widget.keyboardType == TextInputType.phone
+            ? const [AutofillHints.telephoneNumberNational]
+            : null);
+    final value = widget.controller.text;
+    final requirements = widget.requirements.isNotEmpty
+        ? widget.requirements
+        : label.contains('验证码') || label.contains('动态码')
+        ? [
+            RosemaryFieldRequirement(
+              'code',
+              '输入 6 位数字验证码',
+              (value) => RegExp(r'^\d{6}$').hasMatch(value),
+            ),
+          ]
+        : const <RosemaryFieldRequirement>[];
+    final active =
+        validation.armed &&
+        value.isNotEmpty &&
+        widget.controller.value.composing.isCollapsed;
+    final emailInvalid =
+        active &&
+        label.contains('邮箱') &&
+        !label.contains('或') &&
+        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);
+    final errorText =
+        widget.decoration.errorText ?? (emailInvalid ? '邮箱地址格式不正确。' : null);
+    if (hints == null &&
+        widget.textInputAction == null &&
+        widget.decoration.suffixIcon == null &&
+        widget.decoration.prefixIcon == null) {
+      return RosemaryInput(
+        label: label,
+        placeholder: widget.decoration.hintText ?? '',
+        value: value,
+        enabled: widget.enabled ?? true,
+        readOnly: widget.readOnly,
+        password: widget.obscureText,
+        keyboardType: widget.keyboardType,
+        focusNode: node,
+        error: errorText,
+        requirements: requirements,
+        verification: widget.verification,
+        minLines: widget.minLines ?? 1,
+        maxLines: widget.maxLines ?? 8,
+        onCommit: () => widget.onSubmitted?.call(widget.controller.text),
+        onChanged: (text) {
+          widget.controller.value = TextEditingValue(
+            text: text,
+            selection: TextSelection.collapsed(offset: text.length),
+          );
+          widget.onChanged?.call(text);
+        },
+      );
+    }
+    final c = RosemaryThemeData.of(context);
+    final invalid =
+        errorText != null ||
+        (active && requirements.any((rule) => !rule.check(value)));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: rosemaryTextStyle(
+            context,
+            'small',
+          ).copyWith(fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 8),
+        Semantics(
+          textField: true,
+          label: label,
+          validationResult: invalid
+              ? SemanticsValidationResult.invalid
+              : SemanticsValidationResult.none,
+          child: RosmFieldOutline(
+            focused: node.hasFocus,
+            invalid: invalid,
+            child: TextField(
+              controller: widget.controller,
+              focusNode: node,
+              enabled: widget.enabled,
+              readOnly: widget.readOnly,
+              obscureText: widget.obscureText,
               autofillHints: hints,
-              textInputAction: textInputAction,
-              keyboardType: keyboardType,
-              onChanged: onChanged,
-              onSubmitted: onSubmitted,
-              minLines: minLines,
-              maxLines: maxLines,
-              autocorrect: !obscureText,
-              enableSuggestions: !obscureText,
-              style: rosemaryTextStyle(context, 'body'),
-              decoration: decoration.copyWith(
-                labelText: label,
+              textInputAction: widget.textInputAction,
+              keyboardType: widget.keyboardType,
+              onChanged: widget.onChanged,
+              onSubmitted: widget.onSubmitted,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              autocorrect: !widget.obscureText,
+              enableSuggestions: !widget.obscureText,
+              style: rosemaryTextStyle(
+                context,
+                'body',
+              ).copyWith(fontSize: 16, height: 1.5),
+              decoration: InputDecoration(
+                hintText: widget.decoration.hintText,
+                prefixIcon: widget.decoration.prefixIcon,
+                suffixIcon: widget.decoration.suffixIcon,
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
                 floatingLabelBehavior: FloatingLabelBehavior.never,
+                filled: true,
+                fillColor: invalid
+                    ? c.dangerSoft
+                    : widget.enabled == false || widget.readOnly
+                    ? c.surfaceInset
+                    : c.fieldFill,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -83,32 +232,23 @@ class RosmEpassInput extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        );
-      }
-      return RosemaryInput(
-        label: decoration.labelText ?? '',
-        placeholder: decoration.hintText ?? '',
-        value: value.text,
-        enabled: enabled ?? true,
-        readOnly: readOnly,
-        password: obscureText,
-        keyboardType: keyboardType,
-        focusNode: focusNode,
-        error: decoration.errorText,
-        minLines: minLines ?? 1,
-        maxLines: maxLines ?? 8,
-        onCommit: () => onSubmitted?.call(controller.text),
-        onChanged: (text) {
-          controller.value = TextEditingValue(
-            text: text,
-            selection: TextSelection.collapsed(offset: text.length),
-          );
-          onChanged?.call(text);
-        },
-      );
-    },
-  );
+          ),
+        ),
+        RosemaryFieldRequirements(
+          value: value,
+          requirements: requirements,
+          active: active,
+        ),
+        if (widget.verification != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: widget.verification,
+          ),
+        if (errorText != null)
+          RosemaryText(errorText, role: 'small', color: c.danger),
+      ],
+    );
+  }
 }
 
 class RosmEpassTextButton extends StatelessWidget {
@@ -127,7 +267,16 @@ class RosmEpassTextButton extends StatelessWidget {
     enabled: onPressed != null,
     link: true,
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-    child: child,
+    child: DefaultTextStyle.merge(
+      style: TextStyle(
+        fontSize: rosemaryDimension('button', 'fontSize'),
+        height:
+            rosemaryDimension('button', 'lineHeight') /
+            rosemaryDimension('button', 'fontSize'),
+        fontWeight: FontWeight.w500,
+      ),
+      child: child,
+    ),
   );
 }
 
@@ -147,10 +296,22 @@ class RosmEpassOutlinedButton extends StatelessWidget {
     return RosemaryActionSurface(
       onActivate: onPressed,
       enabled: onPressed != null,
-      background: c.surface,
+      background: c.fieldFill,
       foreground: c.ink,
-      border: c.control,
-      child: child,
+      padding: EdgeInsets.symmetric(
+        horizontal: rosemaryDimension('button', 'paddingInline'),
+        vertical: rosemaryDimension('button', 'paddingBlock'),
+      ),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(
+          fontSize: rosemaryDimension('button', 'fontSize'),
+          height:
+              rosemaryDimension('button', 'lineHeight') /
+              rosemaryDimension('button', 'fontSize'),
+          fontWeight: FontWeight.w500,
+        ),
+        child: child,
+      ),
     );
   }
 }
@@ -321,14 +482,18 @@ class _EpassDialogRouteState<T> extends State<_EpassDialogRoute<T>> {
   );
 }
 
-/// Shared paths where the official icon set covers the action; platform symbols
-/// remain only for distinctive capabilities such as biometric authentication.
+/// Map legacy public IconData callers onto the official Rosemary icon set.
 class RosmEpassIcon extends StatelessWidget {
   const RosmEpassIcon(this.icon, {super.key, this.size, this.color});
   final IconData icon;
   final double? size;
   final Color? color;
   static final names = <IconData, String>{
+    Icons.check_circle_rounded: 'check',
+    Icons.verified_user_outlined: 'shield-check',
+    Icons.password_rounded: 'lock',
+    Icons.phone_iphone_rounded: 'message',
+    Icons.pin_outlined: 'key',
     Icons.close_rounded: 'close',
     Icons.refresh_rounded: 'refresh',
     Icons.lock_outline: 'lock',
@@ -343,10 +508,7 @@ class RosmEpassIcon extends StatelessWidget {
   };
   @override
   Widget build(BuildContext context) {
-    final name = names[icon];
-    return name == null
-        ? Icon(icon, size: size, color: color)
-        : RosemaryIcon(name, size: size ?? 20, color: color);
+    return RosemaryIcon(names[icon] ?? 'info', size: size ?? 20, color: color);
   }
 }
 

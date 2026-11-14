@@ -101,12 +101,21 @@ void main() {
       expect(response.statusCode, 200);
       expect(
         await response.body(),
-        allOf(
+        allOf([
           contains('id="approve-button"'),
+          contains('class="document-tools"'),
+          contains('class="document-footer"'),
+          contains('id="theme-toggle"'),
+          contains('aria-labelledby="consent-title"'),
+          contains('border-radius:20px'),
+          isNot(contains('border-bottom: 1px')),
+          isNot(contains('border-right: 1px')),
+          isNot(contains('brand-foot')),
+          isNot(contains('panel-stack')),
           contains("approveButton.dataset.submitting === 'true'"),
           contains("approveButton.setAttribute('aria-disabled', 'true')"),
           contains('授权处理中…'),
-        ),
+        ]),
       );
     },
   );

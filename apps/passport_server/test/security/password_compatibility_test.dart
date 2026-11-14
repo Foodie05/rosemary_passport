@@ -53,7 +53,12 @@ void main() {
         'ARGON2_PARALLELISM': '1',
       }),
     );
-    for (final legacyPassword in ['old', '旧密码仍可登录迷迭香通行证', ' old phrase ']) {
+    for (final legacyPassword in [
+      'old',
+      '旧密码仍可登录迷迭香通行证',
+      ' old phrase ',
+      'legacy-passphrase-' * 4,
+    ]) {
       final hash = await hasher.hash(legacyPassword);
       expect(await hasher.verify(hash, legacyPassword), isTrue);
       expect(PasswordPolicy().validate(legacyPassword).ok, isFalse);

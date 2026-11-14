@@ -1,5 +1,6 @@
 import 'package:dart_frog/dart_frog.dart';
 
+import '../../../../../../lib/src/utils/admin_role_verification.dart';
 import '../../../../../../lib/src/models/authenticated_user.dart';
 import '../../../../../../lib/src/repositories/user_repository.dart';
 import '../../../../../../lib/src/services/audit_service.dart';
@@ -9,6 +10,10 @@ Future<Response> onRequest(RequestContext context, String id) async {
   if (context.request.method != HttpMethod.patch) {
     return errorResponse('method_not_allowed', 'Use PATCH.', statusCode: 405);
   }
+
+  final actor = context.read<AuthenticatedUser>();
+  if (!actor.isAdmin || actor.isBanned)
+    return errorResponse('forbidden', '需要管理员权限。', statusCode: 403);
 
   final body = await tryParseJsonObject(context.request);
   if (body == null) {
@@ -53,16 +58,30 @@ Future<Response> onRequest(RequestContext context, String id) async {
     );
   }
 
-  await repository.updateRoles(userId: id, roles: roles);
+  final failed = await verifyAdminRoleAssignment(context, body);
+  if (failed != null) return failed;
+  try {
+    await repository.updateRoles(
+      userId: id,
+      roles: roles,
+      adminActorId: actor.id,
+    );
+  } on AdminRoleAssignmentDenied {
+    return errorResponse('forbidden', '管理员权限已失效，请刷新后重试。', statusCode: 403);
+  } on RoleAssignmentTargetNotFound {
+    return errorResponse('not_found', 'user not found.', statusCode: 404);
+  }
 
-  final actor = context.read<AuthenticatedUser>();
   await context.read<AuditService>().log(
     action: 'admin.user.roles.update',
     actorId: actor.id,
     actorType: 'admin',
     resourceType: 'user',
     resourceId: id,
-    metadata: {'roles': roles},
+    metadata: {
+      'roles': roles,
+      'verification_method': (body['verification'] as Map)['method'],
+    },
     ip: context.request.headers['x-forwarded-for'],
   );
 
