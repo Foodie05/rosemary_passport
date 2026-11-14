@@ -364,3 +364,11 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-auth > .epass-footer { border:0;padding:0 var(--auth-inset) 24px; }
 .epass-auth > .epass-footer nav { justify-content:flex-end;margin-inline-start:auto;gap:16px; }
 @media(max-width:479px) { .epass-auth .epass-methods { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Login: a single shared code method and coordinated panel/height transitions. */
+.epass-login-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.epass-login-content { display:flex;flex-direction:column;gap:24px; }
+.epass-login-options { display:grid;gap:8px; }
+.epass-sliding-content { position:relative;overflow:hidden;min-width:0; }
+.epass-slide-ghost { position:absolute;inset:0 0 auto;pointer-events:none; }
+@media(max-width:479px) { .epass-auth .epass-login-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); } }

@@ -1,10 +1,11 @@
 import { FormaButton, FormaInput, FormaLoading } from '../components/Forma';
 import { Link, useNavigate } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
-import { SelectionGroup, SelectionContent } from '../design/SelectionMotion';
+import { SlidingSelectionContent, SelectionGroup, SelectionContent } from '../design/SelectionMotion';
 import { useEffect, useId, useState } from 'react';
 import { NewPasswordField } from '../components/NewPasswordField';
 import { evaluatePassword } from '../lib/password-policy';
+import { resolveCodeLoginIdentifier, isAuthorizationLogin } from '../lib/login-identity';
 import { Dialog } from '../components/Dialog';
 import { Brand, BrandDrawing, SiteFooter } from '../components/Brand';
 import {
@@ -44,9 +45,8 @@ function AuthInput({ icon: Icon, label, type = 'text', placeholder, value, onCha
   const [visible, setVisible] = useState(false);
   const password = type === 'password';
   const autoComplete = password ? 'current-password' : label.includes('验证码') || label.includes('动态码') ? 'one-time-code' : label.includes('邮箱') ? 'email' : label.includes('手机') ? 'tel' : undefined;
-  const requirements = !password && (type === 'email' || label === '邮箱地址') ? [{ id: 'email', label: '使用完整邮箱地址，例如 name@example.com', check: value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) }] : undefined;
   return <div className={`epass-auth-field ${password ? 'epass-new-password' : ''}`}>
-    <FormaInput id={id} label={label} name={inputProps.name || autoComplete || id} type={password && visible ? 'text' : type} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={onChange} className={`input-field ${password ? 'pr-12' : ''}`} requirements={requirements} verification={verification} {...inputProps} />
+    <FormaInput id={id} label={label} name={inputProps.name || autoComplete || id} type={password && visible ? 'text' : type} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={onChange} className={`input-field ${password ? 'pr-12' : ''}`} validateEmail={!password && (type === 'email' || label === '邮箱地址')} verification={verification} {...inputProps} />
     {password && <FormaButton type="button" className="epass-password-visibility" aria-label={visible ? '隐藏密码' : '显示密码'} aria-pressed={visible} onClick={() => setVisible(!visible)}>{visible ? <EyeOff size={20} /> : <Eye size={20} />}</FormaButton>}
   </div>;
 }
@@ -97,10 +97,9 @@ function AccountCenterLink({ requestLegalAcceptance }) {
   return (
     <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
       to="/account"
-      className="mx-auto flex w-fit items-center gap-2 rounded-control px-3 py-2 text-sm font-semibold text-muted transition-colors hover:bg-subtle hover:text-ink"
+      className="ml-auto px-1 py-1 text-sm font-semibold text-muted hover:text-ink"
     >
       账户中心
-      <ArrowRight size={15} aria-hidden="true" />
     </AuthActionLink>
   );
 }
@@ -179,7 +178,11 @@ export function LoginPage({
   requestLegalAcceptance,
   legalDocuments,
   authNext = '',
+  currentUser = null,
 }) {
+  const [identifierError, setIdentifierError] = useState('');
+  const loginTab = ['phone_code', 'email_code'].includes(loginMethod) ? 'code' : loginMethod;
+  const loginTabs = [['code', '验证码'], ['webauthn', '通行密钥'], ['password', '密码']];
   const [webauthnLoading, setWebauthnLoading] = useState(false);
   const [webauthnError, setWebauthnError] = useState('');
 
@@ -194,17 +197,24 @@ export function LoginPage({
     setWebauthnError('');
   }, [loginMethod, loginForm.email]);
 
-  function switchTab(nextMethod) {
+  function switchTab(tab) {
+    const identity = resolveCodeLoginIdentifier(loginForm.identifier);
+    const nextMethod = tab === 'code' ? (identity?.method || (loginForm.identifier?.includes('@') ? 'email_code' : 'phone_code')) : tab;
     if (nextMethod === loginMethod && loginStep === 'credentials') {
       return;
     }
     setLoginMethod(nextMethod);
+    if (tab === 'code') setLoginForm(current => ({...current,
+      email:nextMethod === 'email_code' ? (identity?.identifier || current.identifier?.trim() || '') : '',
+      phone_number:nextMethod === 'phone_code' ? (identity?.identifier || current.identifier?.trim() || '') : '',
+    }));
     setLoginStep('credentials');
     setSelectedPasswordFactor('');
   }
 
   function switchAccount() {
     setLoginForm({
+      identifier: '',
       email: '',
       phone_number: '',
       password: '',
@@ -291,23 +301,31 @@ export function LoginPage({
       );
     }
 
+    if (['phone_code', 'email_code'].includes(view.method) && view.step === 'credentials') {
+      return <form className="space-y-6" onSubmit={event => {
+        if (!resolveCodeLoginIdentifier(loginForm.identifier)) {
+          event.preventDefault();
+          setIdentifierError('请输入有效的手机号或邮箱地址。');
+          return;
+        }
+        return (view.method === 'email_code' ? prepareEmailCodeLogin : preparePhoneCodeLogin)(event);
+      }}>
+        <AuthInput label="手机号或邮箱" autoComplete="username" placeholder="手机号或邮箱地址" value={loginForm.identifier || ''} error={identifierError}
+          onChange={event => {
+            const raw = event.target.value;
+            const identity = resolveCodeLoginIdentifier(raw);
+            const method = identity?.method || (raw.includes('@') ? 'email_code' : 'phone_code');
+            setIdentifierError('');
+            setLoginMethod(method);
+            setLoginForm(current => ({...current,identifier:raw,email:method === 'email_code' ? (identity?.identifier || raw.trim()) : '',phone_number:method === 'phone_code' ? (identity?.identifier || raw.trim()) : '',email_code:'',phone_code:''}));
+          }} />
+        <FormaButton type="submit" disabled={loading || loginCodeSending} className="btn-primary flex w-full items-center justify-center gap-2">
+          <LoadingButtonText loading={loading || loginCodeSending} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
+        </FormaButton>
+      </form>;
+    }
+
     if (view.method === 'phone_code') {
-      if (view.step === 'credentials') {
-        return (
-          <form className="space-y-6" onSubmit={preparePhoneCodeLogin}>
-            <AuthInput
-              icon={Smartphone}
-              label="手机号"
-              placeholder="13800138000"
-              value={loginForm.phone_number}
-              onChange={(event) => setLoginForm((current) => ({ ...current, phone_number: event.target.value }))}
-            />
-            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
-              <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
-            </FormaButton>
-          </form>
-        );
-      }
 
       return (
         <form className="space-y-6" onSubmit={completePhoneCodeLogin}>
@@ -324,28 +342,12 @@ export function LoginPage({
           <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
           </FormaButton>
+          <FormaButton type="button" className="w-full" onClick={() => setLoginStep('credentials')}>更改手机号或邮箱</FormaButton>
         </form>
       );
     }
 
     if (view.method === 'email_code') {
-      if (view.step === 'credentials') {
-        return (
-          <form className="space-y-6" onSubmit={prepareEmailCodeLogin}>
-            <AuthInput
-              icon={Mail}
-              label="邮箱地址"
-              placeholder="name@example.com"
-              value={loginForm.email}
-              onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
-            />
-
-            <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
-              <LoadingButtonText loading={loading} loadingText="发送中..." idleText="发送登录验证码" icon={ArrowRight} />
-            </FormaButton>
-          </form>
-        );
-      }
 
       return (
         <form className="space-y-6" onSubmit={completeEmailCodeLogin}>
@@ -362,20 +364,7 @@ export function LoginPage({
           <FormaButton type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-4 text-lg font-bold">
             <LoadingButtonText loading={loading} loadingText="登录中..." idleText="完成登录" />
           </FormaButton>
-          <FormaButton
-            type="button"
-            onClick={() => {
-              if (selectedPasswordFactor) {
-                setSelectedPasswordFactor('');
-              } else {
-                setLoginStep('credentials');
-              }
-            }}
-            className="flex w-full items-center justify-center gap-2 text-sm font-bold text-muted transition-colors hover:text-ink"
-          >
-            <ChevronLeft size={18} />
-            {selectedPasswordFactor ? '返回验证方式' : '返回上一步'}
-          </FormaButton>
+          <FormaButton type="button" className="w-full" onClick={() => setLoginStep('credentials')}>更改手机号或邮箱</FormaButton>
         </form>
       );
     }
@@ -586,45 +575,41 @@ export function LoginPage({
         <BrandSection />
 
         <div className="epass-auth-panel">
-          <div className="mx-auto w-full max-w-md space-y-8">
+          <div className="epass-login-content mx-auto w-full max-w-md">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
                   <h1 className="text-3xl font-bold text-ink">登录</h1>
                   <p className="text-muted">
-                    {loginMethod === 'phone_code'
-                      ? '请输入手机号并使用短信验证码完成登录。'
-                      : loginStep === 'credentials'
-                        ? '选择一种方式，登录 Rosemary Epass。'
-                        : '请完成身份验证，继续登录。'}
+                    {loginStep === 'credentials' ? '选择一种方式，登录 Rosemary Epass。' : '请完成身份验证，继续登录。'}
                   </p>
                 </div>
-                <FormaButton
+                {currentUser && <FormaButton
                   type="button"
                   onClick={switchAccount}
                   className="shrink-0 rounded-control bg-surface px-3 py-2 text-sm font-semibold text-muted  transition-colors hover:bg-canvas hover:text-ink"
                 >
                   切换账号
-                </FormaButton>
+                </FormaButton>}
               </div>
-              <SelectionGroup value={loginMethod} label="登录方式">
-                {[['phone_code', '手机'], ['email_code', '邮箱'], ['webauthn', '通行密钥'], ['password', '密码']].map(([method, label]) => <FormaButton key={method} type="button" aria-pressed={loginMethod === method} onClick={() => switchTab(method)}>{label}</FormaButton>)}
+              <SelectionGroup value={loginTab} label="登录方式" className="epass-login-tabs">
+                {loginTabs.map(([method, label]) => <FormaButton key={method} type="button" aria-pressed={loginTab === method} disabled={loading || loginCodeSending || webauthnLoading} onClick={() => switchTab(method)}>{label}</FormaButton>)}
               </SelectionGroup>
             </div>
 
             <div className="relative py-1">
 
-                <SelectionContent value={`${loginMethod}:${loginStep}:${selectedPasswordFactor}`} index={['phone_code', 'email_code', 'webauthn', 'password'].indexOf(loginMethod)} className="auth-current-step">
+                <SlidingSelectionContent value={`${loginTab}:${loginStep}:${selectedPasswordFactor}`} index={loginTabs.findIndex(([method]) => method === loginTab)} className="auth-current-step">
                   {renderPanel({
                     method: loginMethod,
                     step: loginStep,
                     selectedPasswordFactor,
                   })}
-                </SelectionContent>
+                </SlidingSelectionContent>
 
             </div>
 
-            <div className="space-y-4">
+            <div className="epass-login-options">
               <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} disabled={loading || loginCodeSending || webauthnLoading} />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
@@ -637,18 +622,13 @@ export function LoginPage({
                 </p>
               </div>
 
-              <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
-                to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
-                className="group flex w-full items-center justify-between gap-3 px-1 py-1 text-left"
-              >
-                <span className="min-w-0 text-sm">
-                  <span className="font-bold text-ink transition-colors group-hover:text-ink">忘记密码？</span>
-                  <span className="ml-2 text-muted">使用已绑定的验证方式重置密码</span>
-                </span>
-                <ArrowRight size={17} className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </AuthActionLink>
-
-              <AccountCenterLink requestLegalAcceptance={requestLegalAcceptance} />
+              <div className="flex items-center justify-between gap-4">
+                <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
+                  to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
+                  className="px-1 py-1 text-sm font-bold text-ink hover:underline"
+                >忘记密码？</AuthActionLink>
+                {isAuthorizationLogin(authNext) && <AccountCenterLink requestLegalAcceptance={requestLegalAcceptance} />}
+              </div>
             </div>
           </div>
         </div>

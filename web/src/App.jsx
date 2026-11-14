@@ -213,6 +213,7 @@ function AppRoutes({
                 setLegalAccepted={setLegalAccepted}
                 requestLegalAcceptance={requestLegalAcceptance}
                 legalDocuments={legalDocuments}
+                currentUser={session.user}
                 authNext={loginNext}
               />
             )
@@ -491,6 +492,7 @@ function App() {
   const [postRegisterPasskeyPending, setPostRegisterPasskeyPending] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
+    identifier: '',
     email: '',
     phone_number: '',
     password: '',
@@ -1530,6 +1532,7 @@ function App() {
     setSelectedPasswordFactor('phone_code');
     setRememberMe(false);
     setLoginForm({
+      identifier: payload.user?.phone_number || payload.user?.email || '',
       email: payload.user?.email || '',
       phone_number: payload.user?.phone_number || '',
       password: '',
