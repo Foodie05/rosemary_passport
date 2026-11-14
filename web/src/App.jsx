@@ -1,3 +1,4 @@
+import { roleAssignmentPayload } from './lib/admin-role-change';
 import { fieldFeedbackTarget, publishFieldFeedback } from './lib/field-feedback';
 import { FormaButton, FormaInput } from './components/Forma';
 import { AnimatePresence } from 'motion/react';
@@ -119,6 +120,7 @@ function AppRoutes({
   testAliyunCaptchaConnection,
   testPhoneSmsConnection,
   users,
+  supportedRoles,
   usersPagination,
   dashboard,
   loadDashboard,
@@ -301,6 +303,10 @@ function AppRoutes({
             element={
               <AdminUsers
                 users={users}
+                supportedRoles={supportedRoles}
+                stepUpMethods={session.security?.step_up_methods || []}
+                sendStepUpCode={sendStepUpCode}
+                beginStepUpPasskey={beginStepUpPasskey}
                 pagination={usersPagination}
                 loadUsers={loadUsers}
                 loadUser={loadManagedUser}
@@ -449,6 +455,7 @@ function App() {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [oidcClients, setOidcClients] = useState([]);
+  const [supportedRoles, setSupportedRoles] = useState([]);
   const [users, setUsers] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [cooldowns, setCooldowns] = useState([]);
@@ -878,6 +885,7 @@ function App() {
       params.set('search', search.trim());
     }
     const data = await api(`/api/v1/admin/users?${params.toString()}`, { auth: true });
+    setSupportedRoles(Array.isArray(data.supported_roles) ? data.supported_roles : []);
     setUsers(data.users || []);
     setUsersPagination(
       data.pagination || { page, page_size: 10, total: data.users?.length || 0, total_pages: 1 },
@@ -2119,12 +2127,9 @@ function App() {
     }));
   }
 
-  async function createManagedUser(form) {
-    const roles = `${form.roles || ''}`
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
+  async function createManagedUser(form, verification) {
+    const assignment = roleAssignmentPayload(form.roles, verification, supportedRoles);
+    const roles = assignment.roles;
     if (!form.email?.trim() || !form.nickname?.trim() || !form.password || !roles.length) {
       throw new Error('邮箱、昵称、密码和至少一个角色都是必填项。');
     }
@@ -2137,27 +2142,26 @@ function App() {
         nickname: form.nickname.trim(),
         password: form.password,
         roles,
+        verification: assignment.verification,
       },
     });
     showToast('用户已创建', 'success');
   }
 
-  async function updateManagedUserRoles(userId, rolesInput) {
-    const roles = `${rolesInput || ''}`
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
-    if (!roles.length) {
-      throw new Error('至少保留一个角色或权限标识。');
-    }
-
+  async function updateManagedUserRoles(userId, roles, verification) {
+    const assignment = roleAssignmentPayload(roles, verification, supportedRoles);
     await api(`/api/v1/admin/users/${encodeURIComponent(userId)}/roles`, {
       method: 'PATCH',
       auth: true,
-      body: { roles },
+      body: assignment,
     });
+    const selfDemoted = userId === session.user?.id && !assignment.roles.includes('admin');
+    if (userId === session.user?.id) {
+      setSession(current => ({...current,user:{...current.user,roles:assignment.roles}}));
+      void tryLoadMe();
+    }
     showToast('用户权限已更新', 'success');
+    return {selfDemoted};
   }
 
   async function loadManagedUser(userId) {
@@ -2423,6 +2427,7 @@ function App() {
         testAliyunCaptchaConnection={testAliyunCaptchaConnection}
         testPhoneSmsConnection={testPhoneSmsConnection}
         users={users}
+        supportedRoles={supportedRoles}
         usersPagination={usersPagination}
         dashboard={dashboard}
         loadDashboard={loadDashboard}

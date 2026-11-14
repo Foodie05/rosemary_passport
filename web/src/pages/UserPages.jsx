@@ -1,3 +1,4 @@
+import { StepUpFields } from '../components/StepUpFields';
 import { FormaButton, FormaInput, FormaLoading } from '../components/Forma';
 import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
@@ -12,8 +13,6 @@ import { Dialog } from '../components/Dialog';
 import { RosemarySelect } from '../components/ui';
 import {
   preparePublicKeyCreationOptions,
-  preparePublicKeyRequestOptions,
-  serializeAuthenticationCredential,
   serializeRegistrationCredential,
 } from '../lib/utils';
 
@@ -57,70 +56,6 @@ function getPasskeyErrorMessage(error) {
     return '当前环境不允许使用通行密钥，请检查域名与安全上下文。';
   }
   return getUserErrorMessage(error, '通行密钥连接失败，请重试。');
-}
-
-const STEP_UP_LABELS = {
-  password: '当前密码',
-  email_code: '当前邮箱验证码',
-  phone_code: '当前手机验证码',
-  authenticator: 'Authenticator 动态码',
-  passkey: '系统通行密钥',
-};
-
-function StepUpFields({ methods, excludedFactor, value, onChange, sendStepUpCode, beginStepUpPasskey }) {
-  const factorByMethod = { password: 'password', email_code: 'email', phone_code: 'phone', authenticator: 'authenticator', passkey: 'passkey' };
-  const available = methods.filter((method) => factorByMethod[method] !== excludedFactor);
-  const selected = available.includes(value.method) ? value.method : (available[0] || '');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (selected && selected !== value.method) onChange({ method: selected, password: '', code: '', response: null });
-  }, [selected, value.method]);
-
-  async function handleAction() {
-    setBusy(true);
-    setError('');
-    try {
-      if (selected === 'passkey') {
-        const options = await beginStepUpPasskey(excludedFactor);
-        const credential = await navigator.credentials.get({ publicKey: preparePublicKeyRequestOptions(options) });
-        if (!credential) throw new Error('未获取到通行密钥响应');
-        onChange({ method: selected, password: '', code: '', response: serializeAuthenticationCredential(credential) });
-      } else {
-        await sendStepUpCode(selected, excludedFactor);
-      }
-    } catch (actionError) {
-      setError(getUserErrorMessage(actionError, '验证方式准备失败，请重试。'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!available.length) return <p className="text-sm text-danger">当前没有可用的其他验证方式，请先绑定一种恢复因素。</p>;
-  return (
-    <div className="space-y-3 rounded-panel bg-inset p-4">
-      <label className="text-sm font-bold text-ink">账户二次验证</label>
-      <RosemarySelect
-        label="账户二次验证方式"
-        value={selected}
-        options={available.map((method) => ({ value: method, label: STEP_UP_LABELS[method] || method }))}
-        onChange={(method) => onChange({ method, password: '', code: '', response: null })}
-      />
-      {selected === 'password' ? (
-        <FormaInput aria-label="当前密码" autoComplete="current-password" className="input-field" type="password" placeholder="输入当前密码" value={value.password || ''} onChange={(event) => onChange({ ...value, method: selected, password: event.target.value })} />
-      ) : selected === 'passkey' ? (
-        <FormaButton className="btn-secondary w-full" type="button" disabled={busy} onClick={() => void handleAction()}>{value.response ? '通行密钥已验证' : busy ? '等待系统验证...' : '使用通行密钥验证'}</FormaButton>
-      ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <FormaInput aria-label="身份验证码" autoComplete="one-time-code" className="input-field" inputMode="numeric" placeholder="输入验证码" value={value.code || ''} onChange={(event) => onChange({ ...value, method: selected, code: event.target.value })} />
-          {selected !== 'authenticator' ? <FormaButton className="btn-secondary" type="button" disabled={busy} onClick={() => void handleAction()}>{busy ? '发送中...' : '发送'}</FormaButton> : null}
-        </div>
-      )}
-      <p className="text-xs text-muted">当前变更项本身不能用于本次校验。</p>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
-    </div>
-  );
 }
 
 export function UserAccountPage({
@@ -435,13 +370,13 @@ export function UserAccountPage({
       <header className="epass-page-heading"><p className="epass-eyebrow">YOUR ACCOUNT</p><h1>账户与安全</h1><p>管理个人资料、登录方式与账户恢复设置。</p></header>
       <section className="epass-account-profile" aria-label="个人资料">
         <div className="epass-avatar" aria-hidden="true">{(session.user?.email || 'R').charAt(0).toUpperCase()}</div>
-        <div className="min-w-0 flex-1">
-          {editingNickname ? <FormaInput ref={nicknameRef} aria-label="昵称" className="input-field max-w-sm" value={nickname} onChange={(event) => setNickname(event.target.value)} onBlur={() => void handleNicknameBlur()} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /> : <FormaButton type="button" onClick={() => setEditingNickname(true)} className="text-left text-xl font-semibold break-all" aria-label={`编辑昵称：${displayName}`}>{displayName}<span className="ml-3 text-xs font-normal text-muted">编辑</span></FormaButton>}
+        <div className="epass-profile-details min-w-0 flex-1">
+          {editingNickname ? <FormaInput ref={nicknameRef} aria-label="昵称" className="input-field max-w-sm" value={nickname} onChange={(event) => setNickname(event.target.value)} onBlur={() => void handleNicknameBlur()} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /> : <FormaButton type="button" onClick={() => setEditingNickname(true)} className="epass-profile-edit text-left text-xl font-semibold break-all" aria-label={`编辑昵称：${displayName}`}>{displayName}<span className="ml-3 text-xs font-normal text-muted">编辑</span></FormaButton>}
           <p className="mt-2 break-all text-sm text-muted">{session.user?.email || session.user?.phone_number || '尚未绑定联系方式'}</p>
           <p className="mt-1 break-all font-mono text-xs text-muted">UID · {session.user?.id || '-'}</p>
         </div>
       </section>
-      <div className="grid gap-12 pt-8 lg:grid-cols-[minmax(0,1fr)_256px]">
+      <div className="pt-8">
         <div>
           <section aria-labelledby="login-security"><h2 id="login-security" className="font-editorial text-2xl">登录与验证</h2>
             <div className="epass-settings-list">
@@ -457,10 +392,7 @@ export function UserAccountPage({
             </div>
           </section>
         </div>
-        <aside className="space-y-6">
-          <div className="rounded-panel bg-group p-6"><Shield size={20} className="mb-4 text-accent" aria-hidden="true" /><h2 className="font-semibold">安全提示</h2><p className="mt-3 text-sm text-muted">{mustBindEmail ? '请先绑定邮箱，以便接收验证码和恢复账户。' : '保持恢复方式可用，避免更换设备后无法登录。'}</p><p className="mt-3 text-sm text-muted">修改安全设置时，需要使用其他已绑定方式验证身份。</p></div>
-          <p className="text-xs text-muted">账户角色 · {(session.user?.roles || []).join(' · ') || '普通用户'}</p>
-        </aside>
+
       </div>
 
       <AnimatePresence>{bindModalOpen && (

@@ -73,13 +73,12 @@
   .account-security-dialog__actions { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 }
 
-.epass-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--color-line); padding: 24px 32px; color: var(--color-muted); font-size: 12px; }
+.epass-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; border-top: 0; padding: 24px 32px; color: var(--color-muted); font-size: 12px; }
 .epass-footer nav { display: flex; flex-wrap: wrap; gap: 24px; }
 .epass-footer a:hover { color: var(--color-accent); text-decoration: underline; }
 .epass-skip { position: fixed; top: 8px; left: 16px; padding: 12px 20px; z-index: 200; background: var(--color-surface); transform: translateY(-150%); }
 .epass-skip:focus { transform: none; }
 .epass-auth { min-height: 100dvh; display: flex; flex-direction: column; }
-.epass-auth-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 40px; border-bottom: 1px solid var(--color-line); }
 .epass-auth-body { flex: 1; }
 .epass-auth-grid { min-height: calc(100dvh - 170px); display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
 .epass-auth-brand { border-right: 1px solid var(--color-line); padding: clamp(32px, 5vw, 80px); display: flex; flex-direction: column; justify-content: center; position: relative; }
@@ -132,7 +131,7 @@
   .epass-workspace { padding: 32px 24px; }
 }
 @media (max-width: 640px) {
-  .epass-auth-header, .epass-topbar { padding: 12px 16px; gap: 8px; }
+  .epass-topbar { padding: 12px 16px; gap: 8px; }
   .epass-auth-panel { padding: 40px 20px; }
   .epass-auth-panel h1 { font-size: 32px; }
   .epass-footer { padding: 24px 20px; }
@@ -249,7 +248,6 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 .epass-brand--compact { gap: 9px; }
 .epass-brand-short { font: 500 20px/1.05 var(--font-editorial); }
 .epass-brand-emblem { margin-top: 48px; color: var(--color-accent); }
-.epass-auth-header { padding-block: 16px; }
 .epass-auth-panel h1 { font-family: var(--font-sans); font-size: 40px; font-weight: 500; }
 .epass-topbar { padding-block: 8px; }
 .epass-page-heading h1, .epass-page-heading h2 { font-family: var(--font-sans); font-weight: 500; }
@@ -273,9 +271,9 @@ details[open] > summary > .epass-disclosure-icon { transform: none; }
 .rm-input.pr-12 { padding-right: 48px; }
 .epass-auth-field > .relative > svg { z-index: 1; pointer-events: none; }
 
-/* Align the text's first line with the centre of the 44px checkbox target. */
-.epass-legal-check > span { padding-top: 10px; }
-.epass-legal-check .rm-check > span:last-child:empty { display: none; }
+/* Keep multiline consent text aligned with the checkbox's first line. */
+.epass-legal-check { align-items:flex-start; }
+.epass-legal-check > .rm-check-visual { margin-top:2px; }
 .epass-brand-emblem > svg { margin-left: -10px; }
 
 /* Forma 1.3: product layout only; the SDK owns field outlines and control motion. */
@@ -295,7 +293,6 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-topbar .text-ink { color:var(--r-semantic-color-on-topbar); }
 .epass-workspace,.epass-user-main { max-width:1480px;padding-inline:var(--epass-page-gutter); }
 .epass-footer { padding-inline:max(var(--epass-page-gutter),calc((100% - 1480px)/2 + var(--epass-page-gutter))); }
-.epass-auth-header { min-height:76px;height:76px;padding-block:6px;background:var(--r-semantic-color-surface-topbar);border:0; }
 .epass-auth-brand { border:0; }
 .epass-auth-panel { background:var(--r-semantic-color-surface-group); }
 .epass-theme-toggle.rm-icon-button { min-width:44px;min-height:44px; }
@@ -322,7 +319,7 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .rm-theme .epass-user-identity.rm-button > .rm-button-content { display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:100%;white-space:normal;overflow-wrap:anywhere; }
 .epass-table td:first-child { min-width:220px; }
 
-:is(.epass-topbar,.epass-auth-header) .epass-theme-toggle { background:var(--r-semantic-color-topbar-control);color:var(--r-semantic-color-on-topbar) !important; }
+.epass-topbar .epass-theme-toggle { background:var(--r-semantic-color-topbar-control);color:var(--r-semantic-color-on-topbar) !important; }
 
 /* Product presentation: tonal grouping and zebra rows replace decorative rules. */
 .epass-table .rm-table-wrap { border:0; }
@@ -344,3 +341,27 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 .epass-docs-content .surface-panel,.epass-docs-nav { border:0; }
 
 .forma-dialog.epass-dialog-navigation:dir(rtl) { inset:76px 0 0 auto;border-radius:20px 0 0 20px; }
+
+.epass-profile-edit.rm-button { justify-content:flex-start;border:0;padding-inline:0; }
+.epass-profile-edit .rm-button-content { justify-content:flex-start; }
+.epass-settings-list { display:block;gap:0;padding:8px;border-radius:12px;background:var(--r-semantic-color-surface-group); }
+.epass-settings-list .epass-setting-row { background:transparent;border-radius:0;padding:20px 16px; }
+@media(max-width:1023px) {
+  .epass-user-identity.rm-button { max-width:240px; }
+  .rm-theme .epass-user-identity.rm-button > .rm-button-content { display:flex;align-items:stretch;width:100%;overflow:hidden;white-space:nowrap; }
+  .epass-user-name,.epass-user-contacts,.epass-user-contacts > span { display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal; }
+}
+
+/* Authentication is one inset rounded module, with aligned unframed utilities. */
+.epass-auth { --auth-inset:clamp(24px,4vw,56px); }
+.epass-auth-tools,.epass-auth-body,.epass-auth > .epass-footer { width:calc(100% - var(--epass-page-gutter) * 2);max-width:1480px;margin-inline:auto; }
+.epass-auth-tools { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px var(--auth-inset) 0; }
+.epass-auth-tools .epass-brand { --brand-height:44px; }
+.epass-auth-body { display:flex;flex:1;min-width:0;margin-block:24px; }
+.epass-auth-grid { flex:1;min-width:0;min-height:0;background:transparent; }
+.epass-auth-brand { padding:var(--auth-inset);background:transparent; }
+.epass-auth-panel { min-width:0;padding:var(--auth-inset);border-radius:20px;background:var(--r-semantic-color-surface-group); }
+.epass-auth-panel > div { max-width:none; }
+.epass-auth > .epass-footer { border:0;padding:0 var(--auth-inset) 24px; }
+.epass-auth > .epass-footer nav { justify-content:flex-end;margin-inline-start:auto;gap:16px; }
+@media(max-width:479px) { .epass-auth .epass-methods { grid-template-columns:repeat(2,minmax(0,1fr)); } }

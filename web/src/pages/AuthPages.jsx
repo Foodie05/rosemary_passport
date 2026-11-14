@@ -33,7 +33,7 @@ import {
 function AuthPageFrame({ children }) {
   return <div className="epass-auth">
     <a href="#auth-main" className="epass-skip">跳到主要内容</a>
-    <header className="epass-auth-header"><Brand /><ThemeToggle /></header>
+    <div className="epass-auth-tools"><Brand /><ThemeToggle /></div>
     <main id="auth-main" className="epass-auth-body" tabIndex={-1}>{children}</main>
     <SiteFooter />
   </div>;
@@ -67,21 +67,21 @@ function RememberMeCheckbox({ checked, onChange }) {
 
 function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
   return (
-    <div className="epass-legal-check flex items-start gap-2.5 px-1 text-sm leading-6 text-muted">
-      <RosemaryCheckbox
-        checked={checked}
-        onCheckedChange={onChange}
-        disabled={disabled}
-        ariaLabel="同意使用条款与隐私政策"
-      />
+    <RosemaryCheckbox
+      className="epass-legal-check px-1 text-sm leading-6 text-muted"
+      checked={checked}
+      onCheckedChange={onChange}
+      disabled={disabled}
+      ariaLabel="同意使用条款与隐私政策"
+    >
       <span>
-        我已阅读并同意
+        <span>我已阅读并同意</span>
         <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-ink underline underline-offset-4">《使用条款》</Link>
-        与
+        <span>与</span>
         <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-ink underline underline-offset-4">《隐私政策》</Link>
-        {documents?.terms && documents?.privacy ? `（版本 ${documents.terms.version}/${documents.privacy.version}）` : ''}
+        {documents?.terms && documents?.privacy ? <span>{`（版本 ${documents.terms.version}/${documents.privacy.version}）`}</span> : null}
       </span>
-    </div>
+    </RosemaryCheckbox>
   );
 }
 

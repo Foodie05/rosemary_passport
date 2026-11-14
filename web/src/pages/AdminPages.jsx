@@ -1,9 +1,13 @@
+import {RolePicker} from '../components/RolePicker';
+import {StepUpFields} from '../components/StepUpFields';
+import {roleMfaMethods, roleProofReady} from '../lib/admin-role-change';
+import {getUserErrorMessage} from '../lib/errors';
 import { FormaImport } from '../components/Forma';
 import { FormaButton, FormaInput, FormaTextarea } from '../components/Forma';
 import { IconButton, Table, Search as FormaSearch, Pagination, Badge } from '@rosemary-ui/react';
 import { Link } from '../design/NavigationMotion';
 import { AnimatePresence } from 'motion/react';
-import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from 'react';
+import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { Activity, Ban, BookOpen, Check, ChevronDown, Clock3, Copy, FileText, Key, Mail, RefreshCw, RotateCcw, Search, Settings2, Smartphone, Trash2, UserCheck, UserPlus, Users, Wifi, X } from '../design/Icons';
 import { NewPasswordField } from '../components/NewPasswordField';
@@ -742,19 +746,42 @@ export function AdminLegalDocuments({ documents, loadDocuments, saveDraft, publi
   );
 }
 
-export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserStatus, safely, createUser, updateUserRoles, deleteUser }) {
+export function AdminUsers({ users, supportedRoles = [], stepUpMethods = [], sendStepUpCode, beginStepUpPasskey, pagination, loadUsers, loadUser, updateUserStatus, safely, createUser, updateUserRoles, deleteUser }) {
   const { confirm } = useRosemaryDialog();
   const [search, setSearch] = useState('');
   const [createForm, setCreateForm] = useState({
     email: '',
     nickname: '',
     password: '',
-    roles: 'user',
+    roles: ['user'],
   });
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [editingRoles, setEditingRoles] = useState('user');
+  const [editingRoles, setEditingRoles] = useState(['user']);
   const [viewingUser, setViewingUser] = useState(null);
+  const [roleProof,setRoleProof] = useState({method:'',code:'',response:null});
+  const [roleBusy,setRoleBusy] = useState(false), [roleError,setRoleError] = useState('');
+  const assigning = useRef(false);
+  const mfaMethods = stepUpMethods.filter(method=>roleMfaMethods.includes(method));
+  function resetRoleVerification() {setRoleProof({method:'',code:'',response:null});setRoleError('');}
+  const validRoles = roles => roles.length>0 && roles.every(role=>supportedRoles.includes(role));
+  async function applyRoleAssignment(creating) {
+    if(assigning.current)return;
+    const roles=creating?createForm.roles:editingRoles;
+    if(!validRoles(roles)||!roleProofReady(roleProof))return;
+    assigning.current=true;setRoleBusy(true);setRoleError('');
+    try {
+      const result=creating?await createUser(createForm,roleProof):await updateUserRoles(editingUser.id,editingRoles,roleProof);
+      if(creating){setCreateForm({email:'',nickname:'',password:'',roles:['user']});setCreateModalOpen(false);}
+      else setEditingUser(null);
+      resetRoleVerification();
+      if(!result?.selfDemoted)void safely(()=>loadUsers({page:creating?1:(pagination.page||1),search}), '角色已应用，用户列表刷新失败');
+    } catch(error) {
+      setRoleError(getUserErrorMessage(error,'角色更改未完成，请重新验证后重试。'));
+      setRoleProof(current=>({...current,password:'',code:'',response:null}));
+    } finally {assigning.current=false;setRoleBusy(false);}
+  }
+  const roleVerification = <StepUpFields methods={mfaMethods} excludedFactor="password" value={roleProof} onChange={proof=>{setRoleProof(proof);setRoleError('');}} sendStepUpCode={sendStepUpCode} beginStepUpPasskey={beginStepUpPasskey} disabled={roleBusy} verificationError={roleError} description="使用当前管理员已绑定的任一种 MFA 方式，验证后应用本次角色分配。" />;
   const [banReason, setBanReason] = useState('');
 
   useEffect(() => {
@@ -767,7 +794,7 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
         title="用户管理"
         description="查看当前所有已注册用户，并通过分页方式检索账户。"
         actions={(
-          <FormaButton type="button" className="btn-primary flex items-center gap-2" onClick={() => setCreateModalOpen(true)}>
+          <FormaButton type="button" className="btn-primary flex items-center gap-2" onClick={() => {resetRoleVerification();setCreateModalOpen(true);}} disabled={!supportedRoles.length}>
             <UserPlus size={18} />
             添加新用户
           </FormaButton>
@@ -786,8 +813,8 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
  columns={[
 { id: 'identity', header: '用户', render: user => <>
                     <FormaButton type="button" className="epass-user-identity" onClick={(event) => { event.stopPropagation(); void safely(async () => { setViewingUser(await loadUser(user.id)); setBanReason(''); }, '用户详情加载失败'); }}>
-                      <span className="epass-user-name">{cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}</span>
-                      <span className="epass-user-contacts">{[user.email, user.phone_number].filter(Boolean).map((account) => <span key={account}>{account}</span>)}{!user.email && !user.phone_number && <span>未绑定邮箱或手机号</span>}</span>
+                      <span className="epass-user-name" title={cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}>{cleanDisplayName(user.nickname, user.email || user.phone_number || '未命名用户')}</span>
+                      <span className="epass-user-contacts">{[user.email, user.phone_number].filter(Boolean).map((account) => <span key={account} title={account}>{account}</span>)}{!user.email && !user.phone_number && <span>未绑定邮箱或手机号</span>}</span>
                       <span className="sr-only">查看用户详情</span>
                     </FormaButton>
                   </> },
@@ -816,7 +843,8 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
                         onClick={(event) => {
                           event.stopPropagation();
                           setEditingUser(user);
-                          setEditingRoles((user.roles || []).join(', '));
+                          setEditingRoles((user.roles || []).filter(role=>supportedRoles.includes(role)));
+                          resetRoleVerification();
                         }}
                       />
                       <IconButton
@@ -855,29 +883,17 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
       <AnimatePresence>{createModalOpen && (
         <Modal key="createModalOpen"
           title="添加新用户"
-          onClose={() => setCreateModalOpen(false)}
+          onClose={() => {if(!assigning.current){setCreateModalOpen(false);resetRoleVerification();}}}
           actions={(
             <>
-              <FormaButton type="button" className="btn-secondary" onClick={() => setCreateModalOpen(false)}>
+              <FormaButton type="button" className="btn-secondary" disabled={roleBusy} onClick={() => {setCreateModalOpen(false);resetRoleVerification();}}>
                 取消
               </FormaButton>
               <FormaButton
                 type="button"
                 className="btn-primary"
-                disabled={!evaluatePassword(createForm.password).ok}
-                onClick={() =>
-                  void safely(async () => {
-                    await createUser(createForm);
-                    setCreateForm({
-                      email: '',
-                      nickname: '',
-                      password: '',
-                      roles: 'user',
-                    });
-                    setCreateModalOpen(false);
-                    await loadUsers({ page: 1, search });
-                  }, '新增用户失败')
-                }
+                loading={roleBusy} disabled={roleBusy || !evaluatePassword(createForm.password).ok || !validRoles(createForm.roles) || !roleProofReady(roleProof)}
+                onClick={() => void applyRoleAssignment(true)}
               >
                 创建用户
               </FormaButton>
@@ -885,23 +901,20 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
           )}
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <ConfigField label="邮箱"><FormaInput
+            <ConfigField label="邮箱"><FormaInput disabled={roleBusy}
               className="input-field" type="email"
               placeholder="name@example.com"
               value={createForm.email}
               onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))}
             /></ConfigField>
-            <ConfigField label="昵称"><FormaInput
+            <ConfigField label="昵称"><FormaInput disabled={roleBusy}
               className="input-field"
               value={createForm.nickname}
               onChange={(event) => setCreateForm((current) => ({ ...current, nickname: event.target.value }))}
             /></ConfigField>
-            <NewPasswordField className="md:col-span-2" label="初始密码" value={createForm.password} personalInfo={[createForm.nickname, createForm.email]} onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))} />
-            <ConfigField label="角色（逗号分隔）"><FormaInput
-              className="input-field"
-              value={createForm.roles}
-              onChange={(event) => setCreateForm((current) => ({ ...current, roles: event.target.value }))}
-            /></ConfigField>
+            <NewPasswordField disabled={roleBusy} className="md:col-span-2" label="初始密码" value={createForm.password} personalInfo={[createForm.nickname, createForm.email]} onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))} />
+            <div className="md:col-span-2"><RolePicker roles={createForm.roles} onChange={roles=>setCreateForm(current=>({...current,roles}))} supportedRoles={supportedRoles} disabled={roleBusy}/></div>
+            <div className="md:col-span-2">{roleVerification}</div>
           </div>
         </Modal>
       )}</AnimatePresence>
@@ -909,42 +922,26 @@ export function AdminUsers({ users, pagination, loadUsers, loadUser, updateUserS
       <AnimatePresence>{editingUser && (
         <Modal key="editingUser"
           title={`编辑权限 · ${cleanDisplayName(editingUser.nickname, editingUser.email || '-')}`}
-          onClose={() => setEditingUser(null)}
+          onClose={() => {if(!assigning.current){setEditingUser(null);resetRoleVerification();}}}
           actions={(
             <>
-              <FormaButton type="button" className="btn-secondary" onClick={() => setEditingUser(null)}>
+              <FormaButton type="button" className="btn-secondary" disabled={roleBusy} onClick={() => {setEditingUser(null);resetRoleVerification();}}>
                 取消
               </FormaButton>
               <FormaButton
                 type="button"
                 className="btn-primary"
-                onClick={() =>
-                  void safely(async () => {
-                    await updateUserRoles(editingUser.id, editingRoles);
-                    setEditingUser(null);
-                    await loadUsers({ page: pagination.page || 1, search });
-                  }, '更新用户权限失败')
-                }
+                loading={roleBusy} disabled={roleBusy || !validRoles(editingRoles) || !roleProofReady(roleProof)}
+                onClick={() => void applyRoleAssignment(false)}
               >
-                保存
+                验证并应用更改
               </FormaButton>
             </>
           )}
         >
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {(editingUser.roles || []).map((role) => (
-                <span key={role} className="rounded-full bg-subtle px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-ink">
-                  {role}
-                </span>
-              ))}
-            </div>
-            <FormaInput
-              className="input-field"
-              placeholder="角色，用逗号分隔"
-              value={editingRoles}
-              onChange={(event) => setEditingRoles(event.target.value)}
-            />
+          <div className="space-y-4">
+            <RolePicker roles={editingRoles} onChange={setEditingRoles} supportedRoles={supportedRoles} disabled={roleBusy}/>
+            {roleVerification}
           </div>
         </Modal>
       )}</AnimatePresence>

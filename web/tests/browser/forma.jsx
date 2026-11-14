@@ -25,6 +25,12 @@ const previewUsers=[session.user,
 ];
 const view = new URLSearchParams(location.search).get('view') || 'account';
 function Preview(){
+ const [previewRows,setPreviewRows]=useState(previewUsers);
+ const [roleUpdates,setRoleUpdates]=useState(0);
+ async function updateFixtureRoles(id,roles,proof) {
+   if(!['email_code','phone_code','authenticator'].includes(proof.method)||proof.code!=='123456')throw new Error('合成验证码错误，请使用验收码。');
+   setPreviewRows(rows=>rows.map(user=>user.id===id?{...user,roles}:user));setRoleUpdates(count=>count+1);return {};
+ }
  const [registerForm,setRegisterForm]=useState({nickname:'',email:'',phone_number:'',email_code:'',phone_code:'',password:''});
  const [registerMethod,setRegisterMethod]=useState('email');
  const [legalAccepted,setLegalAccepted]=useState(false);
@@ -42,7 +48,7 @@ function Preview(){
  <Route path="status" element={<AdminStatusManagement cooldowns={[]} pagination={{page:1,total_pages:1,total:0}} loadCooldowns={noop} resetCooldown={noop} safely={safely}/>}/>
  <Route path="legal" element={<AdminLegalDocuments documents={[]} loadDocuments={noop} saveDraft={noop} publishDocument={noop} safely={safely}/>}/>
  <Route path="dashboard" element={<AdminDashboard data={dashboard} loadDashboard={noop} safely={safely}/>}/>
- <Route path="users" element={<AdminUsers users={previewUsers} pagination={{page:1,total_pages:1,total:previewUsers.length}} loadUsers={noop} loadUser={async()=>session.user} safely={safely}/>}/>
+ <Route path="users" element={<><p className="mb-4 text-sm text-muted" data-role-updates={roleUpdates}>本地合成数据 · MFA 验收码 123456 · 已应用 {roleUpdates} 次</p><AdminUsers users={previewRows} supportedRoles={['user','admin']} stepUpMethods={session.security.step_up_methods} sendStepUpCode={async()=>({retry_after:60})} beginStepUpPasskey={async()=>{throw new Error('验收不调用真实通行密钥。');}} updateUserRoles={updateFixtureRoles} pagination={{page:1,total_pages:1,total:previewUsers.length}} loadUsers={noop} loadUser={async()=>session.user} safely={safely}/></>}/>
  <Route path="account" element={account}/>
  <Route path="service" element={<AdminServiceConfig systemForm={systemForm} setSystemForm={setSystemForm} saveServiceConfig={e=>e.preventDefault()}/>}/>
  <Route path="security" element={<AdminSecurityPolicy systemForm={systemForm} setSystemForm={setSystemForm} saveSecurityPolicy={e=>e.preventDefault()} />}/>
