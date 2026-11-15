@@ -33,7 +33,7 @@ test('login legal and recovery actions use lightweight text layout', () => {
   const legalStart = auth.indexOf('function LegalAgreementCheckbox');
   const legalEnd = auth.indexOf('function AccountCenterLink');
   const legal = auth.slice(legalStart, legalEnd);
-  assert.match(legal, /px-1 text-sm/);
+  assert.match(legal, /epass-auth-check epass-legal-check/);
   assert.doesNotMatch(legal, /rounded-2xl|border-sage|bg-sage/);
 
   const loginStart = auth.indexOf('export function LoginPage');

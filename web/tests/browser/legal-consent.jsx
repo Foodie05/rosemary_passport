@@ -41,10 +41,12 @@ if (params.has('checks')) {
   const run = document.createElement('button'), report = document.createElement('pre');
   run.textContent = '运行登录验收'; report.id = 'login-check-report';
   run.onclick = async () => {
-    run.disabled = true;
+    run.disabled = true; delete report.dataset.ready;
     try { const {runLoginChecks} = await import('./login-checks');report.textContent=JSON.stringify(await runLoginChecks(requests),null,2); }
     catch (error) {report.textContent=JSON.stringify({passed:false,error:error.stack});}
-    finally {run.disabled=false;}
+    finally {run.disabled=false;report.dataset.ready='true';}
   };
   checks.append(run,report);document.body.append(checks);
 }
+
+if(new URLSearchParams(location.search).has('layout')) { import('./layout-audit').then(({wireLayoutAudit}) => wireLayoutAudit()); }

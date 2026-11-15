@@ -59,7 +59,7 @@ function CodeInputWithAction({ label, placeholder, value, onChange, actionLabel,
 
 function RememberMeCheckbox({ checked, onChange }) {
   return (
-    <RosemaryCheckbox checked={checked} onCheckedChange={onChange} className="px-1 text-muted">
+    <RosemaryCheckbox checked={checked} onCheckedChange={onChange} className="epass-auth-check text-muted">
       保持登录状态（3 天）
     </RosemaryCheckbox>
   );
@@ -68,7 +68,7 @@ function RememberMeCheckbox({ checked, onChange }) {
 function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
   return (
     <RosemaryCheckbox
-      className="epass-legal-check px-1 text-sm leading-6 text-muted"
+      className="epass-auth-check epass-legal-check text-muted"
       checked={checked}
       onCheckedChange={onChange}
       disabled={disabled}
@@ -76,10 +76,10 @@ function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
     >
       <span>
         <span>我已阅读并同意</span>
-        <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-ink underline underline-offset-4">《使用条款》</Link>
-        <span>与</span>
-        <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="mx-1 font-bold text-ink underline underline-offset-4">《隐私政策》</Link>
-        {documents?.terms && documents?.privacy ? <span>{`（版本 ${documents.terms.version}/${documents.privacy.version}）`}</span> : null}
+        <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《使用条款》</Link>
+        <span className="epass-agreement-clause"><span>与</span>
+        <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《隐私政策》</Link></span>
+        {documents?.terms && documents?.privacy ? <span className="epass-agreement-version">{`（版本 ${documents.terms.version}/${documents.privacy.version}）`}</span> : null}
       </span>
     </RosemaryCheckbox>
   );
@@ -97,7 +97,7 @@ function AccountCenterLink({ requestLegalAcceptance }) {
   return (
     <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
       to="/account"
-      className="ml-auto px-1 py-1 text-sm font-semibold text-muted hover:text-ink"
+      className="epass-auth-text-action ml-auto font-semibold text-muted hover:text-ink"
     >
       账户中心
     </AuthActionLink>
@@ -609,23 +609,23 @@ export function LoginPage({
 
             </div>
 
-            <div className="epass-login-options">
+            <div className="epass-login-options epass-auth-meta">
               <LegalAgreementCheckbox checked={legalAccepted} onChange={setLegalAccepted} documents={legalDocuments} disabled={loading || loginCodeSending || webauthnLoading} />
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="epass-auth-remember-row">
                 <RememberMeCheckbox checked={rememberMe} onChange={setRememberMe} />
-                <p className="text-sm text-muted">
+                <p className="epass-auth-register-prompt text-muted">
                   还没有账户？
                   {' '}
-                  <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="font-bold text-ink underline-offset-4 hover:underline">
+                  <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/register?next=${encodeURIComponent(authNext)}` : '/register'} className="epass-auth-inline-link font-semibold text-ink underline-offset-4 hover:underline">
                     立即注册
                   </AuthActionLink>
                 </p>
               </div>
 
-              <div className="flex items-center justify-between gap-4">
+              <div className="epass-auth-assist-row">
                 <AuthActionLink requestLegalAcceptance={requestLegalAcceptance}
                   to={authNext ? `/forgot-password?next=${encodeURIComponent(authNext)}` : '/forgot-password'}
-                  className="px-1 py-1 text-sm font-bold text-ink hover:underline"
+                  className="epass-auth-text-action font-semibold text-ink hover:underline"
                 >忘记密码？</AuthActionLink>
                 {isAuthorizationLogin(authNext) && <AccountCenterLink requestLegalAcceptance={requestLegalAcceptance} />}
               </div>
@@ -717,7 +717,7 @@ export function RegisterPage({
             </FormaButton>
           </SelectionGroup>
 
-          <SelectionContent value={registerMethod} index={registerMethod === 'email' ? 0 : 1}><form className="space-y-5" onSubmit={(event) => { if (!passwordValid) { event.preventDefault(); return; } submitRegister(event); }}>
+          <SelectionContent value={registerMethod} index={registerMethod === 'email' ? 0 : 1}><form className="epass-auth-form" onSubmit={(event) => { if (!passwordValid) { event.preventDefault(); return; } submitRegister(event); }}>
             <AuthInput
               icon={User}
               label="昵称"
@@ -769,10 +769,10 @@ export function RegisterPage({
             </FormaButton>
           </form></SelectionContent>
 
-          <p className="text-center text-sm text-muted">
+          <p className="epass-auth-meta epass-auth-register-prompt text-muted">
             已经有账户了？
             {' '}
-            <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="font-bold text-ink underline-offset-4 hover:underline">
+            <AuthActionLink requestLegalAcceptance={requestLegalAcceptance} to={authNext ? `/login?next=${encodeURIComponent(authNext)}` : '/login'} className="epass-auth-inline-link font-semibold text-ink underline-offset-4 hover:underline">
               返回登录
             </AuthActionLink>
           </p>
@@ -805,10 +805,7 @@ export function ForgotPasswordPage({
 
             {step === 'request' ? (
               <div className="space-y-8">
-                <div className="space-y-4 text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-panel bg-subtle text-muted">
-                    <Lock size={32} />
-                  </div>
+                <div className="space-y-2">
                   <h1 className="text-2xl font-bold text-ink">忘记密码了？</h1>
                   <p className="leading-relaxed text-muted">使用密码以外的已绑定因素完成验证后重置密码。</p>
                 </div>

@@ -847,7 +847,7 @@ class _ProfileCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed: busy ? null : onSaveNickname,
             busy: busy,
             label: '保存',
@@ -1011,7 +1011,7 @@ class _PasswordSheet extends StatelessWidget {
               onSend: onSend,
             ),
           const SizedBox(height: 18),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed:
                 busy || !const RosmPasswordPolicy().evaluate(value.text).ok
                 ? null
@@ -1100,7 +1100,7 @@ class _CodeSheetFields extends StatelessWidget {
           onSend: onSend,
         ),
         const SizedBox(height: 18),
-        RosemaryButton(
+        RosmEpassButton(
           onPressed: busy ? null : onSubmit,
           busy: busy,
           label: submitLabel,
@@ -1187,7 +1187,7 @@ class _AuthenticatorSheet extends StatelessWidget {
             ),
         const SizedBox(height: 12),
         if (current == null)
-          RosemaryButton(
+          RosmEpassButton(
             onPressed: busy ? null : onBegin,
             busy: busy,
             label: '生成密钥',
@@ -1218,7 +1218,7 @@ class _AuthenticatorSheet extends StatelessWidget {
             decoration: const InputDecoration(labelText: '动态验证码'),
           ),
           const SizedBox(height: 18),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed: busy ? null : onSubmit,
             busy: busy,
             label: '完成设置',
@@ -1388,7 +1388,7 @@ class _AccountError extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            RosemaryButton(onPressed: onRetry, label: actionLabel),
+            RosmEpassButton(onPressed: onRetry, label: actionLabel),
           ],
         ),
       ),

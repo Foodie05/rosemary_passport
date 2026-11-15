@@ -76,7 +76,14 @@ ThemeData buildRosmPassportTheme(
   final duration = MediaQuery.disableAnimationsOf(context)
       ? Duration.zero
       : RosmEpassMotion.hover;
+  final family = RosemaryTokens.typography.roles['body']!.family;
+  final fonts = RosemaryTokens.typography.families[family]!
+      .split(',')
+      .map((font) => font.trim())
+      .toList();
   final textTheme = inherited.textTheme.apply(
+    fontFamily: fonts.first,
+    fontFamilyFallback: fonts.skip(1).toList(),
     bodyColor: ink,
     displayColor: ink,
   );
@@ -90,10 +97,12 @@ ThemeData buildRosmPassportTheme(
     brightness: brightness,
     colorScheme: scheme,
     textTheme: textTheme.copyWith(
+      bodyMedium: textTheme.bodyMedium?.copyWith(fontSize: 16, height: 1.75),
+      bodySmall: textTheme.bodySmall?.copyWith(fontSize: 14, height: 1.5),
       headlineLarge: textTheme.headlineLarge?.copyWith(
-        fontFamily: null,
-        fontFamilyFallback: const [],
-        fontWeight: FontWeight.w400,
+        fontFamily: fonts.first,
+        fontFamilyFallback: fonts.skip(1).toList(),
+        fontWeight: FontWeight.w500,
       ),
     ),
     scaffoldBackgroundColor: canvas,

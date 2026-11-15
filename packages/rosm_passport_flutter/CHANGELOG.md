@@ -1,3 +1,11 @@
+## 0.11.1 — 2026-11-15
+
+- Use a flat canvas for portrait/narrow sign-in, registration, recovery, MFA and consent; retain centered cards in roomy landscape.
+- Align legal prose, document links and footer actions with shared type metrics; preserve ordinary-text toggling and independent keyboard links.
+- Apply Rosemary font families consistently, keep native input icons at 20px inside 44px targets, clip filled fields to the official radius, and center action contents.
+- Constrain dialogs with safe-area and keyboard gutters, a 680px height cap and internal scrolling. Preserve pinned upstream overlay lifecycle and focus behavior through a verified bounds adapter; do not modify vendored source.
+- Add baseline, portrait/landscape, scrolling, keyboard-inset and focus-restoration regression tests, plus optional local rendered evidence.
+
 ## 0.11.0 — 2026-11-14
 
 - Integrate official Rosemary Forma 1.3.0 / SDK 0.5.0, pinned release source with license and SHA256 provenance.

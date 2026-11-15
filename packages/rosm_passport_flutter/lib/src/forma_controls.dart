@@ -1,9 +1,12 @@
+export 'centered_button.dart';
 import 'dart:ui' show SemanticsValidationResult;
 import 'forma_field_outline.dart';
+import 'inset_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:rosemary_ui/rosemary_ui.dart';
 import 'rosm_passport_theme.dart';
 import 'epass_brand.dart';
+import 'epass_tokens.dart';
 
 /// Uses official controlled fields; adapts only native controller/autofill hooks.
 class RosmEpassInput extends StatefulWidget {
@@ -181,54 +184,69 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
           child: RosmFieldOutline(
             focused: node.hasFocus,
             invalid: invalid,
-            child: TextField(
-              controller: widget.controller,
-              focusNode: node,
-              enabled: widget.enabled,
-              readOnly: widget.readOnly,
-              obscureText: widget.obscureText,
-              autofillHints: hints,
-              textInputAction: widget.textInputAction,
-              keyboardType: widget.keyboardType,
-              onChanged: widget.onChanged,
-              onSubmitted: widget.onSubmitted,
-              minLines: widget.minLines,
-              maxLines: widget.maxLines,
-              autocorrect: !widget.obscureText,
-              enableSuggestions: !widget.obscureText,
-              style: rosemaryTextStyle(
-                context,
-                'body',
-              ).copyWith(fontSize: 16, height: 1.5),
-              decoration: InputDecoration(
-                hintText: widget.decoration.hintText,
-                prefixIcon: widget.decoration.prefixIcon,
-                suffixIcon: widget.decoration.suffixIcon,
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
-                suffixIconConstraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
-                floatingLabelBehavior: FloatingLabelBehavior.never,
-                filled: true,
-                fillColor: invalid
-                    ? c.dangerSoft
-                    : widget.enabled == false || widget.readOnly
-                    ? c.surfaceInset
-                    : c.fieldFill,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(RosmEpassGeometry.control),
+              child: TextField(
+                controller: widget.controller,
+                focusNode: node,
+                enabled: widget.enabled,
+                readOnly: widget.readOnly,
+                obscureText: widget.obscureText,
+                autofillHints: hints,
+                textInputAction: widget.textInputAction,
+                keyboardType: widget.keyboardType,
+                onChanged: widget.onChanged,
+                onSubmitted: widget.onSubmitted,
+                minLines: widget.minLines,
+                maxLines: widget.maxLines,
+                autocorrect: !widget.obscureText,
+                enableSuggestions: !widget.obscureText,
+                style: rosemaryTextStyle(
+                  context,
+                  'body',
+                ).copyWith(fontSize: 16, height: 1.5),
+                decoration: InputDecoration(
+                  hintText: widget.decoration.hintText,
+                  prefixIcon: widget.decoration.prefixIcon == null
+                      ? null
+                      : SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Center(child: widget.decoration.prefixIcon),
+                        ),
+                  suffixIcon: widget.decoration.suffixIcon == null
+                      ? null
+                      : SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Center(child: widget.decoration.suffixIcon),
+                        ),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  suffixIconConstraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  floatingLabelBehavior: FloatingLabelBehavior.never,
+                  filled: true,
+                  fillColor: invalid
+                      ? c.dangerSoft
+                      : widget.enabled == false || widget.readOnly
+                      ? c.surfaceInset
+                      : c.fieldFill,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ),
@@ -257,16 +275,18 @@ class RosmEpassTextButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
   });
   final VoidCallback? onPressed;
   final Widget child;
   final ButtonStyle? style;
+  final EdgeInsetsGeometry padding;
   @override
   Widget build(BuildContext context) => RosemaryActionSurface(
     onActivate: onPressed,
     enabled: onPressed != null,
     link: true,
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    padding: padding,
     child: DefaultTextStyle.merge(
       style: TextStyle(
         fontSize: rosemaryDimension('button', 'fontSize'),
@@ -275,7 +295,7 @@ class RosmEpassTextButton extends StatelessWidget {
             rosemaryDimension('button', 'fontSize'),
         fontWeight: FontWeight.w500,
       ),
-      child: child,
+      child: Center(widthFactor: 1, heightFactor: 1, child: child),
     ),
   );
 }
@@ -310,15 +330,16 @@ class RosmEpassOutlinedButton extends StatelessWidget {
               rosemaryDimension('button', 'fontSize'),
           fontWeight: FontWeight.w500,
         ),
-        child: child,
+        child: Center(widthFactor: 1, heightFactor: 1, child: child),
       ),
     );
   }
 }
 
 class RosmEpassBrand extends StatelessWidget {
-  const RosmEpassBrand({super.key, this.compact = false});
+  const RosmEpassBrand({super.key, this.compact = false, this.size = 64});
   final bool compact;
+  final double size;
   @override
   Widget build(BuildContext context) {
     if (compact)
@@ -359,28 +380,28 @@ class RosmEpassBrand extends StatelessWidget {
             Image.asset(
               'assets/rosemary.png',
               package: 'rosm_passport_flutter',
-              width: 64,
-              height: 64,
+              width: size,
+              height: size,
               fit: BoxFit.contain,
             ),
-            const SizedBox(width: 16),
-            const Column(
+            SizedBox(width: size * .25),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Rosemary',
                   style: TextStyle(
                     fontFamily: 'Georgia',
-                    fontSize: 19.2,
+                    fontSize: size * .3,
                     height: 1.15,
                   ),
                 ),
-                SizedBox(height: 2.56),
+                SizedBox(height: size * .04),
                 Text(
                   'Epass',
                   style: TextStyle(
                     fontFamily: 'Georgia',
-                    fontSize: 35.84,
+                    fontSize: size * .56,
                     height: 1.05,
                     fontWeight: FontWeight.w500,
                   ),
@@ -463,7 +484,7 @@ class _EpassDialogRouteState<T> extends State<_EpassDialogRoute<T>> {
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop && widget.dismissible) close(null);
     },
-    child: RosemaryDialog(
+    child: RosmInsetDialog(
       open: open,
       title: widget.title,
       onDismiss: (_) {
@@ -472,12 +493,7 @@ class _EpassDialogRouteState<T> extends State<_EpassDialogRoute<T>> {
       onAnimationFinished: () {
         if (!open && mounted) Navigator.of(context).pop(result);
       },
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: widget.builder(context, close),
-      ),
+      child: widget.builder(context, close),
     ),
   );
 }
@@ -531,6 +547,6 @@ class RosmEpassIconAction extends StatelessWidget {
     label: tooltip ?? '关闭',
     foreground: color,
     padding: const EdgeInsets.all(10),
-    child: icon,
+    child: Center(widthFactor: 1, heightFactor: 1, child: icon),
   );
 }

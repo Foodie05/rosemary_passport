@@ -21,7 +21,7 @@ export async function runLoginChecks(requests) {
   const card = document.querySelector('.epass-login-panel');
   const grid = document.querySelector('.epass-auth-grid');
   const cardRect=card.getBoundingClientRect(), gridRect=grid.getBoundingClientRect();
-  check('login card is vertically centred in the main region', Math.abs(cardRect.top+cardRect.height/2-gridRect.top-gridRect.height/2)<2);
+  check('desktop card centres; phone form sits directly on the canvas', innerWidth > 1023 ? Math.abs(cardRect.top+cardRect.height/2-gridRect.top-gridRect.height/2)<2 : getComputedStyle(card).borderRadius === '0px' && getComputedStyle(card).backgroundColor === 'rgba(0, 0, 0, 0)');
   const contentHeight=document.querySelector('.epass-login-content').getBoundingClientRect().height;
   const padding=parseFloat(getComputedStyle(card).paddingTop)+parseFloat(getComputedStyle(card).paddingBottom);
   check('login card height fits content plus padding', Math.abs(cardRect.height-contentHeight-padding)<2);

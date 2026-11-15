@@ -32,3 +32,18 @@ overlay = overlay.replace('function Modal({', 'export function StartDrawer({').r
 adapter = (root / 'web/src/components/StartDrawer.js').read_text()
 assert adapter[adapter.index('import { jsx as _jsx'):] == overlay, 'start drawer diverges from the verified modal implementation'
 print('Start drawer preserves official lifecycle and uses the inline-start motion sign')
+
+# The SDK exposes no dialog constraints; derive only bounds/header adaptations.
+import re
+from derive_epass_dialog import derive
+expected = derive((vendor / 'rosemary_ui/lib/src/overlays.dart').read_text())
+actual = (root / 'packages/rosm_passport_flutter/lib/src/inset_dialog.dart').read_text()
+compact = lambda value: re.sub(r',(?=[)\]}])', '', re.sub(r'\s+', '', value))
+assert compact(actual) == compact(expected), 'dialog adapter diverges beyond approved viewport changes'
+print('Inset dialog preserves upstream lifecycle, focus and dismissal')
+
+from derive_epass_button import derive as derive_button
+expected_button = derive_button((vendor / 'rosemary_ui/lib/src/primitives.dart').read_text())
+actual_button = (root / 'packages/rosm_passport_flutter/lib/src/centered_button.dart').read_text()
+assert compact(actual_button) == compact(expected_button), 'button adapter diverges beyond content centering'
+print('Button subclass preserves official state, loading and action semantics')

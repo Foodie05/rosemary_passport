@@ -59,3 +59,5 @@ function Preview(){
 const fixtureRoot = import.meta.hot?.data.root ?? createRoot(document.getElementById('root'));
 if (import.meta.hot) import.meta.hot.data.root = fixtureRoot;
 fixtureRoot.render(<Preview/>);
+
+if(new URLSearchParams(location.search).has('layout')) { import('./layout-audit').then(({wireLayoutAudit}) => wireLayoutAudit()); }

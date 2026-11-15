@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'visual_support.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +12,8 @@ import 'package:rosm_passport_flutter/rosm_passport_flutter.dart';
 import 'package:rosemary_ui/rosemary_ui.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(loadVisualFonts);
   tearDown(() {
     TestWidgetsFlutterBinding.instance.platformDispatcher
         .clearPlatformBrightnessTestValue();
@@ -63,7 +69,7 @@ void main() {
   testWidgets(
     'sign-in card fits content and remains vertically centered across tabs',
     (tester) async {
-      tester.view.physicalSize = const Size(600, 1400);
+      tester.view.physicalSize = const Size(1200, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -71,22 +77,71 @@ void main() {
       await tester.pumpAndSettle();
       final card = find.byType(RosemaryCard);
       final initial = tester.getRect(card);
-      expect(initial.center.dy, closeTo(700, 1));
-      expect(initial.height, lessThan(1300));
+      expect(initial.center.dy, closeTo(500, 1));
+      expect(initial.height, lessThan(960));
       tester
           .widget<RosemaryTabs>(find.byType(RosemaryTabs))
           .onChanged('password');
       await tester.pumpAndSettle();
       final password = tester.getRect(card);
-      expect(password.center.dy, closeTo(700, 1));
+      expect(password.center.dy, closeTo(500, 1));
       expect(password.height, greaterThan(initial.height));
       tester.widget<RosemaryTabs>(find.byType(RosemaryTabs)).onChanged('code');
       await tester.pumpAndSettle();
       expect(tester.getRect(card).height, closeTo(initial.height, 1));
-      expect(tester.getRect(card).center.dy, closeTo(700, 1));
+      expect(tester.getRect(card).center.dy, closeTo(500, 1));
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final dark in [false, true]) {
+    testWidgets(
+      'portrait sign-in uses a flat canvas and common text/field edges dark=$dark',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await _pumpSignIn(
+          tester,
+          dark ? RosmPassportThemeMode.dark : RosmPassportThemeMode.light,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(RosemaryCard), findsNothing);
+        final field = find.byType(EditableText).first;
+        final brand = find.text('Rosemary'), heading = find.text('登录');
+        expect(tester.getTopLeft(heading).dx, 20);
+        expect(
+          tester.getTopLeft(brand).dx,
+          75,
+        ); // 20 gutter + 44 mark + 11 lockup gap.
+        expect(tester.getTopLeft(field).dx, greaterThanOrEqualTo(20));
+        for (final icon in find.byType(RosemaryIcon).evaluate()) {
+          expect(
+            tester.getSize(find.byWidget(icon.widget)).width,
+            lessThanOrEqualTo(24),
+          );
+        }
+        final submit = find.byWidgetPredicate(
+          (w) => w is RosemaryButton && w.label == '发送登录验证码  →',
+        );
+        expect(
+          (tester.getCenter(find.text('发送登录验证码  →')).dx -
+                  tester.getCenter(submit).dx)
+              .abs(),
+          lessThan(1),
+        );
+        await _capturePage(tester, 'sdk-login-${dark ? 'dark' : 'light'}');
+        tester
+            .widget<RosemaryTabs>(find.byType(RosemaryTabs))
+            .onChanged('password');
+        await tester.pumpAndSettle();
+        expect(find.byType(RosemaryCard), findsNothing);
+        await _capturePage(tester, 'sdk-password-${dark ? 'dark' : 'light'}');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('system mode follows the platform dark appearance', (
     tester,
@@ -138,10 +193,14 @@ Future<void> _pumpSignIn(
   RosmPassportThemeMode themeMode,
 ) async {
   await tester.pumpWidget(
-    MaterialApp(
-      home: RosmPassportSignInPage(
-        client: _client(),
-        config: RosmPassportSignInConfig(themeMode: themeMode),
+    RepaintBoundary(
+      key: const ValueKey('sdk-page'),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: RosmPassportSignInPage(
+          client: _client(),
+          config: RosmPassportSignInConfig(themeMode: themeMode),
+        ),
       ),
     ),
   );
@@ -194,4 +253,19 @@ RosmPassportClient _client() {
       );
     }),
   );
+}
+
+Future<void> _capturePage(WidgetTester tester, String name) async {
+  final output = Platform.environment['ROSM_VISUAL_OUTPUT'];
+  if (output == null) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('sdk-page')),
+  );
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    await Directory(output).create(recursive: true);
+    await File('$output/$name.png').writeAsBytes(bytes!.buffer.asUint8List());
+    image.dispose();
+  });
 }
