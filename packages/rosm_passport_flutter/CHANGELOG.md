@@ -1,3 +1,8 @@
+## 0.11.2 — 2026-11-16
+
+- Increase the outer padding of flat portrait/narrow authentication screens from 20px to 50px on all sides; retain scrolling with keyboards and large text.
+- Preserve desktop card and dialog spacing, typography, authentication and account APIs.
+
 ## 0.11.1 — 2026-11-15
 
 - Use a flat canvas for portrait/narrow sign-in, registration, recovery, MFA and consent; retain centered cards in roomy landscape.

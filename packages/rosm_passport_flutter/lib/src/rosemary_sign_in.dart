@@ -844,6 +844,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     final theme = buildRosmPassportTheme(context, widget.config.themeMode);
     final colors = theme.colorScheme;
     final mode = _activeMode;
+    final inset = _plainSignIn(context) ? 50.0 : 20.0;
     return RosmEpassTheme(
       data: theme,
       child: Scaffold(
@@ -853,11 +854,11 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               ? Center(child: RosmEpassProgress(color: colors.primary))
               : LayoutBuilder(
                   builder: (context, constraints) => SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(inset),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight > 40
-                            ? constraints.maxHeight - 40
+                        minHeight: constraints.maxHeight > inset * 2
+                            ? constraints.maxHeight - inset * 2
                             : 0,
                       ),
                       child: Align(
@@ -875,7 +876,13 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const RosmEpassBrand(size: 44),
+                                    const Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: RosmEpassBrand(size: 44),
+                                      ),
+                                    ),
                                     RosmEpassIconAction(
                                       tooltip: '关闭',
                                       onPressed: _busy

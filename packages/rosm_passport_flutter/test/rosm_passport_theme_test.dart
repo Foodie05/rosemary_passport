@@ -110,12 +110,12 @@ void main() {
         expect(find.byType(RosemaryCard), findsNothing);
         final field = find.byType(EditableText).first;
         final brand = find.text('Rosemary'), heading = find.text('登录');
-        expect(tester.getTopLeft(heading).dx, 20);
+        expect(tester.getTopLeft(heading).dx, 50);
         expect(
           tester.getTopLeft(brand).dx,
-          75,
-        ); // 20 gutter + 44 mark + 11 lockup gap.
-        expect(tester.getTopLeft(field).dx, greaterThanOrEqualTo(20));
+          105,
+        ); // 50 gutter + 44 mark + 11 lockup gap.
+        expect(tester.getTopLeft(field).dx, greaterThanOrEqualTo(50));
         for (final icon in find.byType(RosemaryIcon).evaluate()) {
           expect(
             tester.getSize(find.byWidget(icon.widget)).width,

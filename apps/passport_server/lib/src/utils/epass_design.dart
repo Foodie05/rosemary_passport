@@ -60,16 +60,16 @@ html[data-theme='dark'] .theme-sun { display:block; }
 .document-footer a { text-decoration:none; }
 .document-footer a:hover { text-decoration:underline; text-underline-offset:4px; }
 @media(max-width:1023px) {
-  body { --document-inset:0px; }
+  body { --document-inset:0px;--document-gutter:60px; }
   .document-tools,.shell,.document-footer { max-width:480px; }
-  .document-tools { padding:24px 0 0; }
+  .document-tools { padding:60px 0 0; }
   .shell { display:block; margin-block:32px; }
   .brand-side,.epass-error .brand { display:none; }
   .main { align-items:flex-start; }
   .panel,.card { max-width:480px;margin-inline:auto;padding:0;border-radius:0;background:transparent; }
-  .document-footer { padding:0 0 24px; }
+  .document-footer { padding:0 0 60px; }
 }
-@media(max-width:640px) { .panel h1,.card h2 { font-size:32px; } }
+@media(max-width:640px) { body { --document-gutter:40px; } .panel h1,.card h2 { font-size:32px; } }
 .epass-lockup { display: inline-flex; gap: 16px; align-items: center; direction: ltr; }
 .epass-lockup > img { width: 64px; height: 64px; object-fit: contain; }
 .epass-lockup > span { display: flex; flex-direction: column; gap: 2.56px; font-family: var(--r-semantic-font-editorial); }

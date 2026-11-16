@@ -415,13 +415,13 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 
 /* A phone form lives directly on the canvas, with no card inset or outline. */
 @media(max-width:1023px) {
-  .epass-auth { --auth-inset:0px; }
-  .epass-auth-tools { padding:24px 0 0; }
+  .epass-auth { --auth-inset:0px;--epass-page-gutter:60px; }
+  .epass-auth-tools { padding:60px 0 0; }
   .epass-auth-body { margin-block:32px; }
   .epass-auth-grid { display:block;align-self:flex-start;width:100%; }
   .epass-auth-panel { padding:0;border-radius:0;background:transparent;max-width:480px;width:100%;margin-inline:auto; }
   .epass-auth-panel h1 { font-size:32px;line-height:1.3; }
-  .epass-auth > .epass-footer { padding:0 0 24px; }
+  .epass-auth > .epass-footer { padding:0 0 60px; }
 }
 
 /* Shared control geometry also applies to account/admin dialogs. */
@@ -442,3 +442,5 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
   .epass-auth-tools,.epass-auth-body,.epass-auth > .epass-footer { max-width:480px; }
 }
 .epass-auth-register-prompt { text-align:end; }
+
+@media(max-width:640px) { .epass-auth { --epass-page-gutter:40px; } }

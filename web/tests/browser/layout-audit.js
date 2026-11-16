@@ -9,7 +9,8 @@ export function auditLayout() {
   if(panel){
     const style=getComputedStyle(panel);
     check('responsive surface',innerWidth<=1023 ? style.backgroundColor==='rgba(0, 0, 0, 0)' && style.borderRadius==='0px' : parseFloat(style.paddingLeft)>=24);
-    check('form viewport gutters',rect(panel).left>=16 && rect(panel).right<=innerWidth-16);
+    const gutter=innerWidth<=640?40:innerWidth<=1023?60:16;
+    check('form viewport gutters',rect(panel).left>=gutter && rect(panel).right<=innerWidth-gutter);
     if(innerWidth<=1023){const tools=document.querySelector('.epass-auth-tools');if(tools)check('phone/tablet utilities share form edges',near(rect(tools).left,rect(panel).left)&&near(rect(tools).right,rect(panel).right));}
   }
   for(const [index,field] of [...document.querySelectorAll('.rm-field')].filter(visible).entries()) {
