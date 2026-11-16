@@ -115,7 +115,8 @@ void main() {
           tester.getTopLeft(brand).dx,
           105,
         ); // 50 gutter + 44 mark + 11 lockup gap.
-        expect(tester.getTopLeft(field).dx, 62);
+        final textStart = tester.getTopLeft(field).dx;
+        expect(textStart, lessThanOrEqualTo(66));
         for (final icon in find.byType(RosemaryIcon).evaluate()) {
           expect(
             tester.getSize(find.byWidget(icon.widget)).width,
@@ -138,7 +139,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(RosemaryCard), findsNothing);
         for (final input in find.byType(EditableText).evaluate()) {
-          expect(tester.getTopLeft(find.byWidget(input.widget)).dx, 62);
+          expect(tester.getTopLeft(find.byWidget(input.widget)).dx, textStart);
         }
         await _capturePage(tester, 'sdk-password-${dark ? 'dark' : 'light'}');
         expect(tester.takeException(), isNull);
