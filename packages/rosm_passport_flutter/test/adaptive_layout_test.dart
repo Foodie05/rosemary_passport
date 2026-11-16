@@ -30,7 +30,6 @@ void main() {
               child: RosmEpassAgreement(
                 checked: false,
                 enabled: true,
-                version: '11/12',
                 onChanged: (_) => changes++,
                 onTerms: () => terms++,
                 onPrivacy: () => privacy++,
@@ -56,10 +55,12 @@ void main() {
       }
 
       final start = baseline('我已阅读并同意');
-      for (final text in ['《使用条款》', '与', '《隐私政策》']) {
+      for (final text in ['《使用条款》', '《隐私政策》']) {
         final delta = (baseline(text) - start).abs();
         expect((delta / 24) - (delta / 24).round(), closeTo(0, .02));
       }
+      expect(baseline('《使用条款》'), closeTo(baseline('《隐私政策》'), .5));
+      expect(find.textContaining('版本'), findsNothing);
       await tester.tap(find.text('我已阅读并同意'));
       expect(changes, 1);
       await tester.tap(find.text('《使用条款》'));

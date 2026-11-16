@@ -1,6 +1,7 @@
 ## 0.11.2 — 2026-11-16
 
 - Increase the outer padding of flat portrait/narrow authentication screens from 20px to 50px on all sides; retain scrolling with keyboards and large text.
+- Keep the legal version out of the checkbox copy and group both document links on one line when space permits; version-bound acceptance remains enforced.
 - Preserve desktop card and dialog spacing, typography, authentication and account APIs.
 
 ## 0.11.1 — 2026-11-15

@@ -12,12 +12,10 @@ class RosmEpassAgreement extends StatelessWidget {
     required this.onChanged,
     required this.onTerms,
     required this.onPrivacy,
-    required this.version,
   });
   final bool checked, enabled;
   final ValueChanged<bool> onChanged;
   final VoidCallback onTerms, onPrivacy;
-  final String version;
   @override
   Widget build(BuildContext context) {
     final textStyle = rosemaryTextStyle(
@@ -55,43 +53,54 @@ class RosmEpassAgreement extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    inline(Text('我已阅读并同意', style: textStyle)),
-                    const TextSpan(text: ' '),
-                    inline(
-                      _InlineAgreementLink(
-                        label: '《使用条款》',
-                        onTap: onTerms,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final links = ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                    child: IntrinsicWidth(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            inline(
+                              _InlineAgreementLink(
+                                label: '《使用条款》',
+                                onTap: onTerms,
+                                style: textStyle,
+                              ),
+                            ),
+                            const TextSpan(text: ' 与 '),
+                            inline(
+                              _InlineAgreementLink(
+                                label: '《隐私政策》',
+                                onTap: onPrivacy,
+                                style: textStyle,
+                              ),
+                            ),
+                          ],
+                        ),
                         style: textStyle,
-                      ),
-                    ),
-                    const TextSpan(text: ' '),
-                    inline(Text('与', style: textStyle)),
-                    const TextSpan(text: ' '),
-                    inline(
-                      _InlineAgreementLink(
-                        label: '《隐私政策》',
-                        onTap: onPrivacy,
-                        style: textStyle,
-                      ),
-                    ),
-                    inline(
-                      Text(
-                        '（版本 $version）',
-                        style: textStyle.copyWith(
-                          color: RosemaryThemeData.of(context).muted,
+                        strutStyle: StrutStyle.fromTextStyle(
+                          textStyle,
+                          forceStrutHeight: true,
                         ),
                       ),
                     ),
-                  ],
-                ),
-                style: textStyle,
-                strutStyle: StrutStyle.fromTextStyle(
-                  textStyle,
-                  forceStrutHeight: true,
-                ),
+                  );
+                  return Text.rich(
+                    TextSpan(
+                      children: [
+                        inline(Text('我已阅读并同意', style: textStyle)),
+                        const TextSpan(text: ' '),
+                        inline(links),
+                      ],
+                    ),
+                    style: textStyle,
+                    strutStyle: StrutStyle.fromTextStyle(
+                      textStyle,
+                      forceStrutHeight: true,
+                    ),
+                  );
+                },
               ),
             ),
           ),

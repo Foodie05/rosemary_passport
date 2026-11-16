@@ -65,7 +65,7 @@ function RememberMeCheckbox({ checked, onChange }) {
   );
 }
 
-function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
+function LegalAgreementCheckbox({ checked, onChange, disabled }) {
   return (
     <RosemaryCheckbox
       className="epass-auth-check epass-legal-check text-muted"
@@ -76,10 +76,7 @@ function LegalAgreementCheckbox({ checked, onChange, documents, disabled }) {
     >
       <span>
         <span>我已阅读并同意</span>
-        <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《使用条款》</Link>
-        <span className="epass-agreement-clause"><span>与</span>
-        <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《隐私政策》</Link></span>
-        {documents?.terms && documents?.privacy ? <span className="epass-agreement-version">{`（版本 ${documents.terms.version}/${documents.privacy.version}）`}</span> : null}
+        <span className="epass-agreement-links"><Link to="/legal/terms" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《使用条款》</Link><span>与</span><Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《隐私政策》</Link></span>
       </span>
     </RosemaryCheckbox>
   );

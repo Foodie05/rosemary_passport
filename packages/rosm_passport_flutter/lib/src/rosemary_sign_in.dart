@@ -1056,7 +1056,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       },
       onTerms: () => _showLegalDocument(documents.terms),
       onPrivacy: () => _showLegalDocument(documents.privacy),
-      version: '${documents.terms.version}/${documents.privacy.version}',
     );
   }
 

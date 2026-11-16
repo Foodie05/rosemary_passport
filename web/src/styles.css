@@ -435,7 +435,7 @@ a.btn-secondary { background:var(--r-semantic-color-field-fill);color:var(--r-se
 
 .forma-dialog:not(.epass-dialog-navigation) { inset-block-start:var(--epass-visible-top,0px);inset-block-end:calc(100dvh - var(--epass-visible-height,100dvh) - var(--epass-visible-top,0px));max-height:calc(var(--epass-visible-height,100dvh) - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 
-.epass-agreement-clause,.epass-agreement-version { white-space:nowrap; }
+.epass-agreement-links { white-space:nowrap; }
 
 .forma-dialog:not(.epass-dialog-navigation) { max-height:min(680px,calc(var(--epass-visible-height,100dvh) * .84),calc(var(--epass-visible-height,100dvh) - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
 @media(max-width:1023px) {
