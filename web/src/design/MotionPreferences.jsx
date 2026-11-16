@@ -1,3 +1,4 @@
+import { Button } from '@rosemary-ui/react';
 import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react';
 import { MotionConfig } from 'motion/react';
 const Context = createContext(null);
@@ -23,7 +24,7 @@ export function MotionPreferences({ children }) {
 }
 export function MotionToggle() {
   const { reduce, setReduce } = useContext(Context);
-  return <button className="epass-motion" type="button" aria-pressed={reduce} onClick={() => setReduce(!reduce)}>动态效果：{reduce ? '减少' : '跟随系统'}</button>;
+  return <Button variant="ghost" className="epass-motion" type="button" aria-pressed={reduce} onClick={() => setReduce(!reduce)}>动态效果：{reduce ? '减少' : '跟随系统'}</Button>;
 }
 
 export function useReducedMotion() { return useContext(Context)?.reduced ?? false; }

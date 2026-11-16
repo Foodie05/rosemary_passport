@@ -1,4 +1,4 @@
-// Generated from official React 0.4.0 CSS by scripts/sync_epass_tokens.py.
+// Generated from official React 0.5.0 CSS by scripts/sync_epass_tokens.py.
 const epassLoadingStyles = r'''.rm-loading {
   position: relative;
   display: inline-block;

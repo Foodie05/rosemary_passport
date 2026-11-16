@@ -4,6 +4,10 @@ import '../models/authenticated_user.dart';
 import '../security/settings_cipher.dart';
 import 'package:postgres/postgres.dart';
 
+class AdminRoleAssignmentDenied implements Exception {}
+
+class RoleAssignmentTargetNotFound implements Exception {}
+
 class UserRecord {
   const UserRecord({
     required this.id,
@@ -266,8 +270,13 @@ class UserRepository {
     required String passwordHash,
     List<String> roles = const ['user'],
     bool isEmailVerified = true,
+    String? adminActorId,
   }) async {
     await _db.runTx((tx) async {
+      if (adminActorId != null) {
+        await _lockRoleUsers(tx, [adminActorId]);
+        await _requireActiveAdmin(tx, adminActorId);
+      }
       await tx.execute(
         Sql.named('''
           insert into users(id, email, nickname, password_hash, is_email_verified)
@@ -296,8 +305,16 @@ class UserRepository {
   Future<void> updateRoles({
     required String userId,
     required List<String> roles,
+    String? adminActorId,
   }) async {
     await _db.runTx((tx) async {
+      final locked = await _lockRoleUsers(tx, [
+        userId,
+        if (adminActorId != null) adminActorId,
+      ]);
+      if (!locked.contains(userId.toLowerCase()))
+        throw RoleAssignmentTargetNotFound();
+      if (adminActorId != null) await _requireActiveAdmin(tx, adminActorId);
       await tx.execute(
         Sql.named('delete from user_roles where user_id = @user_id'),
         parameters: {'user_id': userId},
@@ -312,6 +329,31 @@ class UserRepository {
         );
       }
     });
+  }
+
+  // Every role replacement locks the subject row. Admin assignment locks both
+  // identities in a stable order so a concurrent demotion cannot race MFA.
+  Future<Set<String>> _lockRoleUsers(Session tx, List<String> ids) async {
+    final sorted = ids.map((id) => id.toLowerCase()).toSet().toList()..sort();
+    final locked = <String>{};
+    for (final id in sorted) {
+      final rows = await tx.execute(
+        Sql.named('select id::text from users where id = @id for update'),
+        parameters: {'id': id},
+      );
+      if (rows.isNotEmpty) locked.add(rows.first[0] as String);
+    }
+    return locked;
+  }
+
+  Future<void> _requireActiveAdmin(Session tx, String actorId) async {
+    final rows = await tx.execute(
+      Sql.named(
+        "select 1 from users u join user_roles r on r.user_id = u.id where u.id = @actor and u.account_status = 'active' and r.role = 'admin'",
+      ),
+      parameters: {'actor': actorId},
+    );
+    if (rows.isEmpty) throw AdminRoleAssignmentDenied();
   }
 
   Future<void> deleteUser({required String userId}) async {

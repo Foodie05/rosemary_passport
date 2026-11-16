@@ -22,10 +22,10 @@ export function RosemaryDialogProvider({ children }) {
   useEffect(() => () => pending.current?.resolve(false), []);
   return <RosemaryDialogContext.Provider value={{ confirm, alert }}>
     {children}
-    <AnimatePresence>{dialog && <Dialog key="shared-dialog" role="alertdialog" title={dialog.title || '请确认'} onClose={() => close(false)} actions={<>
+    <AnimatePresence>{dialog && <Dialog key="shared-dialog" className="epass-dialog-compact" role="alertdialog" title={dialog.title || '请确认'} onClose={() => close(false)} actions={<>
       {dialog.kind === 'confirm' && <FormaButton type="button" className="btn-secondary" onClick={() => close(false)}>{dialog.cancelLabel || '取消'}</FormaButton>}
       <FormaButton type="button" className={cn('btn-primary', dialog.tone === 'danger' && 'btn-danger')} onClick={() => close(true)}>{dialog.confirmLabel || (dialog.kind === 'alert' ? '知道了' : '确认')}</FormaButton>
-    </>}><p className="whitespace-pre-line text-sm text-muted">{dialog.message}</p></Dialog>}</AnimatePresence>
+    </>}><p className="whitespace-pre-line text-sm leading-6 text-muted">{dialog.message}</p></Dialog>}</AnimatePresence>
   </RosemaryDialogContext.Provider>;
 }
 

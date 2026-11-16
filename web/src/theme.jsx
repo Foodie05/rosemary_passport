@@ -1,9 +1,9 @@
 import { useReducedMotion } from './design/MotionPreferences';
-import { RosemaryProvider } from '@rosemary-ui/react';
+import { RosemaryProvider, IconButton } from '@rosemary-ui/react';
 import productTheme from './design/epass-theme.json';
-import { FormaButton } from './components/Forma';
+import { importColorScheme } from '@rosemary-ui/tokens';
+const scheme = importColorScheme(productTheme);
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { Laptop, Moon, Sun } from './design/Icons';
 import { cn } from './lib/utils';
 
 const STORAGE_KEY = 'rosm_theme_preference';
@@ -54,8 +54,7 @@ export function ThemeProvider({ children }) {
     [preference, resolvedTheme],
   );
 
-  const colors = Object.fromEntries(Object.entries(productTheme.themes[resolvedTheme]).map(([key, color]) => [key.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), color]));
-  return <ThemeContext.Provider value={value}><RosemaryProvider reducedMotion={reduced} mode={resolvedTheme} language="zh" colors={colors}>{children}</RosemaryProvider></ThemeContext.Provider>;
+  return <ThemeContext.Provider value={value}><RosemaryProvider reducedMotion={reduced} scheme={scheme} mode={resolvedTheme} language="zh">{children}</RosemaryProvider></ThemeContext.Provider>;
 }
 
 export function useTheme() {
@@ -67,7 +66,8 @@ export function useTheme() {
 }
 
 export function ThemeToggle({ className = '' }) {
-  const { preference, setPreference } = useTheme();
-  const options = [{ value: 'system', label: '跟随系统', icon: Laptop }, { value: 'light', label: '浅色主题', icon: Sun }, { value: 'dark', label: '深色主题', icon: Moon }];
-  return <div className={cn('epass-theme', className)} role="group" aria-label="网站主题">{options.map(({ value, label, icon: Icon }) => <FormaButton key={value} type="button" onClick={() => setPreference(value)} aria-pressed={preference === value} aria-label={label} title={label}><Icon size={18} aria-hidden="true" /></FormaButton>)}</div>;
+  const { resolvedTheme, setPreference } = useTheme();
+  const target = resolvedTheme === 'dark' ? 'light' : 'dark';
+  const label = target === 'dark' ? '切换到深色主题' : '切换到浅色主题';
+  return <IconButton variant="secondary" type="button" className={cn('epass-theme-toggle', className)} icon={target === 'dark' ? 'moon' : 'sun'} label={label} title={label} onClick={() => setPreference(target)} />;
 }

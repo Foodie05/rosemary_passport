@@ -50,6 +50,7 @@ function App() {
     check('exit removes modal and restores trigger focus', !document.querySelector('dialog') && document.activeElement === trigger);
     flushSync(() => {setDrawer(true); setOpen(true);}); await frame();
     dialog = document.querySelector('dialog');
+    check('drawer enters from the left edge', timings(dialog).some(a => a.frames[0].transform === 'translateX(-100%)'), timings(dialog));
     check('drawer enters 220ms', timings(dialog).some(a => a.duration === 220), timings(dialog));
     flushSync(() => setOpen(false)); await frame();
     check('drawer exits 180ms', timings(dialog).some(a => a.duration === 180), timings(dialog));

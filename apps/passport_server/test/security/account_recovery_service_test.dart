@@ -160,7 +160,7 @@ void main() {
           account: method == 'phone' ? admin.phoneNumber! : admin.email,
           method: method,
           code: '123456',
-          newPassword: 'A secure new recovery passphrase!',
+          newPassword: 'New-recovery-passphrase-2026!',
         );
         expect(result.code, 'admin_recovery_requires_mfa');
         expect(result.statusCode, 403);
@@ -211,7 +211,7 @@ void main() {
           method: 'passkey',
           code: '',
           passkeyResponse: {'id': 'admin-key'},
-          newPassword: 'A secure new recovery passphrase!',
+          newPassword: 'New-recovery-passphrase-2026!',
         )).ok,
         isTrue,
       );
@@ -420,7 +420,7 @@ void main() {
           account: user.email,
           method: 'email',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).code,
         'invalid_code',
       );
@@ -434,7 +434,7 @@ void main() {
           account: user.email,
           method: 'email',
           code: 'wrong',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).code,
         'invalid_code',
       );
@@ -460,7 +460,7 @@ void main() {
           account: user.email,
           method: 'email',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).ok,
         isTrue,
       );
@@ -493,7 +493,7 @@ void main() {
           account: '13800000000',
           method: 'phone',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).code,
         'phone_verification_not_configured',
       );
@@ -504,7 +504,7 @@ void main() {
           account: 'bad',
           method: 'phone',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).code,
         'invalid_phone_number',
       );
@@ -516,7 +516,7 @@ void main() {
           account: '13800000000',
           method: 'phone',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).code,
         'invalid_code',
       );
@@ -540,7 +540,7 @@ void main() {
           account: '13800000000',
           method: 'phone',
           code: 'wrong',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).statusCode,
         401,
       );
@@ -570,7 +570,7 @@ void main() {
           account: '13800000000',
           method: 'phone',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).ok,
         isTrue,
       );
@@ -579,7 +579,7 @@ void main() {
           account: user.email,
           method: 'unknown',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).code,
         'invalid_request',
       );
@@ -616,7 +616,7 @@ void main() {
           account: user.email,
           method: 'authenticator',
           code: '123456',
-          newPassword: 'A secure historical-compatible passphrase',
+          newPassword: 'New-account-passphrase-2026!',
         )).statusCode,
         429,
       );
@@ -654,7 +654,7 @@ void main() {
         account: user.email,
         method: 'authenticator',
         code: '123456',
-        newPassword: 'A secure historical-compatible passphrase',
+        newPassword: 'New-account-passphrase-2026!',
       );
 
       expect(result.ok, isTrue);
@@ -697,7 +697,7 @@ void main() {
         account: '',
         method: 'passkey',
         code: '',
-        newPassword: 'A secure historical-compatible passphrase',
+        newPassword: 'New-account-passphrase-2026!',
         passkeyResponse: const {'id': 'missing-credential'},
       )).code,
       'verification_failed',
@@ -730,7 +730,7 @@ void main() {
       account: user.email,
       method: 'passkey',
       code: '',
-      newPassword: 'A secure historical-compatible passphrase',
+      newPassword: 'New-account-passphrase-2026!',
       passkeyResponse: const {'id': 'credential-id'},
     );
 

@@ -40,7 +40,7 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
     <aside className="epass-sidebar">
       <Brand compact subtitle="管理控制台" to="/admin/dashboard" />
       <Navigation />
-      <div className="border-t border-line pt-4"><Link className="epass-nav-item" to="/docs"><BookOpen size={20} />接入文档</Link><FormaButton className="epass-nav-item w-full" type="button" onClick={exit}><LogOut size={20} />退出登录</FormaButton></div>
+      <div className="pt-4"><Link className="epass-nav-item" to="/docs"><BookOpen size={20} />接入文档</Link><FormaButton className="epass-nav-item w-full" type="button" onClick={exit}><LogOut size={20} />退出登录</FormaButton></div>
     </aside>
     <div className="flex min-w-0 flex-col">
       <header className="epass-topbar">
@@ -48,7 +48,7 @@ export function AdminLayout({ session, logout, mustBindEmail }) {
         <div className="flex items-center gap-4"><ThemeToggle /><Link to="/admin/account" className="flex items-center gap-3" aria-label={`账户安全：${displayName}`}><span className="hidden text-sm sm:block">{displayName}</span><span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-subtle text-sm text-accent">{getInitial(session.user?.email)}</span></Link></div>
       </header>
       <main id="main-content" tabIndex={-1} className="epass-workspace flex-1">
-        {mustBindEmail && <div className="mb-6 rounded-control border border-warning bg-warning-subtle p-4 text-sm text-warning">请先<Link to="/admin/account" className="underline underline-offset-4">绑定邮箱</Link>，再使用高级管理功能。</div>}
+        {mustBindEmail && <div className="mb-6 rounded-control bg-warning-subtle p-4 text-sm text-warning">请先<Link to="/admin/account" className="underline underline-offset-4">绑定邮箱</Link>，再使用高级管理功能。</div>}
         <Outlet />
       </main>
       <SiteFooter />

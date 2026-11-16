@@ -83,3 +83,85 @@ class RosmEpassProgress extends StatelessWidget {
     child: RosemaryLoading(label: '处理中', size: 20, color: color),
   );
 }
+
+/// One interactive panel, with non-interactive outgoing visuals and linear size.
+class RosmEpassSlidingContent extends StatefulWidget {
+  const RosmEpassSlidingContent({
+    super.key,
+    required this.value,
+    required this.child,
+    this.order = 0,
+  });
+  final Object value;
+  final int order;
+  final Widget child;
+  @override
+  State<RosmEpassSlidingContent> createState() => _SlidingContentState();
+}
+
+class _SlidingContentState extends State<RosmEpassSlidingContent> {
+  var _direction = 1.0;
+  @override
+  void didUpdateWidget(covariant RosmEpassSlidingContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value)
+      _direction = widget.order < oldWidget.order ? -1 : 1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    if (reduced)
+      return KeyedSubtree(key: ValueKey(widget.value), child: widget.child);
+    return ClipRect(
+      child: AnimatedSize(
+        duration: RosmEpassMotion.tabs,
+        curve: Curves.linear,
+        alignment: Alignment.topCenter,
+        child: AnimatedSwitcher(
+          duration: RosmEpassMotion.tabs,
+          switchInCurve: RosmEpassMotion.standard,
+          switchOutCurve: RosmEpassMotion.standard,
+          layoutBuilder: (current, previous) => Stack(
+            alignment: Alignment.topLeft,
+            children: [
+              for (final child in previous)
+                Positioned.fill(
+                  child: OverflowBox(
+                    alignment: Alignment.topLeft,
+                    minHeight: 0,
+                    maxHeight: double.infinity,
+                    child: child,
+                  ),
+                ),
+              if (current != null) current,
+            ],
+          ),
+          transitionBuilder: (child, animation) {
+            final active = child.key == ValueKey(widget.value);
+            return IgnorePointer(
+              ignoring: !active,
+              child: ExcludeFocus(
+                excluding: !active,
+                child: ExcludeSemantics(
+                  excluding: !active,
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: Offset(active ? _direction : -_direction, 0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+          child: KeyedSubtree(key: ValueKey(widget.value), child: widget.child),
+        ),
+      ),
+    );
+  }
+}

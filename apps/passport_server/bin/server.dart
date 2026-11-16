@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dart_frog/dart_frog.dart';
+
 import '../build/bin/server.dart' as generated;
 // Use the bundled service graph as the generated routes. Importing the source
 // tree here would create a second AppServices singleton and leak its pool.
@@ -12,7 +14,12 @@ Future<void> main() async {
 
   final address = InternetAddress.anyIPv6;
   final port = int.tryParse(Platform.environment['PORT'] ?? '8080') ?? 8080;
-  final server = await generated.createServer(address, port);
+  final server = await serve(
+    generated.buildRootHandler(),
+    address,
+    port,
+    poweredByHeader: null,
+  );
   final stopped = Completer<void>();
   var shuttingDown = false;
   final subscriptions = <StreamSubscription<ProcessSignal>>[];

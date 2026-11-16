@@ -21,7 +21,8 @@ test('active pages use Rosemary controls instead of browser-native widgets', () 
 test('confirmation and alert flows use the shared Rosemary dialog provider', () => {
   assert.match(main, /<RosemaryDialogProvider>/);
   assert.match(ui, /role="alertdialog"/);
-  assert.match(dialog, /Dialog as FormaDialog, Drawer/);
+  assert.match(dialog, /Dialog as FormaDialog/);
+  assert.match(dialog, /StartDrawer/); // Placement adapter is independently checked against the release source.
   assert.match(dialog, /open=\{present\}/);
   assert.match(dialog, /onAnimationComplete/);
   assert.doesNotMatch(dialog, /createPortal/);
@@ -32,7 +33,7 @@ test('login legal and recovery actions use lightweight text layout', () => {
   const legalStart = auth.indexOf('function LegalAgreementCheckbox');
   const legalEnd = auth.indexOf('function AccountCenterLink');
   const legal = auth.slice(legalStart, legalEnd);
-  assert.match(legal, /px-1 text-sm/);
+  assert.match(legal, /epass-auth-check epass-legal-check/);
   assert.doesNotMatch(legal, /rounded-2xl|border-sage|bg-sage/);
 
   const loginStart = auth.indexOf('export function LoginPage');

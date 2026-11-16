@@ -109,6 +109,13 @@ RosmSecurityState _$RosmSecurityStateFromJson(Map<String, dynamic> json) =>
       adminMfaRequired: json['admin_mfa_required'] as bool? ?? false,
       hasAuthenticator: json['has_authenticator'] as bool? ?? false,
       hasPhone: json['has_phone'] as bool? ?? false,
+      hasPassword: json['has_password'] as bool? ?? true,
+      hasPasskey: json['has_passkey'] as bool? ?? false,
+      stepUpMethods:
+          (json['step_up_methods'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
 
 RosmAuthResult _$RosmAuthResultFromJson(Map<String, dynamic> json) =>

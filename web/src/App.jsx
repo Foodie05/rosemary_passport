@@ -1,3 +1,5 @@
+import { roleAssignmentPayload } from './lib/admin-role-change';
+import { fieldFeedbackTarget, publishFieldFeedback } from './lib/field-feedback';
 import { FormaButton, FormaInput } from './components/Forma';
 import { AnimatePresence } from 'motion/react';
 import { Notice } from './components/Notice';
@@ -10,8 +12,10 @@ import { ALIYUN_CAPTCHA_PREFIX, ALIYUN_CAPTCHA_SCENE_ID, API_BASE, SECURITY_FIEL
 import { useTheme } from './theme';
 import { getUserErrorMessage, getUserMessage } from './lib/errors';
 import { oidcAuthorizationParameters } from './lib/oidc';
+import { oidcClientRedirectUris, validateOidcClient } from './lib/oidc-client';
 import { normalizeInternalRedirect } from './lib/redirects';
 import { createSingleFlightRefresh, requestWithSessionRefresh } from './lib/session';
+import { createAliyunCaptchaPopup, destroyAliyunCaptcha } from './lib/aliyun-captcha';
 import { preparePublicKeyCreationOptions, serializeRegistrationCredential } from './lib/utils';
 
 const POST_LOGIN_TOAST_STORAGE_KEY = 'rosm_pending_toast';
@@ -116,6 +120,7 @@ function AppRoutes({
   testAliyunCaptchaConnection,
   testPhoneSmsConnection,
   users,
+  supportedRoles,
   usersPagination,
   dashboard,
   loadDashboard,
@@ -208,6 +213,7 @@ function AppRoutes({
                 setLegalAccepted={setLegalAccepted}
                 requestLegalAcceptance={requestLegalAcceptance}
                 legalDocuments={legalDocuments}
+                currentUser={session.user}
                 authNext={loginNext}
               />
             )
@@ -298,6 +304,10 @@ function AppRoutes({
             element={
               <AdminUsers
                 users={users}
+                supportedRoles={supportedRoles}
+                stepUpMethods={session.security?.step_up_methods || []}
+                sendStepUpCode={sendStepUpCode}
+                beginStepUpPasskey={beginStepUpPasskey}
                 pagination={usersPagination}
                 loadUsers={loadUsers}
                 loadUser={loadManagedUser}
@@ -446,6 +456,7 @@ function App() {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [oidcClients, setOidcClients] = useState([]);
+  const [supportedRoles, setSupportedRoles] = useState([]);
   const [users, setUsers] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [cooldowns, setCooldowns] = useState([]);
@@ -481,6 +492,7 @@ function App() {
   const [postRegisterPasskeyPending, setPostRegisterPasskeyPending] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
+    identifier: '',
     email: '',
     phone_number: '',
     password: '',
@@ -522,8 +534,7 @@ function App() {
   const publicCaptchaConfigRef = useRef('');
   const backgroundCaptchaContainerRef = useRef(null);
   const backgroundCaptchaButtonRef = useRef(null);
-  const backgroundCaptchaInstanceRef = useRef(null);
-  const backgroundCaptchaPromiseRef = useRef(null);
+  const backgroundCaptchaRequestRef = useRef(null);
   const refreshFirstPartySession = useMemo(
     () => createSingleFlightRefresh(async () => {
       const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
@@ -608,6 +619,10 @@ function App() {
     }
   }, [location.pathname, location.search]);
 
+  useEffect(() => () => {
+    backgroundCaptchaRequestRef.current?.cancel();
+  }, []);
+
   useEffect(() => {
     void ensurePublicCaptchaWidget();
   }, [publicConfig]);
@@ -633,6 +648,7 @@ function App() {
   }, [loginCodeCooldownRemaining]);
 
   function showToast(message, type = 'info') {
+    if (/^\/(?:login|register|forgot-password)$/.test(window.location.pathname) && publishFieldFeedback(getUserMessage(message), type)) return;
     setToast({ message: type === 'error' ? getUserMessage(message) : message, type });
   }
 
@@ -827,7 +843,6 @@ function App() {
     const data = await api('/api/v1/admin/settings', { auth: true });
     setSystemSettings(data.settings || {});
     const smtp = data.settings?.smtp || {};
-    const registration = data.settings?.registration || {};
     const security = data.settings?.security || {};
     setSystemForm({
       ...SECURITY_TOGGLE_DEFAULTS,
@@ -849,7 +864,6 @@ function App() {
       smtp_password: smtp.password || '',
       smtp_password_confirm: smtp.password || '',
       smtp_secure: Boolean(smtp.secure),
-      registration_email_verify: registration.require_email_verification !== false,
       phone_verification_enabled: security.phone_verification_enabled !== false,
       phone_sms_access_key_id: security.phone_sms_access_key_id || '',
       phone_sms_access_key_secret: '',
@@ -873,6 +887,7 @@ function App() {
       params.set('search', search.trim());
     }
     const data = await api(`/api/v1/admin/users?${params.toString()}`, { auth: true });
+    setSupportedRoles(Array.isArray(data.supported_roles) ? data.supported_roles : []);
     setUsers(data.users || []);
     setUsersPagination(
       data.pagination || { page, page_size: 10, total: data.users?.length || 0, total_pages: 1 },
@@ -1012,11 +1027,7 @@ function App() {
   }
 
   function destroyCaptchaInstance(instanceRef) {
-    try {
-      instanceRef.current?.destroy?.();
-    } catch (_) {
-      // Ignore provider cleanup errors and rebuild the widget.
-    }
+    destroyAliyunCaptcha(instanceRef.current);
     instanceRef.current = null;
   }
 
@@ -1080,72 +1091,50 @@ function App() {
     if (!config.prefix || !config.sceneId || !backgroundCaptchaContainerRef.current) {
       throw new Error('当前未配置阿里云验证码');
     }
-    if (backgroundCaptchaPromiseRef.current) {
+    if (backgroundCaptchaRequestRef.current) {
       throw new Error('人机验证正在处理中，请稍后再试。');
     }
-    await waitForAliyunCaptchaReady(config);
-
-    destroyCaptchaInstance(backgroundCaptchaInstanceRef);
-    backgroundCaptchaContainerRef.current.innerHTML = '';
-    return new Promise((resolve, reject) => {
-      const timer = window.setTimeout(() => {
-        backgroundCaptchaPromiseRef.current = null;
-        reject(new Error('人机验证已超时，请重试。'));
-      }, 120000);
-      const finish = (callback, value) => {
-        const pending = backgroundCaptchaPromiseRef.current;
-        if (!pending) {
-          return;
+    // Reserve this request before loading the SDK so concurrent callers cannot
+    // initialize competing widgets against the same DOM elements.
+    let cancelled = false;
+    const request = {
+      cancel: () => {
+        cancelled = true;
+        request.challenge?.cancel();
+      },
+    };
+    const feedback = fieldFeedbackTarget();
+    feedback('请完成人机验证后继续。');
+    backgroundCaptchaRequestRef.current = request;
+    try {
+      await waitForAliyunCaptchaReady(config);
+      if (cancelled) throw new Error('人机验证已取消。');
+      backgroundCaptchaContainerRef.current.innerHTML = '';
+      request.challenge = createAliyunCaptchaPopup({
+        initCaptcha: (options) => window.initAliyunCaptcha(options),
+        sceneId: config.sceneId,
+        element: '#aliyun-background-captcha',
+        button: '#aliyun-background-captcha-trigger',
+        trigger: () => backgroundCaptchaButtonRef.current?.click(),
+      });
+      const token = await request.challenge.promise;
+      feedback('人机验证已完成，正在继续。');
+      return token;
+    } catch (error) {
+      feedback(getUserErrorMessage(error, '安全验证未完成，请重试。'), error.message?.includes('取消') ? 'info' : 'error');
+      throw error;
+    } finally {
+      if (backgroundCaptchaRequestRef.current === request) {
+        backgroundCaptchaRequestRef.current = null;
+        if (backgroundCaptchaContainerRef.current) {
+          backgroundCaptchaContainerRef.current.innerHTML = '';
         }
-        window.clearTimeout(pending.timer);
-        if (pending.triggerTimer) {
-          window.clearTimeout(pending.triggerTimer);
-        }
-        backgroundCaptchaPromiseRef.current = null;
-        callback(value);
-      };
-      backgroundCaptchaPromiseRef.current = { resolve, reject, timer, triggerTimer: null };
-      try {
-        window.initAliyunCaptcha({
-          SceneId: config.sceneId,
-          mode: 'popup',
-          element: '#aliyun-background-captcha',
-          button: '#aliyun-background-captcha-trigger',
-          slideStyle: { width: 360, height: 40 },
-          success: (captchaVerifyParam) => {
-            if (!captchaVerifyParam) {
-              finish(reject, new Error('人机验证未生成有效凭据，请重试。'));
-              return;
-            }
-            finish(resolve, captchaVerifyParam);
-          },
-          fail: () => finish(
-            reject,
-            new Error('人机验证未通过，请刷新验证后重试。'),
-          ),
-          close: () => finish(reject, new Error('人机验证已取消。')),
-          getInstance: (instance) => {
-            backgroundCaptchaInstanceRef.current = instance;
-            const pending = backgroundCaptchaPromiseRef.current;
-            if (!pending || pending.triggerTimer) {
-              return;
-            }
-            pending.triggerTimer = window.setTimeout(() => {
-              backgroundCaptchaButtonRef.current?.click();
-            }, 2100);
-          },
-        });
-      } catch (error) {
-        finish(reject, error instanceof Error ? error : new Error('人机验证加载失败。'));
       }
-    });
+    }
   }
 
   function resetBackgroundCaptcha() {
-    destroyCaptchaInstance(backgroundCaptchaInstanceRef);
-    if (backgroundCaptchaContainerRef.current) {
-      backgroundCaptchaContainerRef.current.innerHTML = '';
-    }
+    backgroundCaptchaRequestRef.current?.cancel();
   }
 
   async function submitRegisterCode() {
@@ -1543,6 +1532,7 @@ function App() {
     setSelectedPasswordFactor('phone_code');
     setRememberMe(false);
     setLoginForm({
+      identifier: payload.user?.phone_number || payload.user?.email || '',
       email: payload.user?.email || '',
       phone_number: payload.user?.phone_number || '',
       password: '',
@@ -1930,9 +1920,6 @@ function App() {
             phone_sms_template_code: systemForm.phone_sms_template_code || '',
             phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
           },
-          registration: {
-            require_email_verification: Boolean(systemForm.registration_email_verify),
-          },
           smtp: {
             host: systemForm.smtp_host || '',
             port: Number(systemForm.smtp_port || 587),
@@ -1972,9 +1959,6 @@ function App() {
             phone_sms_template_code: systemForm.phone_sms_template_code || '',
             phone_sms_scheme_name: systemForm.phone_sms_scheme_name || '',
           },
-          registration: {
-            require_email_verification: Boolean(systemForm.registration_email_verify),
-          },
           smtp: {
             host: systemForm.smtp_host || '',
             port: Number(systemForm.smtp_port || 587),
@@ -2012,9 +1996,6 @@ function App() {
             aliyun_captcha_scene_id: sceneId,
             aliyun_captcha_access_key_id: systemForm.aliyun_captcha_access_key_id || '',
             aliyun_captcha_access_key_secret: systemForm.aliyun_captcha_access_key_secret || '',
-          },
-          registration: {
-            require_email_verification: Boolean(systemForm.registration_email_verify),
           },
         },
       });
@@ -2149,12 +2130,9 @@ function App() {
     }));
   }
 
-  async function createManagedUser(form) {
-    const roles = `${form.roles || ''}`
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
+  async function createManagedUser(form, verification) {
+    const assignment = roleAssignmentPayload(form.roles, verification, supportedRoles);
+    const roles = assignment.roles;
     if (!form.email?.trim() || !form.nickname?.trim() || !form.password || !roles.length) {
       throw new Error('邮箱、昵称、密码和至少一个角色都是必填项。');
     }
@@ -2167,27 +2145,26 @@ function App() {
         nickname: form.nickname.trim(),
         password: form.password,
         roles,
+        verification: assignment.verification,
       },
     });
     showToast('用户已创建', 'success');
   }
 
-  async function updateManagedUserRoles(userId, rolesInput) {
-    const roles = `${rolesInput || ''}`
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
-    if (!roles.length) {
-      throw new Error('至少保留一个角色或权限标识。');
-    }
-
+  async function updateManagedUserRoles(userId, roles, verification) {
+    const assignment = roleAssignmentPayload(roles, verification, supportedRoles);
     await api(`/api/v1/admin/users/${encodeURIComponent(userId)}/roles`, {
       method: 'PATCH',
       auth: true,
-      body: { roles },
+      body: assignment,
     });
+    const selfDemoted = userId === session.user?.id && !assignment.roles.includes('admin');
+    if (userId === session.user?.id) {
+      setSession(current => ({...current,user:{...current.user,roles:assignment.roles}}));
+      void tryLoadMe();
+    }
     showToast('用户权限已更新', 'success');
+    return {selfDemoted};
   }
 
   async function loadManagedUser(userId) {
@@ -2214,16 +2191,18 @@ function App() {
 
   async function saveOidcClient(event) {
     event.preventDefault();
+    const validationError = Object.values(validateOidcClient(oidcForm))[0];
+    if (validationError) {
+      showToast(validationError, 'error');
+      return;
+    }
     const parseLines = (value, fallback = []) =>
       value
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean)
         .reduce((items, item) => (items.includes(item) ? items : [...items, item]), fallback);
-    const combinedRedirectUris = [
-      ...(oidcForm.enable_web ? parseLines(oidcForm.web_redirect_uris || oidcForm.redirect_uris) : []),
-      ...(oidcForm.enable_app ? parseLines(oidcForm.app_redirect_uri) : []),
-    ].reduce((items, item) => (items.includes(item) ? items : [...items, item]), []);
+    const combinedRedirectUris = oidcClientRedirectUris(oidcForm);
     try {
       const result = await api(`/api/v1/admin/oidc/clients/${encodeURIComponent(oidcForm.client_id.trim())}`, {
         method: 'PUT',
@@ -2297,7 +2276,7 @@ function App() {
       />
       {legalPrompt}
       <AnimatePresence>{toast && (
-        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`fixed right-4 top-4 z-50 max-w-[calc(100vw-2rem)] rounded-control border border-line px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
+        <Notice key="toast" role={toast.type === 'error' ? 'alert' : 'status'} className={`rounded-control px-4 py-3 text-sm font-medium ${toast.type === 'error' ? 'bg-danger-subtle text-danger' : 'bg-surface text-ink'}`}>
           {toast.message}
         </Notice>
       )}</AnimatePresence>
@@ -2451,6 +2430,7 @@ function App() {
         testAliyunCaptchaConnection={testAliyunCaptchaConnection}
         testPhoneSmsConnection={testPhoneSmsConnection}
         users={users}
+        supportedRoles={supportedRoles}
         usersPagination={usersPagination}
         dashboard={dashboard}
         loadDashboard={loadDashboard}

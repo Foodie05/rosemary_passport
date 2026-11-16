@@ -2,6 +2,7 @@ import 'package:dart_frog/dart_frog.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../lib/src/config/app_config.dart';
+import '../../../../../lib/src/utils/admin_role_verification.dart';
 import '../../../../../lib/src/models/authenticated_user.dart';
 import '../../../../../lib/src/repositories/user_repository.dart';
 import '../../../../../lib/src/security/password_hasher.dart';
@@ -30,6 +31,7 @@ Future<Response> onRequest(RequestContext context) async {
 
     return jsonResponse({
       'users': users,
+      'supported_roles': AuthenticatedUser.allowedRoles.toList(),
       'pagination': {
         'page': safePage,
         'page_size': safePageSize,
@@ -42,6 +44,9 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   if (context.request.method == HttpMethod.post) {
+    final actor = context.read<AuthenticatedUser>();
+    if (!actor.isAdmin || actor.isBanned)
+      return errorResponse('forbidden', '需要管理员权限。', statusCode: 403);
     final body = await tryParseJsonObject(context.request);
     if (body == null) {
       return errorResponse(
@@ -106,20 +111,27 @@ Future<Response> onRequest(RequestContext context) async {
       );
     }
 
+    final failed = await verifyAdminRoleAssignment(context, body);
+    if (failed != null) return failed;
+
     final config = AppConfig.fromEnv();
     final passwordHasher = PasswordHasher(config);
     final userId = const Uuid().v4();
     final passwordHash = await passwordHasher.hash(password);
-    await repository.createUser(
-      userId: userId,
-      email: email,
-      nickname: nickname,
-      passwordHash: passwordHash,
-      roles: roles,
-      isEmailVerified: true,
-    );
+    try {
+      await repository.createUser(
+        userId: userId,
+        email: email,
+        nickname: nickname,
+        passwordHash: passwordHash,
+        roles: roles,
+        isEmailVerified: true,
+        adminActorId: actor.id,
+      );
+    } on AdminRoleAssignmentDenied {
+      return errorResponse('forbidden', '管理员权限已失效，请刷新后重试。', statusCode: 403);
+    }
 
-    final actor = context.read<AuthenticatedUser>();
     await context.read<AuditService>().log(
       action: 'admin.user.create',
       actorId: actor.id,

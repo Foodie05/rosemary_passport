@@ -9,7 +9,7 @@ test('new-password feedback and server use the same acceptance cases', () => {
 test('feedback updates before submission and explains the failing condition', () => {
   assert.match(evaluatePassword('orchid').message, /还需 2 个/);
   assert.match(evaluatePassword('Password!2026').message, /容易被猜/);
-  assert.match(evaluatePassword('orchid willow ').message, /首尾不能有空格/);
+  assert.match(evaluatePassword('orchid willow ').message, /不含空格/);
   assert.equal(evaluatePassword('orchid-willow').message, '');
 });
 test('personal information prompts are advice, not an unsupported strength guarantee', () => {

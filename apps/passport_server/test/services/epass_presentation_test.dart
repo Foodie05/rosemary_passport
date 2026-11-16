@@ -15,7 +15,7 @@ void main() {
         expect(normalized['html'], contains('{{code}}'));
         expect(normalized['html'], contains('{{brand_logo_url}}'));
         expect(normalized['html'], contains('Rosemary'));
-        expect(normalized['html'], contains('#315747'));
+        expect(normalized['html'], contains('#25644D'));
         expect(normalized['subject'], 'Rosemary Epass验证码');
       }
       final custom = {'html': '<p>自定义 {{code}}</p>', 'subject': '专用标题'};

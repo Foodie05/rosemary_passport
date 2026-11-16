@@ -10,7 +10,7 @@ class PasswordPolicyResult {
 
 class PasswordPolicy {
   static const minLength = 8;
-  static const maxLength = 128;
+  static const maxLength = 32;
   static const _blockedExact = {
     '1234567',
     '12345678',
@@ -85,13 +85,12 @@ class PasswordPolicy {
   PasswordPolicyResult validate(String password) {
     final length = password.runes.length;
     if (length < minLength || length > maxLength) {
-      return const PasswordPolicyResult.invalid('密码不得少于 8 个字符或超过 128 个字符。');
+      return const PasswordPolicyResult.invalid('密码不得少于 8 个字符或超过 32 个字符。');
     }
-    // Google account character guidance: printable ASCII, no edge spaces.
+    // Forma 1.3 creation policy: printable ASCII U+0021–U+007E, no spaces.
     // This applies only when setting a password; existing logins are unchanged.
-    if (!RegExp(r'^[\x20-\x7e]+$').hasMatch(password) ||
-        password != password.trim()) {
-      return const PasswordPolicyResult.invalid('请使用英文字母、数字或符号，首尾不能有空格。');
+    if (!RegExp(r'^[\x21-\x7e]+$').hasMatch(password)) {
+      return const PasswordPolicyResult.invalid('请使用英文字母、数字和英文符号，不含空格。');
     }
     final categories = [
       RegExp(r'[a-zA-Z]').hasMatch(password),

@@ -1,3 +1,4 @@
+import 'agreement.dart';
 import 'forma_controls.dart';
 import 'dart:async';
 
@@ -5,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:rosemary_ui/rosemary_ui.dart';
 
 import 'models.dart';
+import 'login_identifier.dart';
 import 'epass_motion.dart';
-import 'epass_tokens.dart';
 import 'new_password_field.dart';
 import 'password_policy.dart';
 import 'rosm_aliyun_captcha.dart';
@@ -100,6 +101,12 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   var _legalPromptOpen = false;
   String? _error;
 
+  final _identifier = TextEditingController();
+  bool get _combinedCode =>
+      widget.config.enableEmailCode && widget.config.enablePhoneCode;
+  String get _visibleMode =>
+      _mode == _SignInMode.password ? 'password' : 'code';
+
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _passwordEmail = TextEditingController();
@@ -153,6 +160,8 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     final hint = await widget.client.lastSignIn();
     if (!mounted || hint == null) return;
     setState(() {
+      if (hint.method != RosmSignInMethod.password)
+        _identifier.text = hint.identifier;
       switch (hint.method) {
         case RosmSignInMethod.phoneCode:
           _mode = _SignInMode.phone;
@@ -169,6 +178,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   @override
   void dispose() {
+    _identifier.dispose();
     _email.dispose();
     _phone.dispose();
     _passwordEmail.dispose();
@@ -229,6 +239,19 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   }
 
   Future<void> _sendCode() async {
+    if (_combinedCode) {
+      final identity = RosmCodeLoginIdentifier.tryParse(_identifier.text);
+      if (identity == null) {
+        setState(() => _error = '请输入有效的手机号或邮箱地址。');
+        return;
+      }
+      _mode = identity.isEmail ? _SignInMode.email : _SignInMode.phone;
+      if (identity.isEmail) {
+        _email.text = identity.identifier;
+      } else {
+        _phone.text = identity.identifier;
+      }
+    }
     await _runAuth(() async {
       final captchaToken = await _requestCaptchaToken();
       if (_mode == _SignInMode.email) {
@@ -621,7 +644,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                   onPressed: () => close(false),
                   child: const Text('暂不接受'),
                 ),
-                RosemaryButton(label: '接受并继续', onPressed: () => close(true)),
+                RosmEpassButton(label: '接受并继续', onPressed: () => close(true)),
               ],
             ),
           ],
@@ -664,7 +687,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             const SizedBox(height: 16),
             SelectableText(document.content),
             const SizedBox(height: 24),
-            RosemaryButton(label: '阅读完成', onPressed: () => close(null)),
+            RosmEpassButton(label: '阅读完成', onPressed: () => close(null)),
           ],
         ),
       ),
@@ -821,92 +844,170 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     final theme = buildRosmPassportTheme(context, widget.config.themeMode);
     final colors = theme.colorScheme;
     final mode = _activeMode;
+    final inset = _plainSignIn(context) ? 50.0 : 20.0;
     return RosmEpassTheme(
       data: theme,
       child: Scaffold(
-        backgroundColor: colors.surface,
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           child: _loading
               ? Center(child: RosmEpassProgress(color: colors.primary))
-              : Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(28, 28, 28, 32),
-                      children: [
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: RosmEpassIconAction(
-                            tooltip: '关闭',
-                            onPressed: _busy
-                                ? null
-                                : () => Navigator.of(context).maybePop(),
-                            icon: const RosmEpassIcon(Icons.close_rounded),
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                        _Header(
-                          start: _start,
-                          mode: mode,
-                          confirmingConsent: _pendingAuth != null,
-                          title: _registerMode
-                              ? '创建新账户'
-                              : _recoveryMode
-                              ? '重置密码'
-                              : null,
-                        ),
-                        const SizedBox(height: 26),
-                        if (_error != null) ...[
-                          _Message(text: _error!),
-                          const SizedBox(height: 18),
-                        ],
-                        RosmEpassSelectionContent(
-                          order: _registerMode
-                              ? 3
-                              : _recoveryMode
-                              ? 4
-                              : _pendingAuth != null
-                              ? 6
-                              : _passwordMfaMode ||
-                                    _directStepUpChallenge != null
-                              ? 5
-                              : _mode.index,
-                          value:
-                              '${_pendingAuth != null}:${_recoveryMode}:${_registerMode}:${_passwordMfaMode}:${_directStepUpChallenge}:${_mode.name}:${_selectedPasswordMfaFactor}:${_selectedDirectStepUpFactor}',
-                          child: _pendingAuth != null
-                              ? _ConsentPage(
-                                  appName: _start?.client.displayName,
-                                  scopes: _start?.scopes ?? const [],
-                                  busy: _busy,
-                                  onApprove: _approveAndFinish,
-                                  onDeny: _denyAuthorization,
-                                )
-                              : _recoveryMode
-                              ? _Card(child: _buildRecovery())
-                              : _passwordMfaMode
-                              ? _Card(child: _buildPasswordMfa(colors))
-                              : _directStepUpChallenge != null
-                              ? _Card(child: _buildDirectStepUp(colors))
-                              : Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
+              : LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    padding: EdgeInsets.all(inset),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight > inset * 2
+                            ? constraints.maxHeight - inset * 2
+                            : 0,
+                      ),
+                      child: Align(
+                        alignment: _plainSignIn(context)
+                            ? Alignment.topCenter
+                            : Alignment.center,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 480),
+                          child: _SignInSurface(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    if (_registerMode)
-                                      _buildRegister(colors)
-                                    else ...[
-                                      _buildModeTabs(colors),
-                                      const SizedBox(height: 36),
-                                      _buildModeBody(),
-                                    ],
+                                    const Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: RosmEpassBrand(size: 44),
+                                      ),
+                                    ),
+                                    RosmEpassIconAction(
+                                      tooltip: '关闭',
+                                      onPressed: _busy
+                                          ? null
+                                          : () => Navigator.of(
+                                              context,
+                                            ).maybePop(),
+                                      icon: const RosmEpassIcon(
+                                        Icons.close_rounded,
+                                      ),
+                                      color: colors.onSurfaceVariant,
+                                    ),
                                   ],
                                 ),
+                                const SizedBox(height: 32),
+                                _Header(
+                                  start: _start,
+                                  mode: mode,
+                                  confirmingConsent: _pendingAuth != null,
+                                  title: _registerMode
+                                      ? '创建新账户'
+                                      : _recoveryMode
+                                      ? '重置密码'
+                                      : null,
+                                  intro: _registerMode
+                                      ? '创建账户后继续确认授权。'
+                                      : _recoveryMode
+                                      ? '使用已绑定的验证方式找回账户。'
+                                      : '选择一种方式，继续使用 Rosemary Epass。',
+                                ),
+                                const SizedBox(height: 24),
+                                if (_error != null &&
+                                    (_pendingAuth != null ||
+                                        _start == null ||
+                                        (_passwordMfaMode &&
+                                            _selectedPasswordMfaFactor ==
+                                                null) ||
+                                        (_directStepUpChallenge != null &&
+                                            _selectedDirectStepUpFactor ==
+                                                null))) ...[
+                                  _Message(text: _error!),
+                                  const SizedBox(height: 16),
+                                ],
+                                RosmEpassSelectionContent(
+                                  order: _registerMode
+                                      ? 3
+                                      : _recoveryMode
+                                      ? 4
+                                      : _pendingAuth != null
+                                      ? 6
+                                      : _passwordMfaMode ||
+                                            _directStepUpChallenge != null
+                                      ? 5
+                                      : 0,
+                                  value:
+                                      '${_pendingAuth != null}:${_recoveryMode}:${_registerMode}:${_passwordMfaMode}:${_directStepUpChallenge}:${_selectedPasswordMfaFactor}:${_selectedDirectStepUpFactor}',
+                                  child: _pendingAuth != null
+                                      ? _ConsentPage(
+                                          appName: _start?.client.displayName,
+                                          scopes: _start?.scopes ?? const [],
+                                          busy: _busy,
+                                          onApprove: _approveAndFinish,
+                                          onDeny: _denyAuthorization,
+                                        )
+                                      : _recoveryMode
+                                      ? _Card(child: _buildRecovery())
+                                      : _passwordMfaMode
+                                      ? _Card(child: _buildPasswordMfa(colors))
+                                      : _directStepUpChallenge != null
+                                      ? _Card(child: _buildDirectStepUp(colors))
+                                      : _registerMode
+                                      ? _buildRegister(colors)
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _buildModeTabs(colors),
+                                            const SizedBox(height: 24),
+                                            RosmEpassSlidingContent(
+                                              value: '$_visibleMode:$_sent',
+                                              order: _visibleMode == 'password'
+                                                  ? 1
+                                                  : 0,
+                                              child: _buildModeBody(),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                if (_pendingAuth == null) ...[
+                                  const SizedBox(height: 8),
+                                  _buildLegalAcceptance(colors),
+                                  if (!_registerMode && !_recoveryMode)
+                                    Wrap(
+                                      alignment: WrapAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      spacing: 12,
+                                      runSpacing: 4,
+                                      children: [
+                                        RosmEpassTextButton(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 9,
+                                          ),
+                                          onPressed: _busy
+                                              ? null
+                                              : _openRecovery,
+                                          child: const Text(
+                                            '忘记密码',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              height: 24 / 14,
+                                            ),
+                                          ),
+                                        ),
+                                        if (widget.config.enableRegistration)
+                                          _RegisterPrompt(onTap: _openRegister),
+                                      ],
+                                    ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
-                        if (_pendingAuth == null) ...[
-                          const SizedBox(height: 18),
-                          _buildLegalAcceptance(colors),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -917,25 +1018,26 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
 
   Widget _buildModeTabs(ColorScheme colors) {
     final modes = _availableModes;
-    if (modes.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    if (!modes.contains(_mode) && modes.isNotEmpty) {
-      _mode = modes.first;
-    }
+    if (modes.isEmpty) return const SizedBox.shrink();
+    if (!modes.contains(_mode)) _mode = modes.first;
     return RosemaryTabs(
-      value: _mode.name,
-      options: modes
-          .map(
-            (mode) =>
-                RosemaryOption(mode.name, _labelFor(mode), enabled: !_busy),
-          )
-          .toList(),
+      value: _visibleMode,
+      options: [
+        if (widget.config.enableEmailCode || widget.config.enablePhoneCode)
+          RosemaryOption('code', '验证码', enabled: !_busy),
+        if (widget.config.enablePassword)
+          RosemaryOption('password', '密码', enabled: !_busy),
+      ],
       onChanged: (name) {
         if (_busy) return;
         setState(() {
-          _mode = modes.firstWhere((mode) => mode.name == name);
+          _mode = name == 'password'
+              ? _SignInMode.password
+              : (_mode != _SignInMode.password
+                    ? _mode
+                    : modes.firstWhere((mode) => mode != _SignInMode.password));
           _sent = false;
+          _code.clear();
           _passwordMfaMode = false;
           _error = null;
         });
@@ -946,36 +1048,14 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
   Widget _buildLegalAcceptance(ColorScheme colors) {
     final documents = _legalDocuments;
     if (documents == null) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RosemaryCheckbox(
-          label: '我已阅读并同意',
-          value: _legalAccepted,
-          enabled: !_busy,
-          onChanged: (value) {
-            if (!_busy) setState(() => _legalAccepted = value == true);
-          },
-        ),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            RosmEpassTextButton(
-              onPressed: () => _showLegalDocument(documents.terms),
-              child: const Text('《使用条款》'),
-            ),
-            const Text('与'),
-            RosmEpassTextButton(
-              onPressed: () => _showLegalDocument(documents.privacy),
-              child: const Text('《隐私政策》'),
-            ),
-          ],
-        ),
-        Text(
-          '版本 ${documents.terms.version}/${documents.privacy.version}',
-          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-        ),
-      ],
+    return RosmEpassAgreement(
+      checked: _legalAccepted,
+      enabled: !_busy,
+      onChanged: (value) {
+        if (!_busy) setState(() => _legalAccepted = value);
+      },
+      onTerms: () => _showLegalDocument(documents.terms),
+      onPrivacy: () => _showLegalDocument(documents.privacy),
     );
   }
 
@@ -996,40 +1076,43 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
     return _mode;
   }
 
+  Widget? get _fieldFeedback => _error == null
+      ? null
+      : RosemaryAlert(
+          _error!,
+          tone: _error!.startsWith('密码已重置')
+              ? RosemaryTone.info
+              : RosemaryTone.danger,
+        );
+
   Widget _buildModeBody() {
     if (_mode == _SignInMode.password) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           RosmEpassInput(
+            showLabel: false,
             controller: _passwordEmail,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               labelText: '邮箱',
-              prefixIcon: RosmEpassIcon(Icons.mail_outline_rounded),
+              hintText: '邮箱地址',
             ),
           ),
           const SizedBox(height: 12),
           RosmEpassInput(
+            showLabel: false,
             controller: _password,
+            verification: _fieldFeedback,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '密码',
-              prefixIcon: RosmEpassIcon(Icons.lock_outline_rounded),
-            ),
+            decoration: const InputDecoration(labelText: '密码'),
           ),
           const SizedBox(height: 24),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed: _busy ? null : _preparePasswordLogin,
             busy: _busy,
             label: '继续登录  →',
           ),
-          RosmEpassTextButton(
-            onPressed: _busy ? null : _openRecovery,
-            child: const Text('忘记密码'),
-          ),
-          if (widget.config.enableRegistration)
-            _RegisterPrompt(onTap: _openRegister),
         ],
       );
     }
@@ -1039,35 +1122,49 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         RosmEpassInput(
-          controller: isEmail ? _email : _phone,
-          keyboardType: isEmail
+          showLabel: false,
+          controller: _combinedCode
+              ? _identifier
+              : isEmail
+              ? _email
+              : _phone,
+          enabled: !_busy && !_sent,
+          autofillHints: _combinedCode ? const [AutofillHints.username] : null,
+          onChanged: _combinedCode
+              ? (_) => setState(() {
+                  _error = null;
+                })
+              : null,
+          verification: _sent ? null : _fieldFeedback,
+          keyboardType: _combinedCode
+              ? TextInputType.emailAddress
+              : isEmail
               ? TextInputType.emailAddress
               : TextInputType.phone,
           decoration: InputDecoration(
-            labelText: isEmail ? '邮箱' : '手机号',
-            prefixIcon: RosmEpassIcon(
-              isEmail ? Icons.mail_outline_rounded : Icons.phone_iphone_rounded,
-            ),
+            hintText: _combinedCode
+                ? '手机号或邮箱地址'
+                : isEmail
+                ? '邮箱地址'
+                : '手机号',
+            labelText: _combinedCode
+                ? '手机号或邮箱'
+                : isEmail
+                ? '邮箱'
+                : '手机号',
           ),
         ),
         if (_sent) ...[
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: RosmEpassInput(
-                  controller: _code,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '验证码',
-                    prefixIcon: RosmEpassIcon(Icons.pin_outlined),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 96,
-                child: RosmEpassOutlinedButton(
+          RosmEpassInput(
+            showLabel: false,
+            controller: _code,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '验证码'),
+            verification: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                RosmEpassOutlinedButton(
                   onPressed: _busy || _coolingDown(_CooldownKind.login)
                       ? null
                       : _sendCode,
@@ -1076,22 +1173,31 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                     label: _codeButtonLabel(_CooldownKind.login, '重发'),
                   ),
                 ),
-              ),
-            ],
+                if (_fieldFeedback != null) _fieldFeedback!,
+              ],
+            ),
           ),
         ],
         const SizedBox(height: 24),
-        RosemaryButton(
+        RosmEpassButton(
           onPressed: _busy ? null : (_sent ? _loginWithCode : _sendCode),
           busy: _busy,
           label: _sent
               ? '登录并授权  →'
-              : isEmail
+              : isEmail && !_combinedCode
               ? '发送邮箱验证码  →'
               : '发送登录验证码  →',
         ),
-        if (widget.config.enableRegistration)
-          _RegisterPrompt(onTap: _openRegister),
+        if (_sent)
+          RosmEpassTextButton(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _sent = false;
+                    _code.clear();
+                  }),
+            child: const Text('更改手机号或邮箱'),
+          ),
       ],
     );
   }
@@ -1135,24 +1241,20 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             )
         else ...[
           if (factor == 'email_code' || factor == 'phone_code') ...[
-            Row(
-              children: [
-                Expanded(
-                  child: RosmEpassInput(
-                    key: _mfaCodeKey,
-                    controller: _mfaCode,
-                    focusNode: _mfaCodeFocus,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: factor == 'email_code' ? '邮箱验证码' : '手机验证码',
-                      prefixIcon: const RosmEpassIcon(Icons.pin_outlined),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 106,
-                  child: RosmEpassOutlinedButton(
+            RosmEpassInput(
+              showLabel: false,
+              key: _mfaCodeKey,
+              controller: _mfaCode,
+
+              focusNode: _mfaCodeFocus,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: factor == 'email_code' ? '邮箱验证码' : '手机验证码',
+              ),
+              verification: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  RosmEpassOutlinedButton(
                     onPressed: _busy || _coolingDown(_CooldownKind.passwordMfa)
                         ? null
                         : _sendPasswordMfaCode,
@@ -1164,23 +1266,23 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                       ),
                     ),
                   ),
-                ),
-              ],
+                  if (_fieldFeedback != null) _fieldFeedback!,
+                ],
+              ),
             ),
           ] else if (factor == 'authenticator') ...[
             RosmEpassInput(
+              showLabel: false,
               key: _mfaCodeKey,
               controller: _mfaCode,
+              verification: _fieldFeedback,
               focusNode: _mfaCodeFocus,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '动态验证码',
-                prefixIcon: RosmEpassIcon(Icons.shield_outlined),
-              ),
+              decoration: const InputDecoration(labelText: '动态验证码'),
             ),
           ],
           const SizedBox(height: 22),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed: _busy ? null : _completePasswordMfa,
             busy: _busy,
             label: '完成登录  →',
@@ -1251,35 +1353,30 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         else ...[
           if (factor == 'password')
             RosmEpassInput(
+              showLabel: false,
               controller: _password,
+              verification: _fieldFeedback,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '密码',
-                prefixIcon: RosmEpassIcon(Icons.lock_outline_rounded),
-              ),
+              decoration: const InputDecoration(labelText: '密码'),
             )
           else
-            Row(
-              children: [
-                Expanded(
-                  child: RosmEpassInput(
-                    key: _mfaCodeKey,
-                    controller: _mfaCode,
-                    focusNode: _mfaCodeFocus,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: factor == 'authenticator'
-                          ? 'Authenticator 动态码'
-                          : '验证码',
-                      prefixIcon: const RosmEpassIcon(Icons.shield_outlined),
-                    ),
-                  ),
-                ),
-                if (factor == 'email_code' || factor == 'phone_code') ...[
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 106,
-                    child: RosmEpassOutlinedButton(
+            RosmEpassInput(
+              showLabel: false,
+              key: _mfaCodeKey,
+              controller: _mfaCode,
+
+              focusNode: _mfaCodeFocus,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: factor == 'authenticator'
+                    ? 'Authenticator 动态码'
+                    : '验证码',
+              ),
+              verification: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (factor == 'email_code' || factor == 'phone_code')
+                    RosmEpassOutlinedButton(
                       onPressed:
                           _busy || _coolingDown(_CooldownKind.passwordMfa)
                           ? null
@@ -1291,12 +1388,12 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                         ),
                       ),
                     ),
-                  ),
+                  if (_fieldFeedback != null) _fieldFeedback!,
                 ],
-              ],
+              ),
             ),
           const SizedBox(height: 22),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed: _busy ? null : _completeDirectStepUp,
             busy: _busy,
             label: '完成登录  →',
@@ -1375,6 +1472,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           ),
           const SizedBox(height: 18),
           RosmEpassInput(
+            showLabel: false,
             controller: _registerEmail,
             keyboardType: _registerMethod == 'phone'
                 ? TextInputType.phone
@@ -1382,31 +1480,20 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             readOnly: _registrationHandoff != null,
             decoration: InputDecoration(
               labelText: _registerMethod == 'phone' ? '手机号' : '邮箱',
-              prefixIcon: RosmEpassIcon(
-                _registerMethod == 'phone'
-                    ? Icons.phone_iphone_rounded
-                    : Icons.mail_outline_rounded,
-              ),
             ),
           ),
           if (_registrationHandoff == null) ...[
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: RosmEpassInput(
-                    controller: _registerCode,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '验证码',
-                      prefixIcon: RosmEpassIcon(Icons.pin_outlined),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 106,
-                  child: RosmEpassOutlinedButton(
+            RosmEpassInput(
+              showLabel: false,
+              controller: _registerCode,
+
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '验证码'),
+              verification: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  RosmEpassOutlinedButton(
                     onPressed: _busy || _coolingDown(_CooldownKind.register)
                         ? null
                         : _sendRegisterCode,
@@ -1418,26 +1505,27 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                       ),
                     ),
                   ),
-                ),
-              ],
+                  if (_fieldFeedback != null) _fieldFeedback!,
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 12),
           RosmEpassInput(
+            showLabel: false,
             controller: _registerNickname,
-            decoration: const InputDecoration(
-              labelText: '昵称',
-              prefixIcon: RosmEpassIcon(Icons.person_outline_rounded),
-            ),
+            decoration: const InputDecoration(labelText: '昵称'),
           ),
           const SizedBox(height: 12),
           RosmNewPasswordField(
+            showLabel: false,
             controller: _registerPassword,
+            verification: _registrationHandoff != null ? _fieldFeedback : null,
             enabled: !_busy,
             personalInfo: [_registerEmail, _registerNickname],
           ),
           const SizedBox(height: 22),
-          RosemaryButton(
+          RosmEpassButton(
             onPressed:
                 _busy ||
                     !const RosmPasswordPolicy()
@@ -1474,44 +1562,47 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
         ),
         const SizedBox(height: 12),
         RosmEpassInput(
+          showLabel: false,
           controller: _recoveryAccount,
           keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(labelText: '邮箱或手机号'),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: RosmEpassInput(
-                controller: _recoveryCode,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '验证码'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            RosmEpassOutlinedButton(
-              onPressed: _busy || _coolingDown(_CooldownKind.recovery)
-                  ? null
-                  : _sendRecoveryCode,
-              child: _ButtonContent(
-                busy: _busy,
-                label: _codeButtonLabel(
-                  _CooldownKind.recovery,
-                  _sent ? '重发' : '发送',
+        RosmEpassInput(
+          showLabel: false,
+          controller: _recoveryCode,
+
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: '验证码'),
+          verification: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              RosmEpassOutlinedButton(
+                onPressed: _busy || _coolingDown(_CooldownKind.recovery)
+                    ? null
+                    : _sendRecoveryCode,
+                child: _ButtonContent(
+                  busy: _busy,
+                  label: _codeButtonLabel(
+                    _CooldownKind.recovery,
+                    _sent ? '重发' : '发送',
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (_fieldFeedback != null) _fieldFeedback!,
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         RosmNewPasswordField(
+          showLabel: false,
           controller: _newPassword,
           label: '新密码',
           enabled: !_busy,
           personalInfo: [_recoveryAccount],
         ),
         const SizedBox(height: 16),
-        RosemaryButton(
+        RosmEpassButton(
           onPressed:
               _busy ||
                   !const RosmPasswordPolicy().evaluate(_newPassword.text).ok
@@ -1535,12 +1626,14 @@ class _Header extends StatelessWidget {
     required this.mode,
     required this.confirmingConsent,
     this.title,
+    this.intro,
   });
 
   final RosmAuthorizationStart? start;
   final _SignInMode mode;
   final bool confirmingConsent;
   final String? title;
+  final String? intro;
 
   @override
   Widget build(BuildContext context) {
@@ -1548,24 +1641,22 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const RosmEpassBrand(),
-        const SizedBox(height: 22),
         Text(
-          confirmingConsent ? '确认授权' : title ?? '欢迎回来',
+          confirmingConsent ? '确认授权' : title ?? '登录',
           style: Theme.of(
             context,
-          ).textTheme.headlineLarge?.copyWith(fontSize: 32, height: 1.2),
+          ).textTheme.headlineLarge?.copyWith(fontSize: 32, height: 1.3),
         ),
         const SizedBox(height: 8),
         Text(
           confirmingConsent
               ? _consentIntroFor(start?.client.displayName)
-              : _introFor(mode, start?.client.displayName),
+              : intro ?? _introFor(mode, start?.client.displayName),
           style: TextStyle(
             color: colors.onSurfaceVariant,
             fontSize: 16,
-            height: 1.45,
-            fontWeight: FontWeight.w500,
+            height: 1.5,
+            fontWeight: FontWeight.w400,
           ),
         ),
       ],
@@ -1653,7 +1744,7 @@ class _ConsentPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        RosemaryButton(
+        RosmEpassButton(
           onPressed: busy ? null : onApprove,
           busy: busy,
           label: '确认授权并继续  →',
@@ -1675,15 +1766,7 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
-        border: Border.all(color: colors.outlineVariant),
-        borderRadius: BorderRadius.circular(RosmEpassGeometry.panel),
-      ),
-      child: Padding(padding: const EdgeInsets.all(24), child: child),
-    );
+    return child;
   }
 }
 
@@ -1694,16 +1777,7 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.error.withAlpha(89)),
-      ),
-      child: Text(text, style: TextStyle(color: colors.onErrorContainer)),
-    );
+    return RosemaryAlert(text, tone: RosemaryTone.danger);
   }
 }
 
@@ -1798,23 +1872,27 @@ class _RegisterPrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 28),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(
-            '还没有账号？',
-            style: TextStyle(
-              color: colors.onSurfaceVariant,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-            ),
+    return Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          '还没有账号？',
+          style: TextStyle(
+            color: colors.onSurfaceVariant,
+            fontSize: 14,
+            height: 24 / 14,
           ),
-          RosmEpassTextButton(onPressed: onTap, child: const Text('立即注册')),
-        ],
-      ),
+        ),
+        RosmEpassTextButton(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+          onPressed: onTap,
+          child: const Text(
+            '立即注册',
+            style: TextStyle(fontSize: 14, height: 24 / 14),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1822,14 +1900,6 @@ class _RegisterPrompt extends StatelessWidget {
 enum _SignInMode { phone, email, password }
 
 enum _CooldownKind { login, passwordMfa, register, recovery }
-
-String _labelFor(_SignInMode mode) {
-  return switch (mode) {
-    _SignInMode.phone => '手机',
-    _SignInMode.email => '验证码',
-    _SignInMode.password => '密码',
-  };
-}
 
 String _passwordMfaTitle(String factor) {
   return switch (factor) {
@@ -1901,4 +1971,19 @@ List<String> _scopeMeanings(List<RosmScopeInfo> scopes) {
     }
   }
   return meanings.isEmpty ? const ['确认你的 Rosemary Epass 登录身份'] : meanings;
+}
+
+/// Portrait uses the canvas directly; a roomy landscape keeps the desktop card.
+class _SignInSurface extends StatelessWidget {
+  const _SignInSurface({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return _plainSignIn(context) ? child : RosemaryCard(child: child);
+  }
+}
+
+bool _plainSignIn(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  return size.width < 600 || size.height >= size.width;
 }

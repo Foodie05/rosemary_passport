@@ -105,7 +105,7 @@ class SecurityRepository {
              window_started_at,
              blocked_until,
              updated_at,
-             blocked_until > clock_timestamp() as is_active,
+             coalesce(blocked_until > clock_timestamp(), false) as is_active,
              case
                when blocked_until > clock_timestamp()
                  then greatest(
@@ -116,7 +116,7 @@ class SecurityRepository {
              end as remaining_seconds
       from security_throttles
       where $where
-      order by (blocked_until > clock_timestamp()) desc, updated_at desc,
+      order by is_active desc, updated_at desc,
                scope, subject
       limit @limit offset @offset
       ''',

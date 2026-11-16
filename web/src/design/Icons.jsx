@@ -36,4 +36,10 @@ export function UserCheck(props) { return <Icon name="users" {...props} />; }
 export function UserPlus(props) { return <Icon name="users" {...props} />; }
 export function Users(props) { return <Icon name="users" {...props} />; }
 export function X(props) { return <Icon name="close" {...props} />; }
-export { Activity, Ban, Circle, Fingerprint, Moon, Smartphone, Wifi } from 'lucide-react';
+export function Activity(props) { return <Icon name="motion" {...props} />; }
+export function Ban(props) { return <Icon name="warning" {...props} />; }
+export function Circle(props) { return <Icon name="info" {...props} />; }
+export function Fingerprint(props) { return <Icon name="key" {...props} />; }
+export function Moon(props) { return <Icon name="moon" {...props} />; }
+export function Smartphone(props) { return <Icon name="message" {...props} />; }
+export function Wifi(props) { return <Icon name="globe" {...props} />; }

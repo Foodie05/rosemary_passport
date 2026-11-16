@@ -37,7 +37,7 @@ export function BannedPage({ account }) {
         <h1 className="mt-7 font-editorial text-4xl font-normal">账户已被封禁</h1>
         <p className="mt-4 leading-7 text-muted">该账户目前无法登录 Rosemary Epass，也无法继续向已接入的平台授权。</p>
         {account ? <p className="mt-4 break-all rounded-panel bg-canvas px-4 py-3 text-sm text-muted">账户信息：{account}</p> : null}
-        <div className="mt-7 rounded-panel border border-line bg-canvas p-5 text-left text-sm leading-7 text-muted">
+        <div className="mt-7 rounded-panel bg-canvas p-5 text-left text-sm leading-7 text-muted">
           如认为处置有误，请发送邮件至 <a className="font-bold text-ink underline" href="mailto:info@rosemaryisland.pro">info@rosemaryisland.pro</a>，并提供账户信息、事实说明与申诉理由。
         </div>
         <a href="mailto:info@rosemaryisland.pro" className="btn-primary mt-7 inline-flex w-full items-center justify-center gap-2 py-4 font-bold">提交申诉 <ExternalLink size={17} /></a>

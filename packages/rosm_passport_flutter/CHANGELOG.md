@@ -1,3 +1,36 @@
+## 0.11.3 — 2026-11-16
+
+- Match the Web authentication forms by removing decorative leading icons from login, registration, recovery and MFA fields, including new-password fields. Retain functional password-visibility controls.
+- Show authentication labels as in-field hints without a duplicate label row; preserve persistent semantic names for accessibility and field-level validation.
+- Preserve input controllers, autofill, validation, legal acceptance and authentication APIs; include all earlier cumulative updates.
+
+## 0.11.2 — 2026-11-16
+
+- Increase the outer padding of flat portrait/narrow authentication screens from 20px to 50px on all sides; retain scrolling with keyboards and large text.
+- Keep the legal version out of the checkbox copy and group both document links on one line when space permits; version-bound acceptance remains enforced.
+- Preserve desktop card and dialog spacing, typography, authentication and account APIs.
+
+## 0.11.1 — 2026-11-15
+
+- Use a flat canvas for portrait/narrow sign-in, registration, recovery, MFA and consent; retain centered cards in roomy landscape.
+- Align legal prose, document links and footer actions with shared type metrics; preserve ordinary-text toggling and independent keyboard links.
+- Apply Rosemary font families consistently, keep native input icons at 20px inside 44px targets, clip filled fields to the official radius, and center action contents.
+- Constrain dialogs with safe-area and keyboard gutters, a 680px height cap and internal scrolling. Preserve pinned upstream overlay lifecycle and focus behavior through a verified bounds adapter; do not modify vendored source.
+- Add baseline, portrait/landscape, scrolling, keyboard-inset and focus-restoration regression tests, plus optional local rendered evidence.
+
+## 0.11.0 — 2026-11-14
+
+- Integrate official Rosemary Forma 1.3.0 / SDK 0.5.0, pinned release source with license and SHA256 provenance.
+- Generate all 45 light/dark semantic roles with the official HCT recipe; use official cards and field requirements.
+- Preserve native editing, composition, autofill and controllers through the documented input adapter.
+- Arm field validation after nonempty blur; clear to neutral. New passwords use 8–32 visible ASCII characters without spaces; preserve legacy login and sessions.
+- Combine phone/email code login with local identifier detection; preserve individual method flags, captcha and version-bound legal consent.
+- Slide and fade between tabs with linear content-height changes; center a content-sized rounded card, scroll in constrained viewports, and honor reduced motion.
+- Remove the permanent email example hint; retain blur-triggered errors, native focus, composition and autofill.
+- Group account actions in shared containers, align profile text and truncate long identifiers.
+- Add typed per-operation account proofs, eligible-factor metadata, bound-factor code requests and custom-provider passkey options. Built-in changes require another bound factor; target contact codes remain separate. Preserve legacy API parameters and token/session behavior.
+- Bundle all prior release history and pinned upstream source. Native passkey UI remains outside the built-in screens.
+
 ## 0.10.0
 
 - Align with Rosemary Forma 1.2.0 and official rosemary_ui 0.4.0 at 311a81de1651ba049d3acd476725390de38aacc2.

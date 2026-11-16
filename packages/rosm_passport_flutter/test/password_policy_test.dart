@@ -33,7 +33,7 @@ void main() {
         expect(policy.evaluate(value).ok, isFalse);
       }
       expect(policy.evaluate('orchid').message, contains('还需 2 个'));
-      expect(policy.evaluate('x' * 129).message, contains('最多 128'));
+      expect(policy.evaluate('x' * 129).message, contains('最多 32'));
       expect(
         policy.containsPersonalInfo('maria blooms!', ['maria@example.com']),
         isTrue,
@@ -86,7 +86,7 @@ void main() {
     expect(requests, 0);
   });
   test(
-    'valid interior spaces are sent unchanged and legacy login is unrestricted',
+    'new passwords are sent unchanged and legacy login remains unrestricted',
     () async {
       final bodies = <Map<String, dynamic>>[];
       final client = _client(
@@ -110,10 +110,10 @@ void main() {
       await client.registerWithEmail(
         email: 'new@example.com',
         nickname: 'New',
-        password: 'orchid willow!',
+        password: 'orchid-willow!',
       );
       await client.loginWithPassword(email: 'old@example.com', password: '旧密码');
-      expect(bodies[0]['password'], 'orchid willow!');
+      expect(bodies[0]['password'], 'orchid-willow!');
       expect(bodies[1]['password'], '旧密码');
     },
   );

@@ -39,8 +39,8 @@ class OidcAdminService {
     )) {
       throw ArgumentError(
         isConfidential
-            ? 'confidential redirect_uris must use https or loopback http origins.'
-            : 'public redirect_uris must use https, loopback http, or a mobile custom scheme such as com.example.app:/oidc/callback.',
+            ? '机密客户端的回调地址必须使用 HTTPS 或本机回环 HTTP，不能使用自定义 scheme。'
+            : '回调地址须使用 HTTPS、本机回环 HTTP 或 App 自定义 scheme，且不能包含用户名、密码或 # 片段。',
       );
     }
     final existing = await _repository.findClient(clientId);
@@ -124,6 +124,7 @@ class OidcAdminService {
       'http',
       'https',
       'javascript',
+      'vbscript',
       'mailto',
       'tel',
     };

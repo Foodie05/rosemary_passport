@@ -28,7 +28,7 @@ export function useLegalConsent(documents, loading, routeKey) {
     isLegalAccepted: gate.isAccepted,
     currentLegalDocuments: () => currentDocuments.current,
     legalPrompt: <AnimatePresence>{open && <Dialog
-      key="legal-consent"
+      key="legal-consent" className="epass-dialog-compact"
       title="是否接受使用条款与隐私政策？"
       onClose={gate.decline}
       actions={<>
@@ -37,8 +37,8 @@ export function useLegalConsent(documents, loading, routeKey) {
       </>}
     >
       <p className="leading-relaxed text-muted">继续前，请阅读并确认是否接受
-        <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" className="mx-1 font-bold text-ink underline underline-offset-4">《使用条款》</Link>与
-        <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" className="mx-1 font-bold text-ink underline underline-offset-4">《隐私政策》</Link>。
+        <Link to="/legal/terms" target="_blank" rel="noopener noreferrer" className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《使用条款》</Link>与
+        <Link to="/legal/privacy" target="_blank" rel="noopener noreferrer" className="epass-agreement-link font-semibold text-ink underline underline-offset-4">《隐私政策》</Link>。
       </p>
       <p className="mt-3 text-sm text-muted" role="status">{documents?.terms && documents?.privacy
         ? `版本 ${documents.terms.version}/${documents.privacy.version}`

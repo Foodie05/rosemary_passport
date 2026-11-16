@@ -1,10 +1,11 @@
+import 'package:rosemary_ui/rosemary_ui.dart';
 import 'models.dart';
 
 /// Local feedback for new passwords only. The server remains authoritative.
 class RosmPasswordPolicy {
   const RosmPasswordPolicy();
-  static const minLength = 8;
-  static const maxLength = 128;
+  static const minLength = RosemaryPasswordPolicy.minLength;
+  static const maxLength = RosemaryPasswordPolicy.maxLength;
   static const _blocked = {
     '1234567',
     '12345678',
@@ -67,17 +68,10 @@ class RosmPasswordPolicy {
 
   RosmPasswordValidation evaluate(String password) {
     final length = password.runes.length;
-    final lengthValid = length >= minLength && length <= maxLength;
-    final formatValid =
-        RegExp(r'^[\x20-\x7e]*$').hasMatch(password) &&
-        password == password.trim();
-    final compositionValid =
-        [
-          RegExp(r'[a-zA-Z]'),
-          RegExp(r'[0-9]'),
-          RegExp(r'[!-/:-@\[-`{-~]'),
-        ].where((pattern) => pattern.hasMatch(password)).length >=
-        2;
+    final checks = RosemaryPasswordPolicy.check(password);
+    final lengthValid = checks.length;
+    final formatValid = checks.characters;
+    final compositionValid = checks.categories;
     final lower = password.toLowerCase();
     final normalized = lower
         .replaceAll('@', 'a')
@@ -91,9 +85,9 @@ class RosmPasswordPolicy {
     final message = !lengthValid
         ? (length < minLength
               ? '不少于 8 个字符，还需 ${minLength - length} 个。'
-              : '最多 128 个字符，请缩短密码。')
+              : '最多 32 个字符，请缩短密码。')
         : !formatValid
-        ? '请使用英文字母、数字或符号，首尾不能有空格。'
+        ? '请使用英文字母、数字和英文符号，不含空格。'
         : !compositionValid
         ? '字母、数字、符号中至少包含两种。'
         : !uncommon

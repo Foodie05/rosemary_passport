@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { validateTheme, contrastPairs } from '@rosemary-ui/tokens';
+import { execFileSync } from 'node:child_process';
+import { validateTheme, contrastPairs, generateColorRecipe } from '@rosemary-ui/tokens';
 const read = path => readFileSync(new URL(path, import.meta.url));
 const parse = path => JSON.parse(read(path));
 const product = parse('./epass-theme.json');
@@ -28,4 +29,13 @@ test('web and standalone pages share the same generated semantic CSS', () => {
 });
 test('official mother brand asset is unchanged in web and SDK', () => {
   for (const path of ['../../public/brand/rosemary.png','../../../packages/rosm_passport_flutter/assets/rosemary.png']) assert.equal(createHash('sha256').update(read(path)).digest('hex'),manifest.brand.motherLogoSha256);
+});
+
+test('product colors exactly reproduce the canonical HCT recipe', () => {
+  assert.equal(Object.keys(product.themes.light).length, 45);
+  assert.deepEqual(product.themes, generateColorRecipe(product.recipe).themes);
+});
+
+test('Flutter release source and native outline adapter preserve official bytes', () => {
+  execFileSync('python3', [new URL('../../../scripts/check_rosemary_sdk.py', import.meta.url).pathname]);
 });

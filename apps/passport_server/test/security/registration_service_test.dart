@@ -215,7 +215,7 @@ void main() {
       (await service.registerWithEmail(
         email: user.email,
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         emailCode: '123456',
       )).code,
       'registration_email_not_allowed',
@@ -230,7 +230,7 @@ void main() {
       (await service.registerWithEmail(
         email: user.email,
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         emailCode: '123456',
       )).code,
       'email_already_registered',
@@ -243,7 +243,7 @@ void main() {
       (await service.registerWithEmail(
         email: user.email,
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         emailCode: 'wrong',
       )).code,
       'invalid_email_code',
@@ -281,7 +281,7 @@ void main() {
         (await service.registerWithEmail(
           email: user.email,
           nickname: user.nickname,
-          password: 'A secure historical-compatible passphrase',
+          password: 'New-account-passphrase-2026!',
           emailCode: '123456',
           requestIp: '192.0.2.1',
         )).code,
@@ -291,7 +291,7 @@ void main() {
       final result = await service.registerWithEmail(
         email: user.email,
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         emailCode: '123456',
         requestIp: '192.0.2.1',
       );
@@ -349,7 +349,7 @@ void main() {
         (await service.registerWithEmail(
           email: user.email,
           nickname: user.nickname,
-          password: 'A secure historical-compatible passphrase',
+          password: 'New-account-passphrase-2026!',
           registrationHandoff: 'signed-handoff',
         )).code,
         'invalid_registration_handoff',
@@ -360,7 +360,7 @@ void main() {
       final result = await service.registerWithEmail(
         email: user.email,
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         registrationHandoff: 'signed-handoff',
       );
 
@@ -451,7 +451,7 @@ void main() {
       (await disabled.registerWithPhone(
         phoneNumber: '13800000000',
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         verifyCode: '123456',
       )).code,
       'phone_verification_not_configured',
@@ -461,7 +461,7 @@ void main() {
       (await service.registerWithPhone(
         phoneNumber: 'bad',
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         verifyCode: '123456',
       )).code,
       'invalid_phone_number',
@@ -479,7 +479,7 @@ void main() {
       (await service.registerWithPhone(
         phoneNumber: '13800000000',
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         verifyCode: '123456',
       )).code,
       'phone_already_registered',
@@ -502,7 +502,7 @@ void main() {
       (await service.registerWithPhone(
         phoneNumber: '13800000000',
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         verifyCode: 'wrong',
       )).code,
       'invalid_code',
@@ -533,7 +533,7 @@ void main() {
       (await service.registerWithPhone(
         phoneNumber: '13800000000',
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         verifyCode: '123456',
       )).code,
       'register_failed',
@@ -543,7 +543,7 @@ void main() {
       (await service.registerWithPhone(
         phoneNumber: '13800000000',
         nickname: user.nickname,
-        password: 'A secure historical-compatible passphrase',
+        password: 'New-account-passphrase-2026!',
         verifyCode: '123456',
       )).ok,
       isTrue,

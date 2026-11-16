@@ -26,7 +26,7 @@ void main() {
   });
 
   test('accepts a passphrase with two character categories', () {
-    expect(policy.validate('correct horse battery staple!').ok, isTrue);
+    expect(policy.validate('correct-horse-battery-staple!').ok, isTrue);
   });
 
   test('rejects short, repeated, common, and overlong passwords', () {
@@ -41,7 +41,7 @@ void main() {
   });
 
   test('does not reject a passphrase merely for containing a common word', () {
-    expect(policy.validate('my welcome phrase is private!').ok, isTrue);
+    expect(policy.validate('my-welcome-phrase-is-private!').ok, isTrue);
     expect(policy.validate('correct-horse-2026-battery').ok, isTrue);
   });
 }
