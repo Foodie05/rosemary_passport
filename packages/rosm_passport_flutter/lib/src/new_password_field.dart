@@ -11,13 +11,14 @@ class RosmNewPasswordField extends StatefulWidget {
     required this.controller,
     this.label = '设置密码',
     this.enabled = true,
+    this.showLabel = true,
     this.personalInfo = const [],
     this.onChanged,
     this.verification,
   });
   final TextEditingController controller;
   final String label;
-  final bool enabled;
+  final bool enabled, showLabel;
   final List<TextEditingController> personalInfo;
   final ValueChanged<String>? onChanged;
   final Widget? verification;
@@ -48,6 +49,7 @@ class _RosmNewPasswordFieldState extends State<RosmNewPasswordField> {
         children: [
           RosmEpassInput(
             controller: widget.controller,
+            showLabel: widget.showLabel,
             enabled: widget.enabled,
             obscureText: !_visible,
             keyboardType: TextInputType.visiblePassword,

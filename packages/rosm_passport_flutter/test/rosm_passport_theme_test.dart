@@ -108,6 +108,9 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(RosemaryCard), findsNothing);
+        expect(find.text('手机号或邮箱'), findsNothing);
+        expect(find.text('手机号或邮箱地址'), findsOneWidget);
+        expect(find.bySemanticsLabel('手机号或邮箱'), findsWidgets);
         final field = find.byType(EditableText).first;
         final brand = find.text('Rosemary'), heading = find.text('登录');
         expect(tester.getTopLeft(heading).dx, 50);

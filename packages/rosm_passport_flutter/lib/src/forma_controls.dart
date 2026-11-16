@@ -17,6 +17,7 @@ class RosmEpassInput extends StatefulWidget {
     this.enabled = true,
     this.obscureText = false,
     this.readOnly = false,
+    this.showLabel = true,
     this.keyboardType,
     this.onChanged,
     this.onSubmitted,
@@ -31,7 +32,7 @@ class RosmEpassInput extends StatefulWidget {
   final TextEditingController controller;
   final InputDecoration decoration;
   final bool? enabled;
-  final bool obscureText, readOnly;
+  final bool obscureText, readOnly, showLabel;
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged, onSubmitted;
   final FocusNode? focusNode;
@@ -132,7 +133,8 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
         !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);
     final errorText =
         widget.decoration.errorText ?? (emailInvalid ? '邮箱地址格式不正确。' : null);
-    if (hints == null &&
+    if (widget.showLabel &&
+        hints == null &&
         widget.textInputAction == null &&
         widget.decoration.suffixIcon == null &&
         widget.decoration.prefixIcon == null) {
@@ -167,14 +169,16 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          label,
-          style: rosemaryTextStyle(
-            context,
-            'small',
-          ).copyWith(fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
+        if (widget.showLabel) ...[
+          Text(
+            label,
+            style: rosemaryTextStyle(
+              context,
+              'small',
+            ).copyWith(fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+        ],
         Semantics(
           textField: true,
           label: label,
@@ -206,7 +210,9 @@ class _RosmEpassInputState extends State<RosmEpassInput> {
                   'body',
                 ).copyWith(fontSize: 16, height: 1.5),
                 decoration: InputDecoration(
-                  hintText: widget.decoration.hintText,
+                  hintText:
+                      widget.decoration.hintText ??
+                      (widget.showLabel ? null : label),
                   prefixIcon: widget.decoration.prefixIcon == null
                       ? null
                       : SizedBox(

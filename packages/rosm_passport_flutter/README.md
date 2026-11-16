@@ -353,7 +353,7 @@ Native passkey UI is still not bundled. A custom UI with a trusted platform prov
 
 ### Responsive layout corrections in 0.11.3
 
-Narrow windows and portrait sign-in use the canvas directly, with no outer card. Roomy landscape retains the content-sized centered card. Registration, recovery, MFA and consent follow the same rule. Form labels, links, checkbox prose and footer actions use consistent baseline metrics. Authentication fields match the Web layout without decorative leading icons; functional password-visibility controls retain 44px targets. Native editing uses a clipped 8px fill under the official outline.
+Narrow windows and portrait sign-in use the canvas directly, with no outer card. Roomy landscape retains the content-sized centered card. Registration, recovery, MFA and consent follow the same rule. Form labels, links, checkbox prose and footer actions use consistent baseline metrics. Authentication fields have no decorative leading icons. The sign-in, registration, recovery and MFA forms display their prompts inside the field, without a duplicate label row; persistent semantic names and validation remain. Functional password-visibility controls retain 44px targets. Native editing uses a clipped 8px fill under the official outline.
 
 The string-only upstream checkbox label cannot contain independent links. The legal paragraph composes the SDK checkbox with native inline text and keyboard-accessible document links. Font families come from the pinned Rosemary typography instead of inheriting arbitrary host fonts.
 

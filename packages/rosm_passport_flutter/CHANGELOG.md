@@ -1,6 +1,7 @@
 ## 0.11.3 — 2026-11-16
 
 - Match the Web authentication forms by removing decorative leading icons from login, registration, recovery and MFA fields, including new-password fields. Retain functional password-visibility controls.
+- Show authentication labels as in-field hints without a duplicate label row; preserve persistent semantic names for accessibility and field-level validation.
 - Preserve input controllers, autofill, validation, legal acceptance and authentication APIs; include all earlier cumulative updates.
 
 ## 0.11.2 — 2026-11-16
