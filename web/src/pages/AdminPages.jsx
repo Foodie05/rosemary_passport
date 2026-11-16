@@ -89,7 +89,7 @@ const OIDC_SCOPE_OPTIONS = [
   { value: 'phone', label: 'phone', description: '允许应用读取手机号与手机号验证状态。' },
   { value: 'accountRule', label: 'accountRule', description: '允许应用读取账户角色（如 admin/user）。' },
 ];
-const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.11.2/packages/rosm_passport_flutter';
+const FLUTTER_SDK_GITHUB_URL = 'https://github.com/Foodie05/rosemary_passport/tree/v0.11.3/packages/rosm_passport_flutter';
 const DASHBOARD_PERIODS = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
@@ -1418,7 +1418,7 @@ function OidcDocsContent({ discovery, oidcSettings }) {
     '  rosm_passport_flutter:',
     '    git:',
     '      url: https://github.com/Foodie05/rosemary_passport.git',
-    '      ref: v0.11.2',
+    '      ref: v0.11.3',
     '      path: packages/rosm_passport_flutter',
     '```',
     '',
@@ -1734,13 +1734,13 @@ Scopes:
       <div className="surface-panel space-y-6 rounded-panel p-5 sm:p-8">
         <div>
           <h2 id="flutter-dependencies" tabIndex={-1} className="text-lg font-bold text-ink">2. 添加 SDK 依赖</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">v0.11.2 使用官方 Rosemary Forma 1.3.0 Flutter SDK 0.5.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；通过下方固定 Git 标签接入，包含此前版本的累计更新。</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">v0.11.3 使用官方 Rosemary Forma 1.3.0 Flutter SDK 0.5.0，并锁定其提交。需要 Flutter 3.44.8+ 和 Dart 3.12.2+；通过下方固定 Git 标签接入，包含此前版本的累计更新。</p>
         </div>
         <CodeBlock>{`dependencies:
   rosm_passport_flutter:
     git:
       url: https://github.com/Foodie05/rosemary_passport.git
-      ref: v0.11.2
+      ref: v0.11.3
       path: packages/rosm_passport_flutter`}</CodeBlock>
       </div>
 
@@ -1929,7 +1929,7 @@ await passport.signOut();`}</CodeBlock>
           <p>只有 Public 直连模式才使用自定义 scheme，例如 <InlineCode>com.cruos.zion:/oidc/callback</InlineCode>。</p>
           <p>接入方服务器必须校验 <InlineCode>state</InlineCode>、<InlineCode>nonce</InlineCode>、<InlineCode>issuer</InlineCode>、<InlineCode>aud</InlineCode>、过期时间和 redirect URI。</p>
           <p><InlineCode>scope</InlineCode> 包含 <InlineCode>openid</InlineCode> 时 SDK 会携带 <InlineCode>nonce</InlineCode>。</p>
-          <p>升级至 v0.11.2 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
+          <p>升级至 v0.11.3 时，先确认 Flutter 与 Dart 版本符合要求；已有 Rosm 类型名和 OIDC 会话保持兼容。</p>
           <p>忘记密码需要应用侧先完成人机验证，并把 captcha token 交给 <InlineCode>sendPasswordRecoveryCode</InlineCode>。</p>
           <p>生产环境确认 <InlineCode>issuer</InlineCode> 是 HTTPS 公网地址，并且 native bridge、token、userinfo 端点都能访问。</p>
           <p>应用升级或更换 bundle id / package name 时，同步检查自定义 scheme 与回调配置。</p>

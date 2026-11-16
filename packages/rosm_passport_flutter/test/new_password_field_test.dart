@@ -15,6 +15,10 @@ void main() {
       addTearDown(controller.dispose);
       await tester.pumpWidget(_field(controller));
       expect(find.text('8–32 个字符'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).decoration?.prefixIcon,
+        isNull,
+      );
       controller.text = 'orchid';
       await tester.pump();
       expect(

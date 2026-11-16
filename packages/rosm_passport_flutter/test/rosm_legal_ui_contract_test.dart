@@ -24,6 +24,6 @@ void main() {
 
     expect(readme, contains('currentLegalDocuments()'));
     expect(readme, contains('legalAcceptance: legalDocuments.acceptance'));
-    expect(readme, contains('ref: v0.11.2'));
+    expect(readme, contains('ref: v0.11.3'));
   });
 }

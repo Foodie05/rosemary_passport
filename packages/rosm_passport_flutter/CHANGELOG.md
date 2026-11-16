@@ -1,3 +1,8 @@
+## 0.11.3 — 2026-11-16
+
+- Match the Web authentication forms by removing decorative leading icons from login, registration, recovery and MFA fields, including new-password fields. Retain functional password-visibility controls.
+- Preserve input controllers, autofill, validation, legal acceptance and authentication APIs; include all earlier cumulative updates.
+
 ## 0.11.2 — 2026-11-16
 
 - Increase the outer padding of flat portrait/narrow authentication screens from 20px to 50px on all sides; retain scrolling with keyboards and large text.

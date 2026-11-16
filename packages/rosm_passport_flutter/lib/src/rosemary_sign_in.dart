@@ -1093,20 +1093,14 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           RosmEpassInput(
             controller: _passwordEmail,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: '邮箱',
-              prefixIcon: RosmEpassIcon(Icons.mail_outline_rounded),
-            ),
+            decoration: const InputDecoration(labelText: '邮箱'),
           ),
           const SizedBox(height: 12),
           RosmEpassInput(
             controller: _password,
             verification: _fieldFeedback,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '密码',
-              prefixIcon: RosmEpassIcon(Icons.lock_outline_rounded),
-            ),
+            decoration: const InputDecoration(labelText: '密码'),
           ),
           const SizedBox(height: 24),
           RosmEpassButton(
@@ -1147,9 +1141,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 : isEmail
                 ? '邮箱'
                 : '手机号',
-            prefixIcon: RosmEpassIcon(
-              isEmail ? Icons.mail_outline_rounded : Icons.phone_iphone_rounded,
-            ),
           ),
         ),
         if (_sent) ...[
@@ -1157,10 +1148,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           RosmEpassInput(
             controller: _code,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: '验证码',
-              prefixIcon: RosmEpassIcon(Icons.pin_outlined),
-            ),
+            decoration: const InputDecoration(labelText: '验证码'),
             verification: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1249,7 +1237,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 labelText: factor == 'email_code' ? '邮箱验证码' : '手机验证码',
-                prefixIcon: const RosmEpassIcon(Icons.pin_outlined),
               ),
               verification: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1277,10 +1264,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               verification: _fieldFeedback,
               focusNode: _mfaCodeFocus,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '动态验证码',
-                prefixIcon: RosmEpassIcon(Icons.shield_outlined),
-              ),
+              decoration: const InputDecoration(labelText: '动态验证码'),
             ),
           ],
           const SizedBox(height: 22),
@@ -1358,10 +1342,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               controller: _password,
               verification: _fieldFeedback,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '密码',
-                prefixIcon: RosmEpassIcon(Icons.lock_outline_rounded),
-              ),
+              decoration: const InputDecoration(labelText: '密码'),
             )
           else
             RosmEpassInput(
@@ -1374,7 +1355,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
                 labelText: factor == 'authenticator'
                     ? 'Authenticator 动态码'
                     : '验证码',
-                prefixIcon: const RosmEpassIcon(Icons.shield_outlined),
               ),
               verification: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1483,11 +1463,6 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
             readOnly: _registrationHandoff != null,
             decoration: InputDecoration(
               labelText: _registerMethod == 'phone' ? '手机号' : '邮箱',
-              prefixIcon: RosmEpassIcon(
-                _registerMethod == 'phone'
-                    ? Icons.phone_iphone_rounded
-                    : Icons.mail_outline_rounded,
-              ),
             ),
           ),
           if (_registrationHandoff == null) ...[
@@ -1496,10 +1471,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
               controller: _registerCode,
 
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '验证码',
-                prefixIcon: RosmEpassIcon(Icons.pin_outlined),
-              ),
+              decoration: const InputDecoration(labelText: '验证码'),
               verification: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1523,10 +1495,7 @@ class _RosmPassportSignInPageState extends State<RosmPassportSignInPage> {
           const SizedBox(height: 12),
           RosmEpassInput(
             controller: _registerNickname,
-            decoration: const InputDecoration(
-              labelText: '昵称',
-              prefixIcon: RosmEpassIcon(Icons.person_outline_rounded),
-            ),
+            decoration: const InputDecoration(labelText: '昵称'),
           ),
           const SizedBox(height: 12),
           RosmNewPasswordField(

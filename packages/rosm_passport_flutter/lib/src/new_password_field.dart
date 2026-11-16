@@ -58,7 +58,6 @@ class _RosmNewPasswordFieldState extends State<RosmNewPasswordField> {
             decoration: InputDecoration(
               labelText: widget.label,
               hintText: widget.label,
-              prefixIcon: const RosemaryIcon('lock', size: 20),
               suffixIcon: RosmEpassIconAction(
                 tooltip: _visible ? '隐藏密码' : '显示密码',
                 onPressed: widget.enabled
